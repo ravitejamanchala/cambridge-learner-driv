@@ -6,6 +6,8 @@ import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike } from './car.js';
 import { createTest } from './test.js';
 import { createUI, attachDrag } from './ui.js';
+import { createHub } from './hub.js';
+import { createScenario, evaluate } from './course.js';
 
 const T = THREE, $ = id => document.getElementById(id);
 const shadowed = (o) => { o.traverse(c => { if (c.isMesh) c.castShadow = true; }); return o; };
@@ -29,33 +31,29 @@ async function boot() {
   const player = createPlayer(scene); shadowed(player.mesh);
   const ui = createUI(net);
 
-  // routes: build every configured route up front (each takes a few milliseconds)
+  // mock-test routes (built up front) and lesson routes (built on first use)
   const routes = ROUTES.map(R => { const nodes = R.waypoints.map(w => snapWaypoint(net, w)); return { R, nodes, route: buildRoute(net, nodes, { name: R.name }) }; });
-  let sel = 0, route = routes[0].route, nodes = routes[0].nodes;
+  const lessonCache = new Map();
+  const lessonPlan = (l) => { let c = lessonCache.get(l.id); if (!c) { const n = l.waypoints.map(w => snapWaypoint(net, w)); c = { nodes: n, route: buildRoute(net, n, { name: l.title }) }; lessonCache.set(l.id, c); } return c; };
+  let route = routes[0].route, nodes = routes[0].nodes, plan = { kind: 'mock', index: 0 }, scenario = null;
   const test = createTest(net, traffic, player); test.setRoute(route, nodes);
   const startPos = () => { const st = route.steps[0]; const p = along(st.e, Math.min(8, st.e.len / 3), st.dir, laneCentre(st.e, st.dir, 0)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz)); };
-  const miles = r => (r.len / 1609.34).toFixed(1);
-  function renderPicker() {
-    $('routePick').innerHTML = routes.map((r, i) => `<button class="ropt" role="radio" aria-checked="${i === sel}" data-i="${i}">
-      <span class="rn">${r.R.name}</span><span class="rm">${miles(r.route)} mi · ${r.route.instructions.length} instructions</span><span class="rb">${r.R.blurb}</span></button>`).join('');
-    $('routeSummary').textContent = `${routes[sel].R.name}. First: ${route.instructions[0].text}`;
-    $('startBtn').firstChild.textContent = 'Start this route ';
-  }
-  function selectRoute(i) {
-    sel = i; route = routes[i].route; nodes = routes[i].nodes;
+  // load a plan (lesson or mock route) without starting it: car moves to the start so the map previews it
+  function loadPlan(pl) {
+    plan = pl; if (scenario) { scenario.stop(); scenario = null; }
+    const c = pl.kind === 'lesson' ? lessonPlan(pl.lesson) : routes[pl.index];
+    route = buildRoute(net, c.nodes, { name: pl.kind === 'lesson' ? pl.lesson.title : c.R.name }); nodes = c.nodes;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
-    startPos(); player.indicator = null; ui.renderSteps(route, 0); ui.renderFaults(test); renderPicker();
-    $('testState').textContent = 'Not started'; world.updateChunks(player.x, player.z, 4);
-    // bring the start button into view inside the panel (it can be below the fold on phones)
-    const ov = $('startOv'), btn = $('startBtn');
-    ov.scrollTo({ top: Math.max(0, btn.offsetTop + btn.offsetHeight - ov.clientHeight + 40), behavior: 'smooth' });
+    startPos(); player.indicator = null; ui.renderSteps(route, 0); ui.renderFaults(test);
+    $('testState').textContent = pl.kind === 'lesson' ? 'Lesson · not started' : 'Not started';
+    world.updateChunks(player.x, player.z, 4);
   }
-  $('routePick').addEventListener('click', e => { const b = e.target.closest('.ropt'); if (b) selectRoute(+b.dataset.i); });
+  const hub = createHub({ routes, lessonRoute: (l) => lessonPlan(l).route, onPick: loadPlan, onStart: (pl) => { loadPlan(pl); begin(); } });
   startPos();
   traffic.init(player.x, player.z, WORLD.npcColours);
   world.updateChunks(player.x, player.z, 99);
-  ui.renderSteps(route, 0); ui.renderFaults(test); renderPicker();
-  $('loadOv').hidden = true; $('startOv').hidden = false;
+  ui.renderSteps(route, 0); ui.renderFaults(test);
+  $('loadOv').hidden = true; hub.open();
 
   loadCarModel(CAR.url).then(m => { player.setModel(shadowed(m)); }).catch(err => console.warn('Car model did not load; using the placeholder car.', err));
 
@@ -90,22 +88,44 @@ async function boot() {
   }
 
   // test flow
+  const banner = (text, kind) => { const el = $('banner'); el.hidden = !text; if (text) { el.textContent = text; el.className = 'banner ' + (kind || ''); } };
   test.onFault = () => ui.renderFaults(test);
   test.onFinish = () => {
-    const pass = test.passed(), v = $('verdict');
-    v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
+    if (scenario) scenario.stop();
     $('rD').textContent = test.D; $('rS').textContent = test.S;
-    $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
-      : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
-    $('endOv').hidden = false; $('testState').textContent = pass ? 'Passed' : 'Failed';
+    const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
+    if (plan.kind === 'lesson') {
+      const res = evaluate(plan.lesson, test, scenario);
+      hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S });
+      $('endTag').textContent = 'Lesson complete';
+      v.textContent = res.pass ? 'Lesson passed' : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
+      $('rNote').textContent = plan.lesson.title;
+      reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
+      const nl = hub.nextLesson(plan.lesson.id); next.hidden = !(res.pass && nl); if (nl) next.dataset.l = nl.id;
+      $('testState').textContent = res.pass ? 'Lesson passed' : 'Lesson not passed';
+    } else {
+      const pass = test.passed();
+      hub.Profiles.recordMock(routes[plan.index].R.id, { pass, D: test.D, S: test.S });
+      $('endTag').textContent = 'Mock test complete';
+      v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
+      $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+        : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
+      reasons.innerHTML = ''; next.hidden = true;
+      $('testState').textContent = pass ? 'Passed' : 'Failed';
+    }
+    $('endOv').hidden = false;
   };
-  $('routeBtn').addEventListener('click', () => { test.running = false; $('endOv').hidden = true; $('startOv').hidden = false; });
-  const start = () => {
-    route = buildRoute(net, nodes, { name: routes[sel].R.name }); routes[sel].route = route; test.setRoute(route, nodes); test.wpIndex = 1; test.reset(); startPos();
-    player.indicator = null; sigBtns(); ui.renderFaults(test); ui.renderSteps(route, 0); test.running = true;
+  function begin() {
+    loadPlan(plan);
+    if (plan.kind === 'lesson') scenario = createScenario(plan.lesson, { net, traffic, test, player, ui: { banner } });
+    sigBtns(); test.running = true; banner(null);
+    $('testState').textContent = plan.kind === 'lesson' ? 'Lesson · ' + plan.lesson.title : 'In progress';
     $('startOv').hidden = true; $('endOv').hidden = true; lastStep = -1;
-  };
-  $('startBtn').addEventListener('click', start); $('againBtn').addEventListener('click', start); $('restartBtn').addEventListener('click', start);
+  }
+  $('routeBtn').addEventListener('click', () => { test.running = false; if (scenario) { scenario.stop(); scenario = null; } banner(null); hub.open(); });
+  $('hubBtn').addEventListener('click', () => { banner(null); hub.open(); });
+  $('nextBtn').addEventListener('click', () => { hub.selectLesson($('nextBtn').dataset.l); hub.open(); });
+  $('againBtn').addEventListener('click', begin); $('restartBtn').addEventListener('click', begin);
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3)); setCam(0);
   $('backBtn').addEventListener('click', () => {
     const r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
@@ -160,6 +180,7 @@ async function boot() {
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1;
   function tick(dt) {
     traffic.update(dt, player);
+    if (test.running && scenario) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
       player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 ? 'off' : 'road');
@@ -171,6 +192,7 @@ async function boot() {
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     traffic.update(dt, player);
+    if (test.running && scenario) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
       player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 ? 'off' : 'road');

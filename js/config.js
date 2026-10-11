@@ -28,7 +28,7 @@ export const ROUTES = [
     waypoints: [wp(52.1984, 0.1236, 'Lensfield Road'), wp(52.2135, 0.1356, 'Elizabeth Way'), wp(52.2142, 0.1265, 'Chesterton Road')] },
   { id: 'brooklands', name: 'Hills Road and Trumpington', blurb: 'Right and left turns at busy lights, cycle lanes',
     waypoints: [wp(52.1975, 0.1305, 'Hills Road'), wp(52.1828, 0.1222, 'Long Road')] },
-  { id: 'west', name: 'West Cambridge', blurb: 'Madingley Road at 40 mph, then the cycle lanes on Huntingdon Road',
+  { id: 'west', name: 'West Cambridge', blurb: 'Madingley Road, left turns at lights, then the cycle lanes on Huntingdon Road',
     waypoints: [wp(52.2125, 0.0950, 'Madingley Road'), wp(52.2190, 0.1000, 'Huntingdon Road')] },
   { id: 'mill', name: 'Mill Road and Cherry Hinton Road', blurb: 'Narrow 20 mph streets, two right turns',
     waypoints: [wp(52.1990, 0.1360, 'Mill Road'), wp(52.1940, 0.1460, 'Cherry Hinton Road'), wp(52.1880, 0.1380, 'Hills Road')] },

@@ -107,6 +107,7 @@ export function createPlayer(scene) {
   p.signal = (d) => { p.indicator = p.indicator === d ? null : d; p.indTh = p.th; };
   // input: {throttle 0..1, brake 0..1, steer -1..1 (left +)}
   p.update = (dt, inp, surface) => {
+    p.inp = inp;
     const H = HANDLING, st = clamp(inp.steer, -1, 1) * H.steerSensitivity;
     const rate = Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
     const delta = p.steer * H.maxSteer / (1 + Math.abs(p.v) * 0.075); p.delta = delta;

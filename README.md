@@ -2,9 +2,17 @@
 
 A 3D mock UK driving test that runs in the browser on Cambridge's real road network.
 
-Pick a test route, follow the examiner's instructions, and get marked like a real test: 15 or fewer driving faults and no serious faults is a pass.
+Learn with a course of short lessons, then take mock tests on full routes. Each learner gets a profile that tracks which lessons they have passed and their mock test results.
 
 ## What's in it
+
+- **Course.** 13 lessons in four units, each on a real Cambridge road with a goal, Highway Code rule and its own pass check:
+  - *Getting started:* moving off and stopping, speed limits (Histon Road 30 → 20), emergency stop
+  - *Junctions and traffic lights:* turning left, turning right, traffic lights, stopping at amber (the light is scripted to change as you approach)
+  - *Roundabouts:* mini-roundabout, 1st exit (left), 2nd exit (ahead), 3rd exit (right) at the Perne Road roundabout
+  - *Sharing the road:* zebra crossings (a pedestrian steps out), passing cyclists (1.5 m rule)
+- **Mock tests.** Five full routes marked like the real test: 15 or fewer driving faults and no serious faults is a pass.
+- **Learner profiles.** Name-based profiles stored in the browser (`localStorage`). `js/profile.js` is the single place to swap in a backend such as Supabase or Firebase for real accounts.
 
 - **Real roads.** 548 km of Cambridge streets from OpenStreetMap, with real speed limits, traffic lights, zebra crossings, roundabouts, one-way streets and cycle lanes.
 - **Five test routes.** Examiner instructions are generated from the road layout ("Get into the left-hand lane. At the roundabout, take the 1st exit onto Chesterton Road."). Going off the route triggers a re-route.
@@ -28,6 +36,9 @@ python3 -m http.server 8000
 
 | Path | What it does |
 | --- | --- |
+| `js/course.js` | Units, lessons, scripted events (amber, zebra, cyclist, emergency stop) and pass checks. Add a lesson here. |
+| `js/hub.js` | Profile picker, course list, mock test list |
+| `js/profile.js` | Learner profiles and progress (localStorage) |
 | `js/config.js` | Routes, car model, handling, traffic numbers, colours. Start here to add a route. |
 | `js/net.js` | Road network: lookups, lanes, routing, instruction generation |
 | `js/world.js` | Road surfaces, markings, signals, chunk loading, sun and shadows |

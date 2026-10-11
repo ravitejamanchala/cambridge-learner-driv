@@ -7,8 +7,17 @@ const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a
 
 export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
   let clock = 0;
+  // lessons can script a junction: { group, t0 } holds `group` on green until t0, then runs amber, red, red-and-amber, green
+  const overrides = new Map();
   // UK sequence: red, red+amber, green, amber, red. Junctions alternate two groups; stand-alone crossings get a pedestrian phase.
   function lightState(st) {
+    const ov = overrides.get(st.cluster);
+    if (ov) {
+      const el = clock - ov.t0, mine = st.group === ov.group || st.single;
+      if (el < 0) return mine ? 'G' : 'R';
+      if (el < 30) { if (!mine) return 'R'; return el < 3 ? 'A' : el < 11 ? 'R' : el < 13 ? 'RA' : 'G'; }
+      overrides.delete(st.cluster);
+    }
     const ph = ((clock + st.offset) % 32 + 32) % 32;
     if (st.single) { if (ph < 20) return 'G'; if (ph < 23) return 'A'; if (ph < 30) return 'R'; return 'RA'; }
     if (st.group === 0) { if (ph < 12) return 'G'; if (ph < 15) return 'A'; if (ph < 30) return 'R'; return 'RA'; }
@@ -170,12 +179,18 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
   function update(dt, pl) {
     clock += dt; player = pl;
     for (const a of all) {
-      if (!a.alive || Math.hypot(a.x - pl.x, a.z - pl.z) > TRAFFIC.despawn) { if (!spawn(a, pl.x, pl.z, false)) continue; }
+      if (a.pinned > 0) a.pinned -= dt;
+      else if (!a.alive || Math.hypot(a.x - pl.x, a.z - pl.z) > TRAFFIC.despawn) { if (!spawn(a, pl.x, pl.z, false)) continue; }
       updateAgent(a, dt);
       a.mesh.position.set(a.x, 0, a.z); a.mesh.rotation.y = a.th;
       if (a.kind === 'bike') { const u = a.mesh.userData; u.spin = (u.spin || 0) + a.v * dt / 0.34; for (const wh of u.wheels) wh.rotation.x = -u.spin; u.crank.rotation.x = -u.spin * 0.5; }
     }
     updatePeds(dt, pl.x, pl.z);
   }
-  return { lightState, update, init, cars, bikes, get clock() { return clock; } };
+  // put a cyclist at a given spot (used by lessons)
+  function placeBike(b, e, dir, s, speed) {
+    Object.assign(b, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: speed });
+    const p = trackPoint(b); b.x = p.x; b.z = p.z; b.th = Math.atan2(-p.tx, -p.tz); b.next = chooseNext(b); b.mesh.visible = true; b.pinned = 60;
+  }
+  return { lightState, update, init, cars, bikes, overrides, placeBike, get clock() { return clock; } };
 }
