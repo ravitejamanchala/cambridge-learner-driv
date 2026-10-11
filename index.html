@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A 3D mock UK driving test on Cambridge's real OpenStreetMap road network.">
+<title>Cambridge Learner Drive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: asymmetrical bento. A large 3D drive tile on the left, a stacked instrument column on the right, coaching tiles beneath. Double-bezel tiles throughout. */
+:root{
+  --bg:#e9ece8;
+  --shell:rgba(22,38,29,.05);
+  --ring:rgba(22,38,29,.075);
+  --core:#fbfcfa;
+  --hl:rgba(255,255,255,.9);
+  --ink:#121713;
+  --muted:#58635b;
+  --line:rgba(22,38,29,.09);
+  --accent:#0d6b45;          /* UK primary-route sign green */
+  --accent-soft:rgba(13,107,69,.1);
+  --accent-ink:#ffffff;
+  --warn:#a86b0c;
+  --bad:#c4232c;              /* L-plate red */
+  --bad-soft:rgba(196,35,44,.1);
+  --map-bg:#e4e7df; --map-pave:#cfd2c8; --map-road:#ffffff; --map-park:#bfd3a8; --map-river:#9cc0d0; --map-label:#5b665e;
+  --font-display:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-body:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --spring:cubic-bezier(.32,.72,0,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0e0c; --shell:rgba(255,255,255,.035); --ring:rgba(255,255,255,.075); --core:#131815; --hl:rgba(255,255,255,.06);
+    --ink:#edf1ed; --muted:#9aa59d; --line:rgba(255,255,255,.08);
+    --accent:#45c28c; --accent-soft:rgba(69,194,140,.13); --accent-ink:#06130d;
+    --warn:#e2a640; --bad:#ff5d63; --bad-soft:rgba(255,93,99,.12);
+    --map-bg:#171d19; --map-pave:#252d28; --map-road:#3a443e; --map-park:#24392a; --map-river:#24404c; --map-label:#8f9b93;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0e0c; --shell:rgba(255,255,255,.035); --ring:rgba(255,255,255,.075); --core:#131815; --hl:rgba(255,255,255,.06);
+  --ink:#edf1ed; --muted:#9aa59d; --line:rgba(255,255,255,.08);
+  --accent:#45c28c; --accent-soft:rgba(69,194,140,.13); --accent-ink:#06130d;
+  --warn:#e2a640; --bad:#ff5d63; --bad-soft:rgba(255,93,99,.12);
+  --map-bg:#171d19; --map-pave:#252d28; --map-road:#3a443e; --map-park:#24392a; --map-river:#24404c; --map-label:#8f9b93;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.page{max-width:1320px;margin:0 auto;padding-inline:clamp(16px,3vw,40px);padding-block:clamp(28px,5vw,64px) 56px;display:flex;flex-direction:column;gap:clamp(22px,3vw,36px)}
+.top{display:flex;flex-direction:column;gap:14px;max-width:64ch}
+.eyebrow{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;border-radius:999px;padding:5px 12px;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--muted);background:var(--shell);box-shadow:inset 0 0 0 1px var(--ring)}
+.eyebrow i{width:6px;height:6px;border-radius:50%;background:var(--accent);display:block}
+h1{font-family:var(--font-display);font-size:clamp(36px,5.6vw,66px);line-height:.96;letter-spacing:-.04em;font-weight:600;margin:0;text-wrap:balance}
+.lede{margin:0;color:var(--muted);font-size:16px;line-height:1.55;max-width:60ch}
+
+.bento{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+.tile{background:var(--shell);box-shadow:inset 0 0 0 1px var(--ring);border-radius:30px;padding:6px;min-width:0;animation:rise .9s var(--spring) both}
+.tile:nth-child(2){animation-delay:.05s}.tile:nth-child(3){animation-delay:.1s}.tile:nth-child(4){animation-delay:.15s}.tile:nth-child(5){animation-delay:.2s}.tile:nth-child(6){animation-delay:.25s}.tile:nth-child(7){animation-delay:.3s}
+@keyframes rise{from{transform:translateY(14px);opacity:.35}to{transform:none;opacity:1}}
+.core{background:var(--core);border-radius:24px;height:100%;box-shadow:inset 0 1px 0 var(--hl),0 1px 2px rgba(10,30,20,.03),0 22px 44px -28px rgba(10,30,20,.22);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0;position:relative;overflow:hidden}
+.label{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.label b{font-weight:600;color:var(--ink);letter-spacing:.08em}
+
+.t-drive{grid-column:1/9;grid-row:1/4;min-height:660px}
+.t-speed{grid-column:9/13;grid-row:1}
+.t-next{grid-column:9/13;grid-row:2}
+.t-map{grid-column:9/13;grid-row:3}
+.t-faults{grid-column:1/6}
+.t-tip{grid-column:6/10}
+.t-keys{grid-column:10/13}
+@media (max-width:1079px){
+  .bento{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .t-drive{grid-column:1/-1;grid-row:auto;min-height:540px}
+  .t-speed{grid-column:1/3;grid-row:auto}.t-next{grid-column:3/7;grid-row:auto}
+  .t-map{grid-column:1/4;grid-row:auto}.t-faults{grid-column:4/7}
+  .t-tip{grid-column:1/4}.t-keys{grid-column:4/7}
+}
+@media (max-width:699px){
+  .bento{grid-template-columns:minmax(0,1fr);gap:12px}
+  .bento>.tile{grid-column:1/-1!important}
+  .t-drive{min-height:0;height:clamp(440px,70svh,640px)}
+  .tile{border-radius:26px}.core{border-radius:20px;padding:18px}
+}
+
+/* drive tile */
+.t-drive .core{padding:0;background:#cdd9e1}
+#stage{position:absolute;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;pointer-events:none;z-index:2}
+.glass{background:rgba(9,14,11,.76);color:#f1f5f2;border-radius:18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 10px 30px -14px rgba(0,0,0,.5)}
+.hud-next{display:flex;align-items:center;gap:12px;padding:9px 14px 9px 10px;min-width:0;max-width:340px}
+.hud-next .ico{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.1);display:grid;place-items:center;flex:none}
+.hud-next .ico svg{width:22px;height:22px}
+.hud-next .tx{min-width:0;display:flex;flex-direction:column}
+.hud-next .tx strong{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-next .tx span{font-size:12px;color:rgba(241,245,242,.68);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-right{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 14px;flex:none}
+.hud-spd{font-family:var(--font-mono);font-weight:600;font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.hud-spd small{font-size:10px;letter-spacing:.12em;color:rgba(241,245,242,.6);margin-left:3px}
+.roundel{width:38px;height:38px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 5px #d2232a;display:grid;place-items:center;color:#111;font-weight:700;font-size:14px;font-family:var(--font-body)}
+.roundel.over{animation:pulse 1s var(--spring) infinite}
+@keyframes pulse{50%{transform:scale(1.1)}}
+.hud-sig{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;gap:56px;pointer-events:none;z-index:2}
+.hud-sig svg{width:30px;height:30px;color:rgba(255,255,255,.18);filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));transition:color .12s}
+.hud-sig svg.on{color:#ffb21a}
+.hud-road{position:absolute;left:12px;bottom:12px;padding:6px 12px;font-size:12px;font-weight:500;z-index:2;pointer-events:none}
+@media (pointer:coarse){.hud-road{display:none}}
+
+.touch{position:absolute;left:12px;right:12px;bottom:12px;display:none;justify-content:space-between;align-items:flex-end;gap:12px;z-index:3;pointer-events:none}
+@media (pointer:coarse),(max-width:699px){.touch{display:flex}.hud-road{display:none}}
+.touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
+.touch .col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.tb{width:66px;height:66px;border-radius:50%;border:0;background:rgba(9,14,11,.6);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);display:grid;place-items:center;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .35s var(--spring),background .2s}
+.tb svg{width:26px;height:26px}
+.tb.ped{border-radius:20px;width:62px}
+.tb.gas{height:96px}
+.tb.sm{width:46px;height:46px}
+.tb.sm svg{width:20px;height:20px}
+.tb.on{background:rgba(255,255,255,.9);color:#0b0f0c;transform:scale(.96)}
+.tb.sig-on{background:#ffb21a;color:#1a1200}
+
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:linear-gradient(to top,rgba(7,11,9,.86),rgba(7,11,9,.42));z-index:5}
+.ocard{width:min(460px,100%);border-radius:28px;padding:6px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.ocore{border-radius:22px;background:rgba(14,19,16,.92);color:#eef3ef;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.ocore h2{margin:0;font-size:26px;letter-spacing:-.03em;font-weight:600;line-height:1.05;text-wrap:balance}
+.ocore p{margin:0;color:rgba(238,243,239,.72);font-size:14px;line-height:1.55}
+.ocore .tag{align-self:flex-start;font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:rgba(238,243,239,.75)}
+.ocore ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;color:rgba(238,243,239,.8)}
+.ocore li{display:flex;gap:10px}
+.ocore li span{font-family:var(--font-mono);color:#7fe0b2;flex:none}
+.res{display:flex;gap:10px}
+.res div{flex:1;border-radius:16px;background:rgba(255,255,255,.06);padding:12px 14px;display:flex;flex-direction:column}
+.res b{font-family:var(--font-mono);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.res span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(238,243,239,.6)}
+.verdict.pass{color:#6fe0ac}.verdict.fail{color:#ff8a8e}
+
+.btn{display:inline-flex;align-items:center;gap:14px;padding:7px 7px 7px 22px;border-radius:999px;border:0;background:#45c28c;color:#05120c;font:600 15px/1 var(--font-body);min-height:50px;cursor:pointer;align-self:flex-start;transition:transform .55s var(--spring),background .3s}
+.btn .ic{width:36px;height:36px;border-radius:50%;background:rgba(5,18,12,.12);display:grid;place-items:center;transition:transform .55s var(--spring)}
+.btn .ic svg{width:16px;height:16px}
+.btn:hover .ic{transform:translate(2px,-1px) scale(1.06)}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible,.chip:focus-visible,.tb:focus-visible{outline:2px solid #45c28c;outline-offset:3px}
+
+/* speed tile */
+.spd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.spd-num{font-family:var(--font-mono);font-size:64px;line-height:.85;font-weight:600;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.spd-num small{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:500;margin-left:6px}
+.spd .roundel{width:56px;height:56px;font-size:20px;box-shadow:inset 0 0 0 7px #d2232a}
+.bar{height:8px;border-radius:99px;background:var(--line);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;width:0;border-radius:99px;background:var(--accent);transition:width .2s var(--spring),background .2s}
+.bar i.over{background:var(--bad)}
+.bar em{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.5;left:75%;transition:left .4s var(--spring)}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+
+/* next tile */
+.next-txt{font-size:17px;line-height:1.38;letter-spacing:-.01em;font-weight:500;margin:0;text-wrap:pretty;min-height:3.9em}
+.next-meta{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dist{font-family:var(--font-mono);font-size:13px;color:var(--accent);background:var(--accent-soft);padding:5px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
+.dots{display:flex;gap:5px}
+.dots i{width:14px;height:5px;border-radius:9px;background:var(--line);display:block;transition:background .3s,width .5s var(--spring)}
+.dots i.done{background:var(--accent);opacity:.45}
+.dots i.cur{background:var(--accent);width:24px}
+
+/* in-view route map (top-left of the drive view) */
+.hud-left{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}
+.hud-map{padding:5px;border-radius:20px;flex:none}
+#mini{width:184px;height:184px;border-radius:15px;display:block;background:var(--map-bg)}
+@media (max-width:699px){.hud-sig{top:236px}.hud-left{flex-direction:column;gap:8px}.hud-map{padding:4px;border-radius:18px}#mini{width:124px;height:124px;border-radius:14px}}
+/* route steps tile */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.steps li{display:flex;gap:12px;align-items:baseline;padding:8px 10px;border-radius:12px;font-size:13.5px;color:var(--muted);transition:background .4s var(--spring),color .4s var(--spring)}
+.steps li b{font:600 11.5px/1 var(--font-mono);width:18px;flex:none}
+.steps li.done{opacity:.55}
+.steps li.cur{background:var(--accent-soft);color:var(--ink);font-weight:500}
+.steps li.cur b{color:var(--accent)}
+
+/* faults */
+.counts{display:flex;gap:10px}
+.cnt{flex:1;border-radius:16px;background:var(--shell);box-shadow:inset 0 0 0 1px var(--ring);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.cnt b{font-family:var(--font-mono);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.cnt b small{font-size:13px;color:var(--muted);font-weight:500}
+.cnt span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cnt.s b{color:var(--bad)}
+.flist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:216px;overflow:auto}
+.flist li{display:flex;gap:12px;align-items:flex-start;padding:10px 2px;border-top:1px solid var(--line)}
+.flist li:first-child{border-top:0}
+.badge{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font:600 12px/1 var(--font-mono);background:var(--accent-soft);color:var(--accent)}
+.badge.s{background:var(--bad-soft);color:var(--bad)}
+.flist .fx{min-width:0;display:flex;flex-direction:column}
+.flist .fx strong{font-size:13px;font-weight:600}
+.flist .fx span{font-size:13px;color:var(--muted)}
+.flist .empty{color:var(--muted);font-size:13.5px;border:0}
+
+/* tip */
+.rule{display:flex;align-items:baseline;gap:10px}
+.rule b{font-family:var(--font-mono);font-size:13px;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:999px;font-weight:600}
+.rule span{font-size:13px;color:var(--muted)}
+.tip-txt{margin:0;font-size:15px;line-height:1.55;max-width:52ch}
+
+/* keys */
+.keys{display:grid;grid-template-columns:auto 1fr;gap:9px 12px;align-items:center;font-size:13.5px;margin:0}
+.keys dt{display:flex;gap:4px}
+.keys dd{margin:0;color:var(--muted)}
+kbd{font:600 11.5px/1 var(--font-mono);min-width:26px;height:26px;padding:0 7px;border-radius:8px;display:inline-grid;place-items:center;background:var(--shell);box-shadow:inset 0 0 0 1px var(--ring),inset 0 -2px 0 var(--line);color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.chip{border:0;border-radius:999px;padding:10px 16px;min-height:44px;font:500 13px/1 var(--font-body);background:var(--shell);color:var(--ink);box-shadow:inset 0 0 0 1px var(--ring);cursor:pointer;transition:transform .5s var(--spring),background .25s}
+.chip:hover{background:var(--accent-soft)}
+.chip:active{transform:scale(.97)}
+
+.foot{font-size:12.5px;color:var(--muted);max-width:80ch;margin:0;line-height:1.55}
+.foot a{color:var(--accent);text-underline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:0ms!important}}
+
+.overlay{display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.ocard{margin:auto;flex:none}
+.ocore p.small{font-size:12.5px}
+@media (max-width:699px){
+  .overlay{padding:12px}
+  .ocore{padding:16px;gap:10px}
+  .ocore h2{font-size:20px}
+  .ropt{padding:9px 12px}
+  .ropt .rb,.ocore p.small{display:none}
+  .ropt .rm{grid-column:1/-1}
+}
+.routes{display:flex;flex-direction:column;gap:6px}
+.ropt{display:grid;grid-template-columns:1fr auto;gap:2px 12px;text-align:left;border:0;border-radius:16px;padding:11px 14px;background:rgba(255,255,255,.05);color:#eef3ef;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);cursor:pointer;font-family:var(--font-body);transition:background .3s var(--spring),box-shadow .3s var(--spring)}
+.ropt:hover{background:rgba(255,255,255,.09)}
+.ropt[aria-checked="true"]{background:rgba(69,194,140,.16);box-shadow:inset 0 0 0 1.5px #45c28c}
+.ropt:focus-visible{outline:2px solid #45c28c;outline-offset:2px}
+.ropt .rn{font-weight:600;font-size:14px}
+.ropt .rm{font:500 11.5px/1.4 var(--font-mono);color:rgba(238,243,239,.6);white-space:nowrap}
+.ropt .rb{grid-column:1/-1;font-size:12.5px;color:rgba(238,243,239,.66)}
+.tl{display:flex;flex-direction:column;gap:3px;padding:4px 5px;border-radius:9px;background:#0b0e0c;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.tl i{width:9px;height:9px;border-radius:50%;background:#2a2d2b;display:block}
+.tl[data-s="R"] i:nth-child(1),.tl[data-s="RA"] i:nth-child(1){background:#ff3b30;box-shadow:0 0 8px #ff3b30}
+.tl[data-s="A"] i:nth-child(2),.tl[data-s="RA"] i:nth-child(2){background:#ffb21a;box-shadow:0 0 8px #ffb21a}
+.tl[data-s="G"] i:nth-child(3){background:#2fe07a;box-shadow:0 0 8px #2fe07a}
+.hud-map{pointer-events:auto;position:relative}
+#mini{touch-action:none;cursor:grab}
+#mini.dragging{cursor:grabbing}
+.recentre{border:0;border-radius:999px;padding:7px 12px;min-height:32px;font:600 11.5px/1 var(--font-body);letter-spacing:.02em;background:rgba(255,255,255,.92);color:#0b0f0c;box-shadow:0 6px 18px -8px rgba(0,0,0,.5);cursor:pointer;transition:transform .45s var(--spring)}
+.recentre:active{transform:scale(.96)}
+.recentre:focus-visible{outline:2px solid #45c28c;outline-offset:2px}
+.hud-map .recentre{position:absolute;right:10px;top:10px;padding:6px 10px;min-height:28px;font-size:11px}
+.recentre.cam{position:absolute;right:12px;top:76px;z-index:3;min-height:40px;padding:10px 16px;font-size:13px}
+.ocore h2.load{display:flex;align-items:center;gap:12px;font-size:22px}
+.ocore h2.load i{width:10px;height:10px;border-radius:50%;background:#45c28c;flex:none;animation:pulse 1.1s var(--spring) infinite}
+.overlay#loadOv{background:linear-gradient(to top,rgba(7,11,9,.92),rgba(7,11,9,.7))}
+</style>
+<style>html,body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="top">
+    <span class="eyebrow"><i></i>UK learner practice · Cambridge</span>
+    <h1>Cambridge Learner Drive</h1>
+    <p class="lede">A mock driving test on Cambridge's real road network. Every road, speed limit, traffic light, zebra crossing and roundabout comes from OpenStreetMap. Follow the examiner, keep left, hold the limit and signal before you turn.</p>
+  </header>
+
+  <main class="bento">
+    <section class="tile t-drive" aria-label="3D driving view">
+      <div class="core">
+        <div id="stage"></div>
+        <div class="hud">
+          <div class="hud-left">
+            <div class="glass hud-map"><canvas id="mini" aria-label="Route map, heading up. Drag to pan, scroll or pinch to zoom."></canvas><button class="recentre" id="mapRecentre" hidden>Recentre</button></div>
+            <div class="glass hud-next">
+              <div class="ico" id="hudIco"></div>
+              <div class="tx"><strong id="hudNext">Loading route</strong><span id="hudDist">Press start</span></div>
+            </div>
+          </div>
+          <div class="glass hud-right">
+            <div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div>
+            <div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div>
+            <div class="roundel" id="hudLimit">30</div>
+          </div>
+        </div>
+        <div class="hud-sig" aria-hidden="true">
+          <svg id="sigL" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4 2 12l8 8v-5h12V9H10z"/></svg>
+          <svg id="sigR" viewBox="0 0 24 24" fill="currentColor"><path d="M14 4l8 8-8 8v-5H2V9h12z"/></svg>
+        </div>
+        <div class="glass hud-road" id="hudRoad">Lensfield Road</div>
+        <button class="recentre cam" id="camRecentre" hidden>Back to car</button>
+        <div class="touch" aria-label="Touch controls">
+          <div class="grp">
+            <div class="col">
+              <button class="tb sm" data-sig="L" aria-label="Signal left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 6 4 12l6 6M4 12h16"/></svg></button>
+              <button class="tb" data-k="left" aria-label="Steer left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5 8 12l7 7"/></svg></button>
+            </div>
+            <div class="col">
+              <button class="tb sm" data-sig="R" aria-label="Signal right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 6l6 6-6 6M20 12H4"/></svg></button>
+              <button class="tb" data-k="right" aria-label="Steer right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+          <div class="grp">
+            <button class="tb ped" data-k="down" aria-label="Brake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="8" width="14" height="8" rx="2"/></svg></button>
+            <button class="tb ped gas" data-k="up" aria-label="Accelerate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="overlay" id="loadOv">
+          <div class="ocard"><div class="ocore">
+            <span class="tag">Preparing the test</span>
+            <h2 class="load"><i></i><span id="loadMsg">Loading…</span></h2>
+            <p>548 km of Cambridge roads, built in your browser.</p>
+            <p id="loadErr" hidden>Reload the page to try again.</p>
+          </div></div>
+        </div>
+        <div class="overlay" id="startOv" hidden>
+          <div class="ocard"><div class="ocore">
+            <span class="tag">Mock driving test</span>
+            <h2>Choose a test route</h2>
+            <div class="routes" id="routePick" role="radiogroup" aria-label="Test routes"></div>
+            <p id="routeSummary"></p>
+            <p class="small">Marked the way an examiner would: 15 or fewer driving faults and no serious faults is a pass.</p>
+            <button class="btn" id="startBtn">Start the test <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12 12 4M6 4h6v6"/></svg></span></button>
+          </div></div>
+        </div>
+        <div class="overlay" id="endOv" hidden>
+          <div class="ocard"><div class="ocore">
+            <span class="tag">Test complete</span>
+            <h2 class="verdict" id="verdict">Pass</h2>
+            <div class="res"><div><b id="rD">0</b><span>Driving faults</span></div><div><b id="rS">0</b><span>Serious faults</span></div></div>
+            <p id="rNote"></p>
+            <button class="btn" id="againBtn">Drive the route again <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12 12 4M6 4h6v6"/></svg></span></button>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tile t-speed" aria-label="Speed">
+      <div class="core">
+        <div class="label">Speed <b id="spdRoad">Lensfield Road</b></div>
+        <div class="spd">
+          <div class="spd-num"><span id="spd">0</span><small>MPH</small></div>
+          <div class="roundel" id="limitBig">30</div>
+        </div>
+        <div class="bar"><i id="spdBar"></i><em id="spdMark"></em></div>
+        <p class="note" id="limitNote">Speed limits come from OpenStreetMap.</p>
+      </div>
+    </section>
+
+    <section class="tile t-next" aria-label="Next instruction">
+      <div class="core">
+        <div class="label">Examiner <b id="stepLbl">Step 1</b></div>
+        <p class="next-txt" id="nextTxt">Loading the route.</p>
+        <div class="next-meta"><span class="dist" id="nextDist">–</span><div class="dots" id="dots"></div></div>
+      </div>
+    </section>
+
+    <section class="tile t-map" aria-label="Test route instructions">
+      <div class="core">
+        <div class="label">Test route <b id="routeLbl">–</b></div>
+        <ol class="steps" id="steps"></ol>
+      </div>
+    </section>
+
+    <section class="tile t-faults" aria-label="Faults">
+      <div class="core">
+        <div class="label">Examiner's marking sheet <b id="testState">Not started</b></div>
+        <div class="counts">
+          <div class="cnt"><b><span id="dCount">0</span><small> / 15</small></b><span>Driving faults</span></div>
+          <div class="cnt s"><b id="sCount">0</b><span>Serious faults</span></div>
+        </div>
+        <ul class="flist" id="flist"><li class="empty">No faults yet. Keep left, watch your speed and signal before turning.</li></ul>
+      </div>
+    </section>
+
+    <section class="tile t-tip" aria-label="Highway Code tip">
+      <div class="core">
+        <div class="label">Highway Code <b id="tipCtx">Normal driving</b></div>
+        <div class="rule"><b id="tipRule">Rule 160</b><span>paraphrased</span></div>
+        <p class="tip-txt" id="tipTxt">Keep to the left unless signs or markings say otherwise.</p>
+      </div>
+    </section>
+
+    <section class="tile t-keys" aria-label="Controls">
+      <div class="core">
+        <div class="label">Controls</div>
+        <dl class="keys">
+          <dt><kbd>W</kbd><kbd>↑</kbd></dt><dd>Accelerate</dd>
+          <dt><kbd>S</kbd><kbd>↓</kbd></dt><dd>Brake, hold to reverse</dd>
+          <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Steer</dd>
+          <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>Signal left / right</dd>
+          <dt><kbd>C</kbd></dt><dd>Chase, driver or overhead view</dd>
+          <dt><kbd>Drag</kbd></dt><dd>Pan the route map or overhead view; scroll or pinch to zoom</dd>
+        </dl>
+        <div class="chips">
+          <button class="chip" id="camBtn">View: Chase view</button>
+          <button class="chip" id="backBtn">Back to last instruction</button>
+          <button class="chip" id="restartBtn">Restart test</button>
+          <button class="chip" id="routeBtn">Change route</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <p class="foot">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, available under the Open Database Licence. Roads with no speed limit in the data are treated as 30 mph, or 60 mph for trunk roads. Cycle lanes come from the same data: a solid line marks a mandatory lane, a broken line an advisory one. Buildings and trees are generated, not real. Use this to practise routines like positioning, signalling and roundabout priority alongside lessons with an instructor.</p>
+  <p class="foot">Learner car based on <a href="https://sketchfab.com/3d-models/rx7-fd-redsuns-keisuke-takahashi-b76c1a819fd34cd6b139dceb705d2e8e" target="_blank" rel="noopener">RX7 FD</a> by <a href="https://sketchfab.com/pudimabestado" target="_blank" rel="noopener">Pudim Abestado</a> (Sketchfab Standard licence), repainted with team decals removed.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
