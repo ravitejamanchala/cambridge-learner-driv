@@ -1,5 +1,6 @@
 // Everything on screen outside the 3D view: HUD, heading-up route map, examiner tiles, fault sheet, Highway Code tips.
-const $ = id => document.getElementById(id);
+const DUMMY = { textContent: '', innerHTML: '', hidden: false, dataset: {}, style: {}, classList: { toggle() {}, add() {}, remove() {} }, setAttribute() {} };
+const $ = id => document.getElementById(id) || DUMMY; // tolerate layouts that leave some HUD parts out
 const YD = 1.09361, MPH = 2.23694;
 
 const ICON = {
@@ -72,10 +73,8 @@ export function createUI(net) {
 
   function renderSteps(route, step) {
     const ins = route.instructions, i = Math.min(step, ins.length - 1);
-    $('nextTxt').textContent = ins[i].text; $('stepLbl').textContent = `Step ${i + 1} of ${ins.length}`;
-    $('dots').innerHTML = ins.map((_, k) => `<i class="${k < i ? 'done' : k === i ? 'cur' : ''}"></i>`).join('');
+    $('nextTxt').textContent = ins[i].text;
     $('steps').innerHTML = ins.map((x, k) => `<li class="${k < i ? 'done' : k === i ? 'cur' : ''}"><b>${String(k + 1).padStart(2, '0')}</b><span>${esc(x.short)}</span></li>`).join('');
-    $('routeLbl').textContent = `${(route.len / 1609.34).toFixed(1)} miles`;
   }
   function renderFaults(t) {
     const ul = $('flist'); $('dCount').textContent = t.D; $('sCount').textContent = t.S;
@@ -85,20 +84,16 @@ export function createUI(net) {
   function hud(p, t, running) {
     const mph = Math.round(Math.abs(p.v) * MPH), ctx = t.ctx, way = ctx && ctx.d < 30 ? ctx.way : null;
     const limit = way ? way.mph : 30, over = mph > limit + 1;
-    $('hudSpd').textContent = mph; $('spd').textContent = mph;
-    for (const id of ['hudLimit', 'limitBig']) { $(id).textContent = limit; }
-    $('hudLimit').classList.toggle('over', over);
-    const bar = $('spdBar'); bar.style.width = Math.min(100, mph / 40 * 100) + '%'; bar.classList.toggle('over', over);
-    $('spdMark').style.left = Math.min(100, limit / 40 * 100) + '%';
-    $('limitNote').textContent = !way ? 'Off the road network.' : way.assumed ? `No limit is tagged for ${way.name || 'this road'} in the map data, so ${limit} mph is assumed.` : `${limit} mph limit on ${way.name || 'this road'}, from OpenStreetMap.`;
+    $('hudSpd').textContent = mph; $('hudLimit').textContent = limit; $('hudLimit').classList.toggle('over', over);
+    $('hudLimit').title = !way ? 'Off the road network' : way.assumed ? `No limit tagged for ${way.name || 'this road'}; ${limit} mph assumed` : `${limit} mph limit from OpenStreetMap`;
     const rn = way ? (way.name || 'Unnamed road') : 'Off the road network';
-    $('hudRoad').textContent = rn; $('spdRoad').textContent = rn;
+    $('hudRoad').textContent = rn;
     const R = t.route, ins = R.instructions, i = Math.min(t.step, ins.length - 1), s = ins[i];
     let short = s.short, ico = s.icon, dtxt;
     const yd = Math.max(0, s.s - t.sRoute) * YD; dtxt = yd < 15 ? 'now' : yd > 1700 ? 'in ' + (yd / 1760).toFixed(1) + ' miles' : 'in ' + Math.round(yd / 10) * 10 + ' yd';
     if (t.offRoute) { short = 'Finding a new route'; ico = 'off'; dtxt = 'follow the road'; }
     if (!running && !t.done) dtxt = 'Press start';
-    $('hudNext').textContent = short; $('hudDist').textContent = dtxt + ' · ' + rn; $('nextDist').textContent = t.offRoute ? 'Off route' : dtxt;
+    $('hudNext').textContent = short; $('hudDist').textContent = dtxt + ' · ' + rn;
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
     // tip

@@ -21,7 +21,9 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
 - **Marking.** Speed, positioning, one-way, red/amber lights, roundabout priority, zebras, signalling, lane discipline, cycle lanes, 1.5 m clearance for cyclists, collisions.
 - **Views.** Chase, driver's seat and draggable overhead view; heading-up route map you can drag and zoom.
 
-Controls: W/↑ accelerate, S/↓ brake (hold to reverse), A/D steer, Q/E indicators, C change view. Touch controls appear on phones.
+- **Lobby.** A full-screen landscape game lobby: learner level and XP, course progress card, the selected lesson or route, and PLAY. Settings for steering sensitivity, camera and shadows.
+
+Controls: W/↑ accelerate, S/↓ brake (hold to reverse), A/D steer, Q/E indicators, C change view, Esc pause. Touch controls appear on phones (landscape).
 
 ## Run locally
 
@@ -37,7 +39,7 @@ python3 -m http.server 8000
 | Path | What it does |
 | --- | --- |
 | `js/course.js` | Units, lessons, scripted events (amber, zebra, cyclist, emergency stop) and pass checks. Add a lesson here. |
-| `js/hub.js` | Profile picker, course list, mock test list |
+| `js/hub.js` | Game-style lobby: learner chip and XP, course, mock test, Highway Code and learner sheets, PLAY |
 | `js/profile.js` | Learner profiles and progress (localStorage) |
 | `js/config.js` | Routes, car model, handling, traffic numbers, colours. Start here to add a route. |
 | `js/net.js` | Road network: lookups, lanes, routing, instruction generation |
@@ -69,6 +71,8 @@ python3 tools/build_net.py export.geojson data/cambridge.json
 
 - Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the [Open Database Licence](https://opendatacommons.org/licenses/odbl/). `data/cambridge.json` is a derived database and is shared under the same licence.
 - Learner car based on [RX7 FD](https://sketchfab.com/3d-models/rx7-fd-redsuns-keisuke-takahashi-b76c1a819fd34cd6b139dceb705d2e8e) by [Pudim Abestado](https://sketchfab.com/pudimabestado), Sketchfab Standard licence; repainted with team decals removed.
-- Built with [three.js](https://threejs.org).
+- Lobby layout and style inspired by a game lobby UI concept by JACK UI.
+- Rules paraphrased from The Highway Code (Department for Transport, Crown copyright, Open Government Licence).
+- Built with [three.js](https://threejs.org) (MIT). Fonts: Fredoka, Geist and Geist Mono (SIL Open Font Licence).
 
 This is a practice aid, not a substitute for lessons with an approved driving instructor. Highway Code rules are paraphrased.

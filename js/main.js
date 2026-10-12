@@ -1,5 +1,5 @@
 // Wires the modules together: loads the map, builds the world, runs the loop, handles input and cameras.
-import { DATA_URL, CAR, ROUTES, WORLD } from './config.js';
+import { DATA_URL, CAR, ROUTES, WORLD, HANDLING } from './config.js';
 import { loadNet, buildRoute, snapWaypoint, along, nearest, laneCentre } from './net.js';
 import { buildWorld } from './world.js';
 import { createTraffic } from './traffic.js';
@@ -21,6 +21,7 @@ async function boot() {
   setLoad('Building the city…');
   await new Promise(r => setTimeout(r, 20));
 
+  let camInit = false, paused = false;
   const renderer = new T.WebGLRenderer({ antialias: true });
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
@@ -44,7 +45,7 @@ async function boot() {
     const c = pl.kind === 'lesson' ? lessonPlan(pl.lesson) : routes[pl.index];
     route = buildRoute(net, c.nodes, { name: pl.kind === 'lesson' ? pl.lesson.title : c.R.name }); nodes = c.nodes;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
-    startPos(); player.indicator = null; ui.renderSteps(route, 0); ui.renderFaults(test);
+    startPos(); camInit = false; player.indicator = null; ui.renderSteps(route, 0); ui.renderFaults(test);
     $('testState').textContent = pl.kind === 'lesson' ? 'Lesson · not started' : 'Not started';
     world.updateChunks(player.x, player.z, 4);
   }
@@ -53,7 +54,10 @@ async function boot() {
   traffic.init(player.x, player.z, WORLD.npcColours);
   world.updateChunks(player.x, player.z, 99);
   ui.renderSteps(route, 0); ui.renderFaults(test);
-  $('loadOv').hidden = true; hub.open();
+  const setMode = (m) => { document.body.dataset.mode = m; camInit = false; };
+  const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
+  const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
+  setMode('lobby'); $('loadOv').hidden = true; hub.open();
 
   loadCarModel(CAR.url).then(m => { player.setModel(shadowed(m)); }).catch(err => console.warn('Car model did not load; using the placeholder car.', err));
 
@@ -62,9 +66,16 @@ async function boot() {
   let cam = 0; const CAMS = ['Chase view', 'Driver view', 'Overhead'];
   const KM = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
   const sigBtns = () => document.querySelectorAll('[data-sig]').forEach(b => b.classList.toggle('sig-on', b.dataset.sig === player.indicator));
-  const setCam = (c) => { cam = c; $('camBtn').textContent = 'View: ' + CAMS[cam]; };
+  const setCam = (c, save) => {
+    cam = c; $('camBtn').textContent = 'View: ' + CAMS[cam];
+    document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.cam === cam));
+    if (save) { prefs.cam = cam; savePrefs(); }
+  };
   window.addEventListener('keydown', e => {
-    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const k = KM[e.code];
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.code === 'Escape') { if (hub.anyOpen()) hub.closeSheets(); else if (document.body.dataset.mode === 'drive' && $('resultSheet').hidden) paused ? resume() : pause(); return; }
+    if (document.body.dataset.mode !== 'drive') return;
+    const k = KM[e.code];
     if (k) { key[k] = 1; if (test.running) e.preventDefault(); }
     else if (e.code === 'KeyQ') { player.signal('L'); sigBtns(); } else if (e.code === 'KeyE') { player.signal('R'); sigBtns(); }
     else if (e.code === 'KeyC') setCam((cam + 1) % 3);
@@ -113,20 +124,40 @@ async function boot() {
       reasons.innerHTML = ''; next.hidden = true;
       $('testState').textContent = pass ? 'Passed' : 'Failed';
     }
-    $('endOv').hidden = false;
+    $('resultSheet').hidden = false; hub.render();
   };
+  function pause() { if (!test.running) return; paused = true; test.running = false; for (const k in key) key[k] = 0; $('pauseSheet').hidden = false; }
+  function resume() { if (!paused) return; paused = false; test.running = true; $('pauseSheet').hidden = true; }
+  function toLobby() {
+    test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
+    $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
+  }
   function begin() {
+    paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);
     if (plan.kind === 'lesson') scenario = createScenario(plan.lesson, { net, traffic, test, player, ui: { banner } });
     sigBtns(); test.running = true; banner(null);
     $('testState').textContent = plan.kind === 'lesson' ? 'Lesson · ' + plan.lesson.title : 'In progress';
-    $('startOv').hidden = true; $('endOv').hidden = true; lastStep = -1;
+    lastStep = -1;
   }
-  $('routeBtn').addEventListener('click', () => { test.running = false; if (scenario) { scenario.stop(); scenario = null; } banner(null); hub.open(); });
-  $('hubBtn').addEventListener('click', () => { banner(null); hub.open(); });
-  $('nextBtn').addEventListener('click', () => { hub.selectLesson($('nextBtn').dataset.l); hub.open(); });
+  $('pauseBtn').addEventListener('click', pause);
+  $('resumeBtn').addEventListener('click', resume); $('resumeX').addEventListener('click', resume);
+  $('quitBtn').addEventListener('click', toLobby); $('hubBtn').addEventListener('click', toLobby);
+  $('nextBtn').addEventListener('click', () => { hub.selectLesson($('nextBtn').dataset.l); loadPlan(hub.plan()); begin(); });
   $('againBtn').addEventListener('click', begin); $('restartBtn').addEventListener('click', begin);
-  $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3)); setCam(0);
+  $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  // settings: steering sensitivity, default camera, shadows (saved in this browser)
+  const sens = $('steerSens');
+  if (prefs.sens) HANDLING.steerSensitivity = prefs.sens;
+  sens.value = HANDLING.steerSensitivity;
+  sens.addEventListener('input', () => { HANDLING.steerSensitivity = +sens.value; prefs.sens = +sens.value; savePrefs(); });
+  document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.addEventListener('click', () => setCam(+b.dataset.cam, true)));
+  const setSh = (on) => { world.setShadows(on); document.querySelectorAll('#shSeg [data-sh]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.sh === (on ? 1 : 0))); prefs.sh = on ? 1 : 0; savePrefs(); };
+  document.querySelectorAll('#shSeg [data-sh]').forEach(b => b.addEventListener('click', () => setSh(b.dataset.sh === '1')));
+  setCam(prefs.cam || 0); setSh(prefs.sh !== 0);
+  $('portraitOk').addEventListener('click', () => document.body.classList.add('allow-portrait'));
   $('backBtn').addEventListener('click', () => {
     const r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
     let best = 0; for (let k = 0; k < r.cum.length; k++) if (r.cum[k] <= s) best = k;
@@ -150,26 +181,28 @@ async function boot() {
   const ovPanned = () => Math.hypot(ov.px, ov.pz) > 3 || Math.abs(ov.h - 95) > 5;
   const showCamRecentre = () => { $('camRecentre').hidden = !(cam === 2 && ovPanned()); };
   attachDrag(renderer.domElement, (dx, dy) => {
-    if (cam !== 2) return;
+    if (cam !== 2 || document.body.dataset.mode !== 'drive') return;
     const mpp = 2 * Math.hypot(ov.h, ov.h * 0.38) * Math.tan(camera.fov * Math.PI / 360) / (stage.clientHeight || 1);
     ov.px -= dx * mpp; ov.pz -= dy * mpp; showCamRecentre();
   }, (f) => { if (cam !== 2) return; ov.h = Math.min(380, Math.max(25, ov.h / f)); showCamRecentre(); });
   $('camRecentre').addEventListener('click', () => { ov.px = ov.pz = 0; ov.h = 95; showCamRecentre(); });
 
   // camera
-  const camPos = new T.Vector3(), camLook = new T.Vector3(); let camInit = false, farMode = -1;
+  const camPos = new T.Vector3(), camLook = new T.Vector3(); let farMode = -1, orbit = 0;
   function updateCamera(dt) {
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th), rx = -fz, rz = fx; let px, py, pz, lx, ly, lz, k = 1 - Math.exp(-dt * 4.2);
-    if (cam === 0) { px = player.x - fx * 9.2; py = 4.1; pz = player.z - fz * 9.2; lx = player.x + fx * 7; ly = 1.2; lz = player.z + fz * 7; }
+    const lobby = document.body.dataset.mode === 'lobby';
+    if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
+    else if (cam === 0) { px = player.x - fx * 9.2; py = 4.1; pz = player.z - fz * 9.2; lx = player.x + fx * 7; ly = 1.2; lz = player.z + fz * 7; }
     else if (cam === 1) { const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z; lx = px + fx * 20; ly = 0.9; lz = pz + fz * 20; k = 1; }
     else { lx = player.x + ov.px; ly = 0; lz = player.z + ov.pz; px = lx; py = ov.h; pz = lz + ov.h * 0.38; k = 1 - Math.exp(-dt * 12); }
-    const mode = cam === 2 ? Math.round(ov.h / 20) : -1;
+    const mode = cam === 2 && !lobby ? Math.round(ov.h / 20) : -1;
     if (mode !== farMode) {
-      farMode = mode; const extra = cam === 2 ? ov.h : 0;
+      farMode = mode; const extra = mode >= 0 ? ov.h : 0;
       scene.fog.near = WORLD.fogNear + extra; scene.fog.far = WORLD.fogFar + extra; camera.far = WORLD.fogFar + 200 + extra; camera.updateProjectionMatrix();
     }
     showCamRecentre();
-    cockpit.visible = cam === 1; player.mesh.visible = cam !== 1; wheel.rotation.z = player.steer * 1.8;
+    cockpit.visible = cam === 1 && !lobby; player.mesh.visible = cam !== 1 || lobby; wheel.rotation.z = player.steer * 1.8;
     if (!camInit) { camPos.set(px, py, pz); camLook.set(lx, ly, lz); camInit = true; }
     camPos.lerp(new T.Vector3(px, py, pz), k); camLook.lerp(new T.Vector3(lx, ly, lz), k);
     camera.position.copy(camPos); camera.lookAt(camLook);
@@ -206,7 +239,7 @@ async function boot() {
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
     updateCamera(dt); world.updateSun(cam === 2 ? player.x + ov.px : player.x, cam === 2 ? player.z + ov.pz : player.z); renderer.render(scene, camera);
-    uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
+    uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
     requestAnimationFrame(frame);
   }

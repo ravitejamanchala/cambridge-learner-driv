@@ -183,7 +183,8 @@ export function buildWorld(scene, net, traffic) {
     for (const l of lamps) l.instanceColor.needsUpdate = true;
     globeMat.color.setHex(Math.floor(clock * 1.6) % 2 ? 0x7a5a1c : 0xffb21a);
   }
-  return { updateChunks, updateSignals, updateSun, chunkCount: () => chunks.size, pending: () => queue.length };
+  function setShadows(on) { sun.castShadow = !!on; }
+  return { updateChunks, updateSignals, updateSun, setShadows, chunkCount: () => chunks.size, pending: () => queue.length };
 }
 
 function dash(acc, e, s, len, off, y) {
