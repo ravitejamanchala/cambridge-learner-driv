@@ -12,8 +12,7 @@ export const CAR = {
   hide: /^teamlogo/i,
   wheel: (mesh) => !!(mesh.material && mesh.material.name === 'material_2'),
   material: { roughness: 0.72, metalness: 0 },
-  seat: { x: 0.36, y: 1.02, z: 0.2 },
-  credit: { title: 'RX7 FD', author: 'Pudim Abestado', url: 'https://sketchfab.com/3d-models/rx7-fd-redsuns-keisuke-takahashi-b76c1a819fd34cd6b139dceb705d2e8e', licence: 'Sketchfab Standard' }
+  seat: { x: 0.36, y: 1.02, z: 0.2 }
 };
 
 // Steering and pedals. `steerSensitivity` 1 = default; lower is calmer.

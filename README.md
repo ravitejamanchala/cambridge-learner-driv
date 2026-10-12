@@ -13,3 +13,14 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
   - *Sharing the road:* zebra crossings, passing cyclists, pedestrian light crossings, turning left across a cycle lane
   - *Faster roads:* the two-second rule, a 60 mph country road, a 70 mph dual carriageway
   - *Theory and show me, tell me:* quizzes on show me, tell me, road signs, stopping distances and priority. These are unofficial practice questions written for this project, not the DVSA theory test question bank.
+
+## Demo build
+
+For demos the Info screen is removed (its markup is kept in `info-sheet.release.html` for the release version) and the code is shipped as one minified file:
+
+```sh
+npm i esbuild
+node tools/build_demo.mjs . dist
+```
+
+Deploy the `dist` folder.

@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Learn to drive on Cambridge's real roads: lessons, theory quizzes, puzzles on the trickiest junctions and mock UK driving tests in 3D.">
 <meta name="theme-color" content="#f39a52">
 <title>Cambridge Learner Drive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -85,6 +84,7 @@ body:not([data-mode="drive"]) #hud{display:none}
 .passcard .bar{flex:1;height:10px;border-radius:9px;background:rgba(43,32,48,.35);overflow:hidden}
 .passcard .bar i{display:block;height:100%;width:0;background:#fff;border-radius:9px;transition:width .8s var(--spring)}
 
+.credit-line{position:absolute;left:50%;bottom:calc(10px + var(--safe-b));transform:translateX(-50%);margin:0;max-width:24vw;text-align:center;font:500 10px/1.35 var(--font-body);color:rgba(255,255,255,.78);text-shadow:0 1px 0 rgba(120,50,10,.4);pointer-events:none}
 .playzone{position:absolute;right:calc(22px + var(--safe-r));bottom:calc(18px + var(--safe-b));display:flex;flex-direction:column;align-items:flex-end;gap:12px;width:min(320px,38vw)}
 .event{position:relative;width:100%;display:flex;align-items:center;gap:12px;border:0;cursor:pointer;text-align:left;padding:10px 14px 10px 10px;border-radius:18px;
   background:linear-gradient(180deg,#c6b3fb,var(--lav));color:#fff;box-shadow:0 0 0 3px #fff,0 5px 0 var(--lav-deep),0 16px 26px -14px rgba(60,30,120,.6)}
@@ -314,7 +314,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       <button class="gbtn" data-open="courseSheet" aria-label="Course"><span class="disc"><svg viewBox="0 0 40 40"><path d="M6 9c5-2 10-2 14 1v22c-4-3-9-3-14-1z" fill="#ffd28a" stroke="#c9741f" stroke-width="2" stroke-linejoin="round"/><path d="M34 9c-5-2-10-2-14 1v22c4-3 9-3 14-1z" fill="#ffe7bd" stroke="#c9741f" stroke-width="2" stroke-linejoin="round"/><path d="M10 15c2.5-.8 5-.6 7 .6M10 20c2.5-.8 5-.6 7 .6M23 15.6c2-1.2 4.5-1.4 7-.6" stroke="#c9741f" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="lb">Course</span></button>
       <button class="gbtn" data-open="mockSheet" aria-label="Mock test"><span class="disc"><svg viewBox="0 0 40 40"><rect x="8" y="7" width="24" height="28" rx="4" fill="#fff" stroke="#8a6ae3" stroke-width="2"/><rect x="14" y="4" width="12" height="7" rx="2.5" fill="#b49cf5" stroke="#8a6ae3" stroke-width="2"/><path d="M13 19l3 3 6-6M13 28h14" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lb">Mock test</span></button>
       <button class="gbtn" data-open="codeSheet" aria-label="Highway Code"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff" stroke="#d2232a" stroke-width="4.5"/><text x="20" y="25" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="14" fill="#2b2030">20</text></svg></span><span class="lb">Highway Code</span></button>
-      <button class="gbtn" data-open="infoSheet" aria-label="Info and credits"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#38cbb9" stroke="#14857a" stroke-width="2"/><circle cx="20" cy="13.5" r="2.3" fill="#fff"/><path d="M20 18.5v10" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg></span><span class="lb">Info</span></button>
+      <button class="gbtn" data-open="infoSheet" aria-label="Info and credits" hidden><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#38cbb9" stroke="#14857a" stroke-width="2"/><circle cx="20" cy="13.5" r="2.3" fill="#fff"/><path d="M20 18.5v10" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg></span><span class="lb">Info</span></button>
     </div>
     <div class="col r">
       <button class="gbtn" data-open="puzzleSheet" aria-label="Puzzles"><span class="disc"><svg viewBox="0 0 40 40"><path d="M7 7h11v5a3.5 3.5 0 1 0 0 7v4H7z" fill="#b49cf5" stroke="#6a4fc4" stroke-width="2" stroke-linejoin="round"/><path d="M21 7h12v12h-5a3.5 3.5 0 1 0-7 0z" fill="#ffc23d" stroke="#c98a0e" stroke-width="2" stroke-linejoin="round"/><path d="M21 22h12v11H21v-4a3.5 3.5 0 1 0 0-7z" fill="#38cbb9" stroke="#14857a" stroke-width="2" stroke-linejoin="round"/><path d="M7 26h4a3.5 3.5 0 1 1 7 0v7H7z" fill="#ef4f97" stroke="#a52a63" stroke-width="2" stroke-linejoin="round"/></svg></span><span class="lb">Puzzles</span></button>
@@ -326,6 +326,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       <b id="passTitle">Learner pass</b>
       <span class="row"><span class="n" id="passUnit">1</span><span class="bar"><i id="passBar"></i></span></span>
     </button>
+    <p class="credit-line">© OpenStreetMap contributors</p>
     <div class="playzone">
       <button class="event" id="eventCard" aria-label="Selected drive details">
         <span class="th" id="eventIco"></span>
@@ -418,23 +419,6 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       <div class="set"><span>Mirrors<small>Rear-view and door mirrors in the driver view</small></span><div class="seg" id="miSeg"><button data-mi="1" aria-pressed="true">On</button><button data-mi="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Route guide<small>Arrows on the road and a marker at the next turn</small></span><div class="seg" id="gdSeg"><button data-gd="1" aria-pressed="true">On</button><button data-gd="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Shadows<small>Turn off if it feels slow</small></span><div class="seg" id="shSeg"><button data-sh="1" aria-pressed="true">On</button><button data-sh="0" aria-pressed="false">Off</button></div></div>
-    </div></div></div>
-
-  <div class="sheet" id="infoSheet" hidden><div class="card" role="dialog" aria-labelledby="infoH">
-    <header><h2 id="infoH">About and credits</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
-    <div class="body">
-      <p><b>Cambridge Learner Drive</b> is a personal, non-commercial practice project by Raviteja Manchala: short lessons and mock UK driving tests on Cambridge's real roads. It is a practice aid, not a substitute for lessons with an approved driving instructor.</p>
-      <div class="credits">
-        <div class="credit"><b>Map data</b>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, available under the Open Database Licence. Roads, speed limits, lights, crossings, roundabouts and cycle lanes come from it; exported with Overpass Turbo.</div>
-        <div class="credit"><b>Learner car</b><a href="https://sketchfab.com/3d-models/rx7-fd-redsuns-keisuke-takahashi-b76c1a819fd34cd6b139dceb705d2e8e" target="_blank" rel="noopener">RX7 FD</a> by <a href="https://sketchfab.com/pudimabestado" target="_blank" rel="noopener">Pudim Abestado</a> on Sketchfab (Sketchfab Standard licence). Repainted, team decals removed.</div>
-        <div class="credit"><b>Lobby design</b>Layout and style inspired by a game lobby UI concept by <b style="display:inline;font:inherit;font-weight:700">JACK UI</b>, shared as a reference.</div>
-        <div class="credit"><b>The Highway Code and DVSA guidance</b>Rules, show me, tell me questions and sign meanings are paraphrased from The Highway Code and DVSA guidance on GOV.UK. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence v3.0</a>.</div>
-        <div class="credit"><b>Quizzes</b>Unofficial practice questions written for this project. They are not the DVSA theory test or its revision question bank, and this project is not endorsed by DVSA.</div>
-        <div class="credit"><b>3D engine</b><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> by Ricardo Cabello (mrdoob) and contributors, MIT licence.</div>
-        <div class="credit"><b>Fonts</b>Fredoka by Milena Brandão and Hafontia; Geist and Geist Mono by Vercel. Both under the SIL Open Font Licence, via Google Fonts.</div>
-        <div class="credit"><b>Built with</b>Code written with Claude (Anthropic), directed and designed by Raviteja Manchala.</div>
-        <div class="credit"><b>Buildings and traffic</b>Generated for the scene. They are not real buildings and do not represent real traffic levels.</div>
-      </div>
     </div></div></div>
 
   <div class="sheet" id="pauseSheet" hidden><div class="card" role="dialog" aria-labelledby="pauseH">
