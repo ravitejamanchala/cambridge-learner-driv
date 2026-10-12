@@ -24,6 +24,10 @@ const TIPS = {
 };
 
 export function createUI(net) {
+  // Highway Code tip: a small chip that opens for a few seconds when the advice changes; tap to open or close
+  const tipCard = document.getElementById('tipCard'); let tipTimer = 0;
+  function openTip(ms) { if (!tipCard) return; tipCard.classList.add('open'); tipCard.setAttribute('aria-expanded', 'true'); clearTimeout(tipTimer); if (ms) tipTimer = setTimeout(() => { tipCard.classList.remove('open'); tipCard.setAttribute('aria-expanded', 'false'); }, ms); }
+  if (tipCard) tipCard.addEventListener('click', () => { if (tipCard.classList.contains('open')) { clearTimeout(tipTimer); tipCard.classList.remove('open'); tipCard.setAttribute('aria-expanded', 'false'); } else openTip(0); });
   const mini = $('mini'), g = mini.getContext('2d'); let col = {}, colT = -9, lastIco = '', tipKey = '';
   // drag to pan, wheel or pinch to zoom; pan is a world offset from the car
   const view = { px: 0, pz: 0, zoom: 1, th: 0, k: 0.38 };
@@ -117,7 +121,7 @@ export function createUI(net) {
     // traffic light ahead
     const la = running ? t.lightAhead : null, tl = $('hudLight'); tl.hidden = !la;
     if (la) { const st = la.state; tl.dataset.s = st; tl.setAttribute('aria-label', { R: 'Red light', RA: 'Red and amber', A: 'Amber light', G: 'Green light' }[st] + ' ahead'); }
-    if (key !== tipKey) { tipKey = key; const tp = TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; }
+    if (key !== tipKey) { tipKey = key; const tp = TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; if (running && !matchMedia('(pointer:coarse)').matches) openTip(5000); } // phones: chip only, tap to read
   }
   return { drawMap, renderSteps, renderFaults, hud, setNet: (n) => { net = n; } };
 }

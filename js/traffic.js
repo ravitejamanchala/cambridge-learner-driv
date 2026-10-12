@@ -64,6 +64,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     return w.w / 2 - 0.85;
   }
   function chooseNext(a) {
+    if (a.path) { const i = a.path.findIndex(st => st.e === a.e && st.dir === a.dir); if (i >= 0 && a.path[i + 1]) return a.path[i + 1]; }
     const v = endNode(a), opts = net.out[v].filter(o => o.e !== a.e && !(a.kind === 'bike' && /trunk/.test(o.e.way.cls)));
     if (!opts.length) return null;
     const p = along(a.e, a.e.len - 0.5, a.dir);
@@ -106,7 +107,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       const dir = e.way.oneway ? 1 : (Math.random() < 0.5 ? 1 : -1);
       const lane = a.kind === 'car' ? Math.floor(Math.random() * laneInfo(e, dir).n) : 0;
       const s = 8 + Math.random() * Math.max(1, e.len - 20);
-      Object.assign(a, { e, dir, s, lane, prev: null });
+      Object.assign(a, { e, dir, s, lane, prev: null, path: null });
       const p = trackPoint(a);
       if (all.some(o => o !== a && o.alive && Math.hypot(o.x - p.x, o.z - p.z) < (a.kind === 'bike' ? 10 : 18))) continue;
       Object.assign(a, { v: a.kind === 'bike' ? 4 : 5, x: p.x, z: p.z, th: Math.atan2(-p.tx, -p.tz), stuck: 0, ghost: 0, alive: true });
@@ -197,8 +198,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     const p = trackPoint(b); b.x = p.x; b.z = p.z; b.th = Math.atan2(-p.tx, -p.tz); b.next = chooseNext(b); b.mesh.visible = true; b.pinned = 60;
   }
   // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
-  function placeCar(c, e, dir, s, speed) {
-    Object.assign(c, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: 1 });
+  // path (optional): route steps the car should follow instead of choosing turns at random
+  function placeCar(c, e, dir, s, speed, cruise = 1, path = null) {
+    Object.assign(c, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { lightState, update, init, cars, bikes, overrides, placeBike, placeCar, miniNodes, get clock() { return clock; } };

@@ -20,7 +20,7 @@ const net = buildNet(full);
 
 const plans = [
   ...ROUTES.map(r => ({ key: 'route:' + r.id, name: r.name, wps: r.waypoints })),
-  ...LESSONS.map(l => ({ key: 'lesson:' + l.id, name: l.title, wps: l.waypoints })),
+  ...LESSONS.filter(l => l.waypoints).map(l => ({ key: 'lesson:' + l.id, name: l.title, wps: l.waypoints })),
   ...PUZZLES.map(p => ({ key: 'puzzle:' + p.id, name: p.title, wps: p.waypoints }))
 ];
 for (const p of plans) {

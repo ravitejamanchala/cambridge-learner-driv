@@ -104,6 +104,10 @@ async function boot() {
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    if (pl.lesson && pl.lesson.questions) { // theory quiz: no driving, no map
+      if (start) { if (A.test) A.test.running = false; paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; banner(null); setMode('lobby'); hub.startQuiz(pl.lesson); }
+      return;
+    }
     const tok = ++pickTok; await useArea(areaOf(pl));
     if (tok !== pickTok || !A.net) return;
     loadPlan(pl); if (start) begin();
@@ -233,7 +237,8 @@ async function boot() {
   const binn = new T.Mesh(new T.BoxGeometry(0.42, 0.12, 0.2), trimM); binn.position.set(0, -0.36, -0.78); cockpit.add(binn);
   const wheel = new T.Mesh(new T.TorusGeometry(0.19, 0.024, 8, 28), trimM); wheel.position.set(0, -0.44, -0.56); wheel.rotation.x = -0.35; cockpit.add(wheel);
   const spoke = new T.Mesh(new T.BoxGeometry(0.36, 0.035, 0.02), trimM); wheel.add(spoke);
-  for (const sx of [-1, 1]) { const pil = new T.Mesh(new T.BoxGeometry(0.045, 1.0, 0.045), dashM); pil.position.set(-CAR.seat.x + sx * 0.86, 0.1, -1.1); pil.rotation.z = -sx * 0.3; pil.rotation.x = -0.5; cockpit.add(pil); }
+  for (const sx of [-1, 1]) { const pil = new T.Mesh(new T.BoxGeometry(0.022, 1.0, 0.022), dashM); pil.position.set(-CAR.seat.x + sx * 0.95, 0.12, -1.15); pil.rotation.z = -sx * 0.32; pil.rotation.x = -0.5; cockpit.add(pil); }
+  mirrors.mount(cockpit, CAR.seat.x);
 
   // ---------- overhead view: drag to pan, wheel or pinch to zoom ----------
   const ov = { px: 0, pz: 0, h: 95 };
@@ -269,7 +274,7 @@ async function boot() {
   let layoutT = 0; function layoutSoon() { layoutT = 0.05; }
   function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); layoutSoon(); }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(prefs.cam || 0); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
+  setCam(prefs.cam ?? 1); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
   function sim(dt) {
@@ -297,13 +302,10 @@ async function boot() {
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
-    if (layoutT > 0 && (layoutT -= dt) <= 0) mirrors.layout();
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
     guide.update(test, traffic.clock); guide.group.visible = guide.group.visible && drive;
-    const useMirrors = drive && cam !== 2 && mirrors.enabled;
-    if (useMirrors) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
+    if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
     renderer.render(scene, camera);
-    if (useMirrors) mirrors.draw();
     uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
   }

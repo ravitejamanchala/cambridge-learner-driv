@@ -10,13 +10,13 @@ export function createGuide() {
   const shape = new T.Shape(); // chevron pointing along -z (forward)
   shape.moveTo(0, -0.9); shape.lineTo(0.95, 0.15); shape.lineTo(0.6, 0.5); shape.lineTo(0, -0.15); shape.lineTo(-0.6, 0.5); shape.lineTo(-0.95, 0.15); shape.closePath();
   const cg = new T.ShapeGeometry(shape); cg.rotateX(-Math.PI / 2); cg.scale(1, 1, -1);
-  const cm = new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.8, depthWrite: false, side: T.DoubleSide });
+  const cm = new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide });
   const chev = new T.InstancedMesh(cg, cm, N); chev.frustumCulled = false; chev.renderOrder = 7; group.add(chev);
   // next-turn marker: a soft beam and a bobbing arrow
-  const beam = new T.Mesh(new T.CylinderGeometry(0.9, 0.9, 14, 20, 1, true), new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.18, depthWrite: false, side: T.DoubleSide }));
-  beam.position.y = 7; beam.renderOrder = 7;
-  const head = new T.Mesh(new T.ConeGeometry(0.9, 1.6, 4), new T.MeshBasicMaterial({ color: 0xef4f97 })); head.rotation.x = Math.PI; head.renderOrder = 7;
-  const ring = new T.Mesh(new T.RingGeometry(1.6, 2.1, 32), new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.85, depthWrite: false, side: T.DoubleSide }));
+  const beam = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 7, 12, 1, true), new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.35, depthWrite: false, side: T.DoubleSide }));
+  beam.position.y = 3.5; beam.renderOrder = 7;
+  const head = new T.Mesh(new T.ConeGeometry(0.45, 0.8, 4), new T.MeshBasicMaterial({ color: 0xef4f97 })); head.rotation.x = Math.PI; head.renderOrder = 7;
+  const ring = new T.Mesh(new T.RingGeometry(1.1, 1.4, 32), new T.MeshBasicMaterial({ color: 0xef4f97, transparent: true, opacity: 0.85, depthWrite: false, side: T.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.08; ring.renderOrder = 7;
   const marker = new T.Group(); marker.add(beam, head, ring); group.add(marker);
   const m4 = new T.Matrix4(), q = new T.Quaternion(), up = new T.Vector3(0, 1, 0), pos = new T.Vector3(), sc = new T.Vector3(1, 1, 1);
@@ -43,7 +43,7 @@ export function createGuide() {
     chev.count = n; chev.instanceMatrix.needsUpdate = true;
     const tp = ins.final ? lanePoint(R, Math.max(0, R.len - 6)) : pointOnRoute(R, ins.s);
     marker.position.set(tp.x, 0, tp.z);
-    head.position.y = 3.2 + Math.sin(clock * 3) * 0.35; head.rotation.y = clock;
+    head.position.y = 7.6 + Math.sin(clock * 3) * 0.25; head.rotation.y = clock;
     ring.scale.setScalar(1 + (clock * 0.8 % 1) * 0.35); ring.material.opacity = 0.85 * (1 - (clock * 0.8 % 1));
   }
   return { group, update, set enabled(b) { on = b; }, get enabled() { return on; } };

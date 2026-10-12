@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Learn to drive on Cambridge's real roads: a course of lessons, puzzles on the trickiest junctions and mock UK driving tests in 3D.">
+<meta name="description" content="Learn to drive on Cambridge's real roads: lessons, theory quizzes, puzzles on the trickiest junctions and mock UK driving tests in 3D.">
 <meta name="theme-color" content="#f39a52">
 <title>Cambridge Learner Drive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,6 +132,14 @@ body:not([data-mode="drive"]) #hud{display:none}
 .event .k .stars svg{width:12px;height:12px;fill:rgba(255,255,255,.4)}.event .k .stars svg.on{fill:#ffe07a}
 .unit-h.tier{display:flex;align-items:center;gap:8px}.unit-h.tier i{width:12px;height:12px;border-radius:4px;display:block}.unit-h .lk{color:var(--ink-soft);letter-spacing:.02em;text-transform:none;font-weight:500}
 .dh{display:flex;gap:12px;align-items:center}.dh .dic{width:56px;height:56px;flex:none}.dh .dic svg{width:56px;height:56px}.dh h3{margin:0 0 4px}
+.quizcard{width:min(620px,100%)}
+.qprog{display:flex;align-items:center;gap:10px;font:600 12px/1 var(--font-display);color:var(--ink-soft)}.qprog .bar{flex:1;height:8px;border-radius:8px;background:var(--cream-2);overflow:hidden}.qprog .bar i{display:block;height:100%;background:var(--lav)}
+.qq{margin:0;font:600 17px/1.35 var(--font-display);color:var(--ink)}
+.qopts{display:flex;flex-direction:column;gap:8px}
+.qopt{display:flex;gap:10px;align-items:flex-start;text-align:left;border:0;cursor:pointer;padding:10px 12px;border-radius:14px;background:#fff;box-shadow:0 0 0 2px var(--cream-2),0 3px 0 var(--cream-2);font:500 14px/1.35 var(--font-body);color:var(--ink)}
+.qopt b{flex:none;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:var(--cream-2);font:700 12px/1 var(--font-display);color:var(--orange-deep)}
+.qopt:disabled{cursor:default}.qopt.right{box-shadow:0 0 0 3px var(--green)}.qopt.right b{background:var(--green);color:#fff}.qopt.wrong{box-shadow:0 0 0 3px var(--red)}.qopt.wrong b{background:var(--red);color:#fff}
+.qwhy{padding:10px 12px;border-radius:12px;font-size:13.5px;line-height:1.45}.qwhy.ok{background:#d6f5e4}.qwhy.no{background:#ffe1e1}
 .unit-h{font:700 12px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--orange-deep);margin:6px 2px 0}
 .item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;width:100%;text-align:left;border:0;cursor:pointer;padding:10px 12px;border-radius:16px;background:#fff;box-shadow:0 0 0 2px var(--cream-2),0 3px 0 var(--cream-2);transition:transform .35s var(--spring),box-shadow .3s}
 .item:hover{transform:translateY(-1px)}
@@ -202,20 +210,13 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .recentre{position:absolute;right:10px;top:10px;border:0;border-radius:999px;padding:6px 10px;min-height:28px;font:600 11px/1 var(--font-display);background:#fff;color:var(--ink);cursor:pointer;box-shadow:0 4px 12px -6px rgba(0,0,0,.5)}
 .recentre.cam{position:absolute;right:calc(12px + var(--safe-r));top:calc(76px + var(--safe-t));z-index:2;left:auto;padding:10px 16px;min-height:40px;font-size:13px}
 #hud{--mir-w:clamp(190px,24vw,330px);--mir-h:calc(var(--mir-w) * .3);--wing-w:clamp(104px,12vw,168px);--wing-h:calc(var(--wing-w) * .64);--next-top:calc(12px + var(--safe-t))}
-body:not(.no-mirrors):not(.cam-over) #hud{--next-top:calc(22px + var(--safe-t) + var(--mir-h))}
-.mirror{position:absolute;pointer-events:none;border-radius:16px;box-shadow:0 0 0 3px #1d1820,0 0 0 5px rgba(255,255,255,.18),0 10px 24px -10px rgba(0,0,0,.6)}
-.mirror.rear{left:50%;top:calc(8px + var(--safe-t));width:var(--mir-w);height:var(--mir-h);transform:translateX(-50%);border-radius:14px}
-.mirror.wing{top:calc(24px + var(--safe-t) + clamp(130px,26vh,200px));width:var(--wing-w);height:var(--wing-h);border-radius:12px 18px 18px 12px}
-.mirror.wing.l{left:calc(14px + var(--safe-l))}
-.mirror.wing.r{right:calc(14px + var(--safe-r));top:calc(80px + var(--safe-t));border-radius:18px 12px 12px 18px}
-body.no-mirrors .mirror,body.cam-over .mirror{display:none}
 .areaload{position:absolute;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%);z-index:25;padding:9px 16px;border-radius:999px;background:var(--plum-a);color:#fff;font:600 13px/1 var(--font-display);pointer-events:none}
-.hud-next{position:absolute;left:50%;top:var(--next-top);transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:9px 16px 9px 10px;max-width:min(460px,46vw)}
-.hud-next .ico{width:42px;height:42px;border-radius:13px;background:var(--orange);display:grid;place-items:center;flex:none;color:#fff}
-.hud-next .ico svg{width:24px;height:24px}
+.hud-next{position:absolute;left:50%;top:var(--next-top);transform:translateX(-50%);display:flex;align-items:center;gap:9px;padding:5px 13px 5px 5px;max-width:min(380px,40vw);border-radius:14px}
+.hud-next .ico{width:32px;height:32px;border-radius:10px;background:var(--orange);display:grid;place-items:center;flex:none;color:#fff}
+.hud-next .ico svg{width:19px;height:19px}
 .hud-next .tx{min-width:0;display:flex;flex-direction:column;gap:2px}
-.hud-next strong{font:600 16px/1.15 var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hud-next span{font:500 12px/1.2 var(--font-mono);color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-next strong{font:600 14px/1.15 var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-next span{font:500 10.5px/1.2 var(--font-mono);color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-right{position:absolute;right:calc(12px + var(--safe-r));top:calc(12px + var(--safe-t));display:flex;align-items:center;gap:8px}
 .speedo{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px}
 .hud-spd{font:600 24px/1 var(--font-mono);font-variant-numeric:tabular-nums}
@@ -230,23 +231,24 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
 .tl[data-s="G"] i:nth-child(3){background:#2fe07a;box-shadow:0 0 8px #2fe07a}
 .pausebtn{width:52px;height:52px;border-radius:16px;border:0;cursor:pointer;display:grid;place-items:center}
 .pausebtn svg{width:22px;height:22px}
-.hud-sig{position:absolute;left:50%;top:calc(var(--next-top) + 72px);transform:translateX(-50%);display:flex;gap:64px;pointer-events:none}
+.hud-sig{position:absolute;left:50%;top:calc(var(--next-top) + 50px);transform:translateX(-50%);display:flex;gap:64px;pointer-events:none}
 .hud-sig svg{width:32px;height:32px;color:rgba(255,255,255,.2);filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));transition:color .12s}
 .hud-sig svg.on{color:#ffb21a}
-.hud-bl{position:absolute;left:calc(12px + var(--safe-l));bottom:calc(12px + var(--safe-b));display:flex;flex-direction:column;gap:8px;max-width:min(340px,34vw)}
-.tipcard{padding:10px 14px;display:flex;flex-direction:column;gap:4px}
+.hud-bl{position:absolute;left:calc(12px + var(--safe-l));bottom:calc(12px + var(--safe-b));display:flex;flex-direction:column;gap:6px;max-width:min(300px,30vw)}
+.tipcard{padding:7px 12px;display:flex;flex-direction:column;gap:4px;border:0;cursor:pointer;text-align:left;font:inherit;align-self:flex-start;border-radius:14px;max-width:100%}
+.tipcard p{display:none}.tipcard.open p{display:block}.tipcard.open{padding:9px 13px}
 .tipcard .h{display:flex;gap:8px;align-items:baseline;font:600 11px/1 var(--font-mono);color:#ffcf8a}
 .tipcard .h span{font-family:var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7)}
-.tipcard p{margin:0;font-size:12.5px;line-height:1.4;color:rgba(255,255,255,.9)}
+.tipcard p{margin:0;font-size:12px;line-height:1.4;color:rgba(255,255,255,.9)}
 .fchips{display:flex;gap:8px}
-.fchip{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;font:600 13px/1 var(--font-display)}
-.fchip b{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--font-mono);background:#ffe9c2;color:#9a5a00}
+.fchip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;font:600 11.5px/1 var(--font-display)}
+.fchip b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--font-mono);background:#ffe9c2;color:#9a5a00}
 .fchip.s b{background:#ffd9da;color:#b4232a}
 .hud-road{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);padding:7px 14px;font:600 13px/1 var(--font-display)}
 .banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:4;padding:14px 26px;border-radius:20px;font:700 22px/1.1 var(--font-display);background:rgba(24,18,26,.86);color:#fff;pointer-events:none;text-align:center;max-width:80%}
 .banner.stop{background:#d2232a;font-size:48px;letter-spacing:.06em;padding:16px 36px;animation:pulse .6s var(--spring) infinite}
 .touch{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(12px + var(--safe-b));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
-@media (pointer:coarse){.touch{display:flex}.hud-bl,.hud-road{display:none}}
+@media (pointer:coarse){.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.hud-bl .fchips{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
 .touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
 .touch .c{display:flex;flex-direction:column;gap:10px;align-items:center}
 .tb{width:70px;height:70px;border-radius:50%;border:0;background:rgba(24,18,26,.55);color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);display:grid;place-items:center;touch-action:none;transition:transform .3s var(--spring),background .2s}
@@ -336,9 +338,6 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
 
   <!-- ================= DRIVING HUD ================= -->
   <div class="layer" id="hud">
-    <div class="mirror rear" id="mirrorRear" aria-hidden="true"></div>
-    <div class="mirror wing l" id="mirrorL" aria-hidden="true"></div>
-    <div class="mirror wing r" id="mirrorR" aria-hidden="true"></div>
     <div class="glass hud-map"><canvas id="mini" aria-label="Route map, heading up. Drag to pan, scroll or pinch to zoom."></canvas><button class="recentre" id="mapRecentre" hidden>Recentre</button></div>
     <div class="glass hud-next"><div class="ico" id="hudIco"></div><div class="tx"><strong id="hudNext">Get ready</strong><span id="hudDist">–</span></div></div>
     <div class="hud-right">
@@ -351,7 +350,7 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
       <svg id="sigR" viewBox="0 0 24 24" fill="currentColor"><path d="M14 4l8 8-8 8v-5H2V9h12z"/></svg>
     </div>
     <div class="hud-bl">
-      <div class="glass tipcard"><div class="h"><b id="tipRule">Rule 160</b><span id="tipCtx">Normal driving</span></div><p id="tipTxt">Keep to the left unless road signs or markings tell you otherwise.</p></div>
+      <button class="glass tipcard" id="tipCard" aria-expanded="false" title="Highway Code tip: tap to read"><div class="h"><b id="tipRule">Rule 160</b><span id="tipCtx">Normal driving</span></div><p id="tipTxt">Keep to the left unless road signs or markings tell you otherwise.</p></button>
       <div class="fchips"><div class="glass fchip"><b id="dCount">0</b>Driving faults</div><div class="glass fchip s"><b id="sCount">0</b>Serious</div></div>
     </div>
     <div class="glass hud-road" id="hudRoad">–</div>
@@ -387,6 +386,10 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
     <header><h2 id="pzH">Puzzles</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body split"><div class="list" id="puzzleList" role="radiogroup" aria-label="Puzzles"></div><div class="detail" id="puzzleDetail"></div></div></div></div>
 
+  <div class="sheet" id="quizSheet" hidden><div class="card sm quizcard" role="dialog" aria-labelledby="quizH">
+    <header><h2 id="quizH">Quiz</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <div class="body" id="quizBody"></div></div></div>
+
   <div class="sheet" id="mockSheet" hidden><div class="card" role="dialog" aria-labelledby="mockH">
     <header><h2 id="mockH">Mock test</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body split"><div class="list" id="routePick" role="radiogroup" aria-label="Mock test routes"></div><div class="detail" id="mockDetail"></div></div></div></div>
@@ -411,8 +414,8 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
     <header><h2 id="setH">Settings</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body">
       <div class="set"><label for="steerSens"><span>Steering sensitivity</span><small>Lower is calmer</small></label><input type="range" id="steerSens" min="0.5" max="1.5" step="0.05" value="1"></div>
-      <div class="set"><span>Camera<small>Also C while driving</small></span><div class="seg" id="camSeg"><button data-cam="0" aria-pressed="true">Chase</button><button data-cam="1" aria-pressed="false">Driver</button><button data-cam="2" aria-pressed="false">Overhead</button></div></div>
-      <div class="set"><span>Mirrors<small>Rear-view and door mirrors</small></span><div class="seg" id="miSeg"><button data-mi="1" aria-pressed="true">On</button><button data-mi="0" aria-pressed="false">Off</button></div></div>
+      <div class="set"><span>Camera<small>Also C while driving</small></span><div class="seg" id="camSeg"><button data-cam="1" aria-pressed="true">Driver</button><button data-cam="0" aria-pressed="false">Chase</button><button data-cam="2" aria-pressed="false">Overhead</button></div></div>
+      <div class="set"><span>Mirrors<small>Rear-view and door mirrors in the driver view</small></span><div class="seg" id="miSeg"><button data-mi="1" aria-pressed="true">On</button><button data-mi="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Route guide<small>Arrows on the road and a marker at the next turn</small></span><div class="seg" id="gdSeg"><button data-gd="1" aria-pressed="true">On</button><button data-gd="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Shadows<small>Turn off if it feels slow</small></span><div class="seg" id="shSeg"><button data-sh="1" aria-pressed="true">On</button><button data-sh="0" aria-pressed="false">Off</button></div></div>
     </div></div></div>
@@ -425,7 +428,8 @@ body.no-mirrors .mirror,body.cam-over .mirror{display:none}
         <div class="credit"><b>Map data</b>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, available under the Open Database Licence. Roads, speed limits, lights, crossings, roundabouts and cycle lanes come from it; exported with Overpass Turbo.</div>
         <div class="credit"><b>Learner car</b><a href="https://sketchfab.com/3d-models/rx7-fd-redsuns-keisuke-takahashi-b76c1a819fd34cd6b139dceb705d2e8e" target="_blank" rel="noopener">RX7 FD</a> by <a href="https://sketchfab.com/pudimabestado" target="_blank" rel="noopener">Pudim Abestado</a> on Sketchfab (Sketchfab Standard licence). Repainted, team decals removed.</div>
         <div class="credit"><b>Lobby design</b>Layout and style inspired by a game lobby UI concept by <b style="display:inline;font:inherit;font-weight:700">JACK UI</b>, shared as a reference.</div>
-        <div class="credit"><b>The Highway Code</b>Rules are paraphrased from The Highway Code, Department for Transport, Crown copyright, used under the Open Government Licence.</div>
+        <div class="credit"><b>The Highway Code and DVSA guidance</b>Rules, show me, tell me questions and sign meanings are paraphrased from The Highway Code and DVSA guidance on GOV.UK. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence v3.0</a>.</div>
+        <div class="credit"><b>Quizzes</b>Unofficial practice questions written for this project. They are not the DVSA theory test or its revision question bank, and this project is not endorsed by DVSA.</div>
         <div class="credit"><b>3D engine</b><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> by Ricardo Cabello (mrdoob) and contributors, MIT licence.</div>
         <div class="credit"><b>Fonts</b>Fredoka by Milena Brandão and Hafontia; Geist and Geist Mono by Vercel. Both under the SIL Open Font Licence, via Google Fonts.</div>
         <div class="credit"><b>Built with</b>Code written with Claude (Anthropic), directed and designed by Raviteja Manchala.</div>

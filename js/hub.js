@@ -32,7 +32,8 @@ export function createHub({ meta, onPick, onStart }) {
   const plan = () => st.kind === 'lesson' ? { kind: 'lesson', key: 'lesson:' + st.lesson, lesson: LESSONS.find(x => x.id === st.lesson) }
     : st.kind === 'puzzle' ? { kind: 'puzzle', key: 'puzzle:' + st.puzzle, lesson: PUZZLES.find(x => x.id === st.puzzle) }
     : { kind: 'mock', key: 'route:' + ROUTES[st.route].id, index: st.route };
-  const pick = () => { render(); onPick(plan()); };
+  const isQuiz = (pl) => !!(pl.lesson && pl.lesson.questions);
+  const pick = () => { render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); };
 
   // ---------- sheets ----------
   let afterProfile = null;
@@ -70,11 +71,12 @@ export function createHub({ meta, onPick, onStart }) {
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
         <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? '<span class="tick">✓</span>' : ''}<span class="tt">${esc(l.title)}</span></button>`;
     }).join('') + '</div>').join('');
-    const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id);
+    const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id), qz = !!l.questions;
     $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
-      <p class="muted">${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}</p>
-      <div class="btns"><button class="cbtn go" data-start>Start lesson</button></div>`;
+      <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
+        : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
+      <div class="btns"><button class="cbtn go" data-start>${qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
   $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; pick(); });
 
@@ -130,7 +132,7 @@ export function createHub({ meta, onPick, onStart }) {
     const pl = plan();
     if (pl.kind === 'lesson') {
       const l = pl.lesson, [txt] = status(l.id);
-      $('eventKind').textContent = 'Lesson · ' + txt; $('eventTitle').textContent = l.title; $('eventSub').textContent = l.road; $('eventIco').innerHTML = ICONS[LESSON_ICON[l.id]] || ICONS.car;
+      $('eventKind').textContent = (l.questions ? 'Quiz · ' : 'Lesson · ') + txt; $('eventTitle').textContent = l.title; $('eventSub').textContent = l.road; $('eventIco').innerHTML = ICONS[LESSON_ICON[l.id]] || ICONS.car;
     } else if (pl.kind === 'puzzle') {
       const z = pl.lesson, t = TIERS.find(x => x.id === z.tier);
       $('eventKind').innerHTML = `Puzzle · ${esc(t.title)} ${stars(starsFor(Profiles.lesson(z.id)))}`; $('eventTitle').textContent = z.title; $('eventSub').textContent = z.road; $('eventIco').innerHTML = ICONS[z.icon];
@@ -145,11 +147,46 @@ export function createHub({ meta, onPick, onStart }) {
   function play() {
     if (!Profiles.current()) { afterProfile = play; openSheet('profileSheet'); return; }
     const pl = plan(); if (pl.kind === 'puzzle' && !puzzleOpen(pl.lesson)) { openSheet('puzzleSheet'); return; }
+    if (isQuiz(pl)) { startQuiz(pl.lesson); return; }
     closeSheets(); onStart(pl);
   }
   $('playBtn').addEventListener('click', play);
 
-  function open() { closeSheets(); render(); onPick(plan()); if (!Profiles.current()) openSheet('profileSheet'); }
+  // ---------- quiz runner (theory modules) ----------
+  const qz = { quiz: null, i: 0, right: 0, answered: false };
+  function startQuiz(q) { closeSheets(); Object.assign(qz, { quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
+  function drawQuiz() {
+    const q = qz.quiz, n = q.questions.length;
+    if (qz.i >= n) {
+      const pass = qz.right / n >= q.pass;
+      Profiles.recordLesson(q.id, { pass, D: n - qz.right, S: 0 });
+      const nx = pass ? next({ kind: 'lesson', lesson: q }) : null;
+      $('quizBody').innerHTML = `<h3 class="verdict ${pass ? 'pass' : 'fail'}">${pass ? 'Passed' : 'Not yet'}</h3>
+        <div class="score"><div><b>${qz.right}/${n}</b><span>Correct</span></div><div><b>${Math.ceil(q.pass * n)}</b><span>Needed to pass</span></div></div>
+        <p class="muted" style="margin:0">Unofficial practice questions written from The Highway Code and DVSA guidance. Not the DVSA theory test.</p>
+        <div class="btns">${nx ? `<button class="cbtn go" data-qnext="${nx.id}">Next: ${esc(nx.title)}</button>` : ''}<button class="cbtn alt" data-qagain>Try again</button><button class="cbtn lav" data-close>Back to lobby</button></div>`;
+      render(); return;
+    }
+    const it = q.questions[qz.i];
+    $('quizBody').innerHTML = `<div class="qprog"><span>Question ${qz.i + 1} of ${n}</span><span class="bar"><i style="width:${qz.i / n * 100}%"></i></span></div>
+      <p class="qq">${esc(it.q)}</p><div class="qopts">${it.options.map((o, k) => `<button class="qopt" data-k="${k}"><b>${'ABCD'[k]}</b><span>${esc(o)}</span></button>`).join('')}</div>
+      <div class="qwhy" id="qwhy" hidden></div><div class="btns"><button class="cbtn go" id="qnextBtn" hidden>${qz.i === n - 1 ? 'See result' : 'Next question'}</button></div>`;
+    qz.answered = false;
+  }
+  $('quizSheet').addEventListener('click', e => {
+    const o = e.target.closest('.qopt');
+    if (o && !qz.answered) {
+      qz.answered = true; const it = qz.quiz.questions[qz.i], k = +o.dataset.k, ok = k === it.a; if (ok) qz.right++;
+      document.querySelectorAll('.qopt').forEach(b => { b.disabled = true; const kk = +b.dataset.k; if (kk === it.a) b.classList.add('right'); else if (kk === k) b.classList.add('wrong'); });
+      const w = $('qwhy'); w.hidden = false; w.className = 'qwhy ' + (ok ? 'ok' : 'no'); w.innerHTML = `<b>${ok ? 'Correct.' : 'Not quite.'}</b> ${esc(it.why)}`;
+      $('qnextBtn').hidden = false; $('qnextBtn').focus({ preventScroll: true }); return;
+    }
+    if (e.target.closest('#qnextBtn')) { qz.i++; drawQuiz(); return; }
+    if (e.target.closest('[data-qagain]')) { startQuiz(qz.quiz); return; }
+    const nb = e.target.closest('[data-qnext]'); if (nb) { st.kind = 'lesson'; st.lesson = nb.dataset.qnext; const pl = plan(); render(); if (isQuiz(pl)) startQuiz(pl.lesson); else { $('quizSheet').hidden = true; onStart(pl); } }
+  });
+
+  function open() { closeSheets(); render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); if (!Profiles.current()) openSheet('profileSheet'); }
   // what comes after this lesson or puzzle (null if none, or the next puzzle is still locked)
   function next(pl) {
     if (pl.kind === 'lesson') { const i = LESSONS.findIndex(l => l.id === pl.lesson.id); return LESSONS[i + 1] ? { kind: 'lesson', id: LESSONS[i + 1].id, title: LESSONS[i + 1].title } : null; }
@@ -158,5 +195,5 @@ export function createHub({ meta, onPick, onStart }) {
   }
   function select(kind, id) { st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; return plan(); }
   if (Profiles.current()) st.lesson = firstOpen();
-  return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor };
+  return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz };
 }
