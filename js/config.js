@@ -1,6 +1,7 @@
 // All tunable settings live here. Add routes, swap the car or change rules without touching the engine.
 
 export const DATA_URL = 'data/cambridge.json';
+export const AREAS_URL = 'data/areas/'; // the sim loads one small area per drive (built by tools/split_areas.mjs)
 
 // Player car. `wheel` picks wheel meshes; `hide` removes nodes by name; `seat` is the driver's eye (UK: right-hand drive = +x).
 export const CAR = {

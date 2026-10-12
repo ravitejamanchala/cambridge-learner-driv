@@ -80,10 +80,26 @@ export function createTest(net, traffic, player) {
     else if (nr.d < way.w / 2) t.flags.kerb = false;
     // roundabout entry
     if (way.rb && !t.onRb && v > 3.2) {
-      const busy = traffic.cars.some(c => c.alive && c.e.way.rb && Math.hypot(c.x - player.x, c.z - player.z) < 20 && ((player.x - c.x) * -Math.sin(c.th) + (player.z - c.z) * -Math.cos(c.th)) > 0);
+      const busy = traffic.cars.concat(traffic.bikes).some(c => c.alive && c.e.way.rb && Math.hypot(c.x - player.x, c.z - player.z) < 20 && ((player.x - c.x) * -Math.sin(c.th) + (player.z - c.z) * -Math.cos(c.th)) > 0);
       if (busy) t.fault('D', 'Junctions – observation', 'Did not give way to traffic already on the roundabout', 'rbgw', 6);
     }
     t.onRb = way.rb; player.onRb = way.rb;
+    // mini-roundabouts (Rule 188): give way to traffic from the right, and go round the painted circle, not over it
+    for (const m of net.minis) {
+      const dx = player.x - m.x, dz = player.z - m.z; if (Math.abs(dx) > 30 || Math.abs(dz) > 30) continue;
+      const d = Math.hypot(dx, dz), inside = d < 7, was = t.flags['mini' + m.x] || false; t.flags['mini' + m.x] = inside;
+      if (inside && !was && v > 2) {
+        const rx = -fz, rz = fx; // driver's right
+        const fromRight = traffic.cars.concat(traffic.bikes).some(c => {
+          if (!c.alive || c.v < 1.5) return false;
+          const ox = c.x - m.x, oz = c.z - m.z, od = Math.hypot(ox, oz); if (od > 24 || od < 2.5) return false;
+          const toward = -(ox * -Math.sin(c.th) + oz * -Math.cos(c.th)) / od; // heading at the mini?
+          return toward > 0.5 && (ox * rx + oz * rz) / od > 0.35;
+        });
+        if (fromRight) t.fault('D', 'Junctions – observation', 'Did not give way to traffic from the right at the mini-roundabout', 'minigw', 6);
+      }
+      if (d < 1.1 && v > 4.5) t.fault('D', 'Junctions – positioning', 'Drove over the painted centre of the mini-roundabout', 'minic', 8);
+    }
     // traffic lights: crossing a stop line
     for (const st of stopsNear(net, player.x, player.z)) {
       const rx = player.x - st.x, rz = player.z - st.z, a = rx * st.tx + rz * st.tz, lat = rx * st.tz - rz * st.tx;

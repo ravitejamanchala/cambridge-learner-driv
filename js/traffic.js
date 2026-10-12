@@ -119,6 +119,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     for (let i = 0; i < TRAFFIC.cars; i++) { const c = { kind: 'car', mesh: makeCarMesh(colours[i % colours.length]) }; cars.push(c); all.push(c); spawn(c, px, pz, true); }
     for (let i = 0; i < TRAFFIC.bikes; i++) { const b = { kind: 'bike', mesh: makeBikeMesh(i) }; bikes.push(b); all.push(b); spawn(b, px, pz, true); }
   }
+  // nodes at mini-roundabouts: traffic slows right down to go round them
+  const miniNodes = new Set();
+  for (let v = 0; v < net.nx.length; v++) if (net.minis.some(m => Math.abs(m.x - net.nx[v]) < 8 && Math.abs(m.z - net.nz[v]) < 8)) miniNodes.add(v);
   const brakeTo = (target, dist, dec = 3.4) => Math.sqrt(Math.max(0, target * target + 2 * dec * Math.max(0, dist)));
   function ringBusy(v, self) {
     const x = net.nx[v], z = net.nz[v];
@@ -148,6 +151,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     if (a.next) {
       const p = along(a.e, a.e.len - 0.5, a.dir), q = along(a.next.e, Math.min(4, a.next.e.len / 2), a.next.dir);
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
+      if (miniNodes.has(endNode(a))) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 3));
       if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 6));
       if (a.next.e.way.rb && !w.rb && rem < 22 && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 4));
       vmax = stopAhead(a, a.next.e, a.next.dir, rem, vmax);
@@ -192,5 +196,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     Object.assign(b, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: speed });
     const p = trackPoint(b); b.x = p.x; b.z = p.z; b.th = Math.atan2(-p.tx, -p.tz); b.next = chooseNext(b); b.mesh.visible = true; b.pinned = 60;
   }
-  return { lightState, update, init, cars, bikes, overrides, placeBike, get clock() { return clock; } };
+  // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
+  function placeCar(c, e, dir, s, speed) {
+    Object.assign(c, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: 1 });
+    const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
+  }
+  return { lightState, update, init, cars, bikes, overrides, placeBike, placeCar, miniNodes, get clock() { return clock; } };
 }

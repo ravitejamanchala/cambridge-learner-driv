@@ -11,6 +11,7 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
   - *Junctions and traffic lights:* turning left, turning right, traffic lights, stopping at amber (the light is scripted to change as you approach)
   - *Roundabouts:* mini-roundabout, 1st exit (left), 2nd exit (ahead), 3rd exit (right) at the Perne Road roundabout
   - *Sharing the road:* zebra crossings (a pedestrian steps out), passing cyclists (1.5 m rule)
+- **Puzzles.** Real tricky layouts graded Easy, Medium, Hard and Hardest, with up to 3 stars each: minis in a row, the Fulbourn double mini-roundabout, the Fendon Road Dutch-style roundabout, Four Lamps, the East Road signal-controlled roundabout, Mitcham's Corner one-way system, and the Milton and Histon interchanges on the A14. Traffic is timed to arrive from your right so you have to give way. Each tier unlocks after you solve a puzzle in the one before.
 - **Mock tests.** Five full routes marked like the real test: 15 or fewer driving faults and no serious faults is a pass.
 - **Learner profiles.** Name-based profiles stored in the browser (`localStorage`). `js/profile.js` is the single place to swap in a backend such as Supabase or Firebase for real accounts.
 
@@ -19,7 +20,8 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
 - **UK markings and signs.** Give-way lines and triangles, SLOW, speed-limit roundels and terminal signs, no entry, lane arrows, Belisha beacons.
 - **Traffic.** Cars that hold their lane and curve through junctions, cyclists in cycle lanes, pedestrians at zebras, UK light sequence including red-and-amber.
 - **Marking.** Speed, positioning, one-way, red/amber lights, roundabout priority, zebras, signalling, lane discipline, cycle lanes, 1.5 m clearance for cyclists, collisions.
-- **Views.** Chase, driver's seat and draggable overhead view; heading-up route map you can drag and zoom.
+- **Views and mirrors.** Chase, driver's seat and draggable overhead view; rear-view and door mirrors; heading-up route map you can drag and zoom; arrows on the road and a marker at the next turn (can be turned off).
+- **Small downloads.** Each drive loads only its own part of the city (20–140 KB) instead of the whole map.
 
 - **Lobby.** A full-screen landscape game lobby: learner level and XP, course progress card, the selected lesson or route, and PLAY. Settings for steering sensitivity, camera and shadows.
 
@@ -38,6 +40,10 @@ python3 -m http.server 8000
 
 | Path | What it does |
 | --- | --- |
+| `js/puzzles.js` | Puzzle tiers and puzzles. Add a puzzle here, then run `node tools/split_areas.mjs`. |
+| `js/mirrors.js` | Rear-view and door mirrors |
+| `js/guide.js` | Route arrows and next-turn marker |
+| `js/icons.js` | Lesson and puzzle tile icons |
 | `js/course.js` | Units, lessons, scripted events (amber, zebra, cyclist, emergency stop) and pass checks. Add a lesson here. |
 | `js/hub.js` | Game-style lobby: learner chip and XP, course, mock test, Highway Code and learner sheets, PLAY |
 | `js/profile.js` | Learner profiles and progress (localStorage) |
@@ -51,13 +57,15 @@ python3 -m http.server 8000
 | `js/test.js` | The examiner: progress, re-routing, fault marking |
 | `js/ui.js` | HUD, route map, tiles |
 | `js/main.js` | Wiring, input, cameras, loop. `window.cambridgeDrive.addInput()` is the hook for a steering wheel |
-| `data/cambridge.json` | Road network built from OpenStreetMap |
+| `data/cambridge.json` | Full road network built from OpenStreetMap (source for the areas; not loaded by the app) |
+| `data/areas/` | Small map areas, one per group of nearby drives, plus `index.json` |
+| `tools/split_areas.mjs` | Rebuilds `data/areas/` after you change routes, lessons or puzzles |
 | `tools/build_net.py` | Rebuilds `data/cambridge.json` from an Overpass Turbo GeoJSON export |
 | `tools/restyle_rx7.py` | Repaints the car texture and packs the model |
 
 ### Adding a route
 
-Add an entry to `ROUTES` in `js/config.js` with waypoints (`lat`, `lon`, and the road name to snap to). The route and its instructions are built automatically.
+Add an entry to `ROUTES` in `js/config.js` with waypoints (`lat`, `lon`, and the road name to snap to). The route and its instructions are built automatically. Then run `node tools/split_areas.mjs` so the drive gets its map area.
 
 ### Updating the map
 
@@ -65,6 +73,7 @@ Export roads from [Overpass Turbo](https://overpass-turbo.eu) as GeoJSON, then:
 
 ```sh
 python3 tools/build_net.py export.geojson data/cambridge.json
+node tools/split_areas.mjs
 ```
 
 ## Credits and licences

@@ -102,7 +102,7 @@ export function loadCarModel(url) {
 export function createPlayer(scene) {
   const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, mesh: makeBoxCar(0x1a7c52, true) };
   scene.add(p.mesh);
-  p.setModel = (m) => { scene.remove(p.mesh); p.mesh = m; scene.add(m); };
+  p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); };
   p.place = (x, z, th) => Object.assign(p, { x, z, th, v: 0, steer: 0, delta: 0 });
   p.signal = (d) => { p.indicator = p.indicator === d ? null : d; p.indTh = p.th; };
   // input: {throttle 0..1, brake 0..1, steer -1..1 (left +)}

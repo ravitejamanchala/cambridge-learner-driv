@@ -56,6 +56,12 @@ function prismGeo() {
 }
 
 let K = null;
+// shared geometry, materials and textures that must survive a map-area change
+export function kitResources() {
+  if (!K) return [];
+  const mats = Object.values(K.mats);
+  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean)];
+}
 function kit() {
   if (K) return K;
   const lam = (c, o = {}) => new T.MeshLambertMaterial({ color: c, ...o });

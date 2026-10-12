@@ -1,3 +1,4 @@
+import { along } from './net.js';
 // The learner course: units of short lessons on real Cambridge roads, each with a goal,
 // a Highway Code rule, an optional scripted event, and its own pass check.
 const wp = (lat, lon, road) => ({ lat, lon, road });
@@ -149,6 +150,32 @@ export function createScenario(lesson, deps) {
     };
     S.result = () => ({ ok: true, why: '' });
   }
+  // puzzles: send a car (or cyclist) at the junction from the learner's right, timed to arrive with them
+  if (lesson.scenario === 'yield') {
+    const R = route(), js = R.instructions.filter(i => i.node !== undefined && (i.kind === 'rb' || i.mini || i.double));
+    const ins = js[lesson.yieldAt || 0]; let placed = false, sent = false;
+    if (ins) S.update = () => {
+      if (placed) return;
+      const ahead = ins.s - test.sRoute; if (ahead > 48 || ahead < 14) return;
+      placed = true;
+      const v = ins.node, x = net.nx[v], z = net.nz[v], a = ins.approach, t = along(a.e, a.e.len - 1, a.dir), rx = -t.tz, rz = t.tx;
+      let best = null, bs = 0.2;
+      for (const o of net.inc[v]) {
+        const arr = -o.dir; if (o.e === a.e || (o.e.way.oneway && arr !== 1)) continue;
+        if ((ins.kind === 'rb') !== o.e.way.rb) continue;
+        const f = along(o.e, Math.max(0, o.e.len - 20), arr), dx = f.x - x, dz = f.z - z, L = Math.hypot(dx, dz) || 1, sc = (dx * rx + dz * rz) / L;
+        if (sc > bs) { bs = sc; best = { e: o.e, dir: arr }; }
+      }
+      if (!best) return;
+      const bike = lesson.yieldWith === 'bike', pool = (bike ? traffic.bikes : traffic.cars).slice();
+      pool.sort((p, q) => Math.hypot(q.x - player.x, q.z - player.z) - Math.hypot(p.x - player.x, p.z - player.z));
+      const ag = pool[0]; if (!ag) return;
+      const d = Math.min(best.e.len - 1, bike ? 18 : 26), tL = ahead / Math.max(player.v, 4);
+      const speed = Math.max(bike ? 3 : 3.5, Math.min(bike ? 6 : 9, d / tL));
+      (bike ? traffic.placeBike : traffic.placeCar)(ag, best.e, best.dir, best.e.len - d, speed); sent = true;
+    };
+    S.result = () => !placed ? { ok: false, why: 'You did not reach the junction.' } : { ok: true, why: sent ? '' : '' };
+  }
   if (lesson.scenario === 'estop') {
     let state = 'wait', t0 = 0, react = null, stopT = null;
     S.update = (dt, clock) => {
@@ -173,10 +200,10 @@ export function evaluate(lesson, test, scen) {
   const focus = test.faults.filter(f => (lesson.focus || []).some(p => f.cat.startsWith(p)));
   let pass = true;
   if (test.S > 0) { pass = false; reasons.push(`${test.S} serious fault${test.S > 1 ? 's' : ''}.`); }
-  if (focus.length) { pass = false; reasons.push(`This lesson is about: ${[...new Set(focus.map(f => f.cat))].join(', ')}. ${focus[0].text}.`); }
-  if (test.D > (lesson.maxD ?? 2)) { pass = false; reasons.push(`${test.D} driving faults; this lesson allows ${lesson.maxD ?? 2}.`); }
+  if (focus.length) { pass = false; reasons.push(`This drive is about: ${[...new Set(focus.map(f => f.cat))].join(', ')}. ${focus[0].text}.`); }
+  if (test.D > (lesson.maxD ?? 2)) { pass = false; reasons.push(`${test.D} driving faults; this drive allows ${lesson.maxD ?? 2}.`); }
   const r = scen && scen.result ? scen.result() : null;
   if (r) { if (!r.ok) pass = false; if (r.why) reasons.push(r.why); }
-  if (pass && !reasons.length) reasons.push('Clean drive with no faults in this lesson’s focus area.');
+  if (pass && !reasons.length) reasons.push('Clean drive: no faults in what this drive is testing.');
   return { pass, reasons };
 }

@@ -59,8 +59,16 @@ export function createUI(net) {
       g.strokeStyle = col['--accent']; g.globalAlpha = 0.9; g.lineWidth = 3.4 / k; g.beginPath();
       for (let i = 0; i < route.xs.length; i++) i ? g.lineTo(route.xs[i], route.zs[i]) : g.moveTo(route.xs[i], route.zs[i]); g.stroke(); g.globalAlpha = 1;
       const ins = route.instructions[Math.min(step, route.instructions.length - 1)];
-      const tp = pointOnRoute(route, ins.s); g.fillStyle = col['--accent']; g.beginPath(); g.arc(tp.x, tp.z, 5 / k, 0, Math.PI * 2); g.fill();
-      g.fillStyle = col['--map-bg']; g.beginPath(); g.arc(tp.x, tp.z, 2.2 / k, 0, Math.PI * 2); g.fill();
+      // destination: chequered flag; next instruction: pulsing pink target
+      const ep = pointOnRoute(route, route.len), fs = 3.2 / k;
+      g.save(); g.translate(ep.x, ep.z); g.rotate(-p.th); g.fillStyle = '#2b2030'; g.fillRect(-0.4 / k, -4 * fs, 0.8 / k, 4 * fs);
+      for (let a = 0; a < 2; a++) for (let b = 0; b < 3; b++) { g.fillStyle = (a + b) % 2 ? '#fff' : '#2b2030'; g.fillRect(b * fs * 0.9, -4 * fs + a * fs * 0.9, fs * 0.9, fs * 0.9); }
+      g.restore();
+      const tp = pointOnRoute(route, ins.s), pulse = (clock * 1.2) % 1;
+      g.strokeStyle = col['--accent']; g.globalAlpha = 1 - pulse; g.lineWidth = 2 / k; g.beginPath(); g.arc(tp.x, tp.z, (7 + pulse * 9) / k, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(tp.x, tp.z, 7.5 / k, 0, Math.PI * 2); g.fill();
+      g.fillStyle = col['--accent']; g.beginPath(); g.arc(tp.x, tp.z, 5.5 / k, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(tp.x, tp.z, 2 / k, 0, Math.PI * 2); g.fill();
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
     const nr = Math.min(cx, cy, mini.height - cy) - 11 * dpr, nx = cx + sn * nr, ny = cy - cs * nr;
@@ -111,7 +119,7 @@ export function createUI(net) {
     if (la) { const st = la.state; tl.dataset.s = st; tl.setAttribute('aria-label', { R: 'Red light', RA: 'Red and amber', A: 'Amber light', G: 'Green light' }[st] + ' ahead'); }
     if (key !== tipKey) { tipKey = key; const tp = TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; }
   }
-  return { drawMap, renderSteps, renderFaults, hud };
+  return { drawMap, renderSteps, renderFaults, hud, setNet: (n) => { net = n; } };
 }
 export function pointOnRoute(route, s) {
   const c = route.cum; let lo = 0, hi = c.length - 1; s = Math.max(0, Math.min(route.len, s));

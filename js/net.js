@@ -206,6 +206,22 @@ function turnOf(a, b) { const cross = a.x * b.z - a.z * b.x, dot = a.x * b.x + a
 function signalsAt(net, v, r, junctionOnly) { const x = net.nx[v], z = net.nz[v]; return stopsNear(net, x, z).some(s => Math.hypot(s.x - x, s.z - z) < r && !(junctionOnly && s.single)); }
 function miniAt(net, v) { const x = net.nx[v], z = net.nz[v]; return net.minis.some(m => Math.hypot(m.x - x, m.z - z) < 10); }
 
+// Two mini-roundabouts a few metres apart act as one junction (a "double mini"): give one instruction for the whole thing.
+function mergeDoubleMinis(S, out) {
+  for (let j = 0; j < out.length - 1; j++) {
+    const a = out[j], b = out[j + 1];
+    if (!a.mini || !b.mini || b.s - a.s > 30) continue;
+    const ang = turnOf(endTangent(S[a.stepI]), startTangent(S[b.stepI + 1])), deg = Math.abs(ang) * 180 / Math.PI;
+    const kind = deg < 35 ? 'straight' : deg > 150 ? 'uturn' : ang < 0 ? 'left' : 'right';
+    const verb = kind === 'straight' ? 'go straight ahead' : kind === 'uturn' ? 'go all the way round and back' : 'turn ' + kind;
+    const nm = b.road, lr = kind === 'left' ? 'L' : kind === 'right' ? 'R' : null;
+    out.splice(j, 2, { ...a, kind, icon: kind === 'uturn' ? 'rb' : kind, double: true, road: nm,
+      text: `At the double mini-roundabout, ${verb}${nm ? ' onto ' + nm : ''}. Give way to the right at each one.`,
+      short: `Double mini · ${kind === 'straight' ? 'Straight on' : kind === 'uturn' ? 'All the way round' : 'Turn ' + kind}${nm ? ' · ' + nm : ''}`,
+      signal: lr, laneReq: a.lanes >= 2 ? lr : null });
+  }
+}
+
 function makeInstructions(net, route) {
   const S = route.steps, out = [];
   for (let i = 0; i < S.length - 1; i++) {
@@ -249,7 +265,14 @@ function makeInstructions(net, route) {
     let text = laneText(laneReq) + (where ? where + verb : verb.charAt(0).toUpperCase() + verb.slice(1)) + onto + '.';
     out.push({ s: sAt, node: v, kind, icon, text, short: laneShort(laneReq) + short + (nm ? ' · ' + nm : (lights ? ' · lights' : '')), road: nm,
       signal: (kind === 'left' || kind === 'right') && deg > 34 ? (kind === 'left' ? 'L' : 'R') : null,
-      laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir } });
+      laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir }, mini, stepI: i });
+  }
+  mergeDoubleMinis(S, out);
+  // one instruction per junction: drop "straight on" repeats from clustered lights and crossings a few metres apart
+  for (let j = out.length - 1; j > 0; j--) {
+    const a = out[j - 1], b = out[j];
+    if (b.kind === 'straight' && !b.double && b.s - a.s < 45) out.splice(j, 1);
+    else if (a.kind === 'straight' && !a.double && b.s - a.s < 30) out.splice(j - 1, 1);
   }
   out.push({ s: Math.max(0, route.len - 12), kind: 'end', icon: 'stop', final: true, text: 'When it is safe, pull up on the left and stop.', short: 'Pull up on the left' });
   return out;
