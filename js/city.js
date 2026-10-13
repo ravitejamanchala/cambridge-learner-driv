@@ -99,7 +99,7 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const inChunk = (x, z) => Math.floor(x / C) === cx && Math.floor(z / C) === cz;
   const centreDist = (x, z) => Math.hypot(x + 150, z + 380); // roughly Market Square
   for (const e of edges) {
-    const cls = e.way.cls; if (/trunk/.test(cls) || e.way.rb) continue;
+    const cls = e.way.cls; if (/trunk/.test(cls) || e.way.rb || e.way.mph >= 50) continue; // no houses along fast roads and country lanes
     const main = /^(primary|secondary|tertiary)/.test(cls);
     // street lamps on main roads
     if (main) for (let s = 10, i = 0; s < e.len - 6; s += 34, i++) {

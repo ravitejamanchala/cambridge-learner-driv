@@ -234,7 +234,7 @@ function roads() {
   B.edge(dual, [[2800, 0], [2640, 6.5], [1400, 6.5], [160, 6.5], [0, 0]]);
   B.road({ name: 'Babraham Road', cls: 'primary', mph: 40, w: 7.3 }, [[2800, 0], [3300, 0], [3500, 0]]);
   // Grantchester Lane: narrow, national speed limit, bends you cannot see round
-  const gl = []; for (let z = 0; z <= 1700; z += 12) gl.push([3500 + 70 * Math.sin(z / 110) * Math.min(1, z / 120), z]);
+  const gl = []; for (let z = 0; z <= 1700; z += 12) gl.push([3500 + 50 * Math.sin(z / 130) * Math.min(1, z / 120), z]); // bends about 340 m radius: fine at 60 if you slow a little
   B.curve({ name: 'Grantchester Lane', cls: 'unclassified', mph: 60, w: 5.6 }, gl, [0, 4, gl.length - 5, gl.length - 1]);
   return B;
 }
