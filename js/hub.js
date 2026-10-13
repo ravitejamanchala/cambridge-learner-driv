@@ -79,7 +79,7 @@ export function createHub({ meta, onPick, onStart }) {
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
       <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
-      <div class="btns">${qz ? '' : `<label>Scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
+      <div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
   $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
 

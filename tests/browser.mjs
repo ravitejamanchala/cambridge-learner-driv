@@ -27,7 +27,7 @@ try {
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','cockpit-drill',true);});
  assert.equal(await page.locator('#trainingControls').isVisible(),true);
  // Engine cannot start before preparation. Rejected controls cause a real recorded fault.
- await page.locator('[data-operation="engine"]').click();
+ await page.keyboard.press('KeyI');
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.operation.engine),false);
  for(const action of ['doorClosed','seatSet','mirrorsSet','belt'])await page.locator(`[data-operation="${action}"]`).click();
  await page.evaluate(()=>window.cambridgeDrive.step(2));

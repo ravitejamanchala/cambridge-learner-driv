@@ -177,7 +177,12 @@ async function boot() {
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => { const k = KM[e.code]; if (k) key[k] = 0; });
-  window.addEventListener('blur', () => { for (const k in key) key[k] = 0; });
+  const releaseControls = () => {
+    for (const k in key) { key[k] = 0; tch[k] = 0; }
+    document.querySelectorAll('.touch .on').forEach(b => b.classList.remove('on'));
+  };
+  window.addEventListener('blur', releaseControls);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseControls(); });
   document.querySelectorAll('[data-k]').forEach(b => {
     const k = b.dataset.k;
     const on = e => { e.preventDefault(); tch[k] = 1; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
@@ -204,16 +209,30 @@ async function boot() {
   document.querySelectorAll('[data-observe]').forEach(b => b.addEventListener('click', () => look(b.dataset.observe)));
   $('assessParking').addEventListener('click', () => { if (A.test?.running && plan?.lesson?.manoeuvre) scenario?.finishAttempt(); });
   function renderTrainingControls() {
+    const parking = !!plan?.lesson?.manoeuvre, op = player.operation;
+    const preparation = ['cockpit','engine'].includes(plan?.lesson?.scenario);
+    const nextPreparation = ['doorClosed','seatSet','mirrorsSet','belt'].find(action => !op[action]) || (plan?.lesson?.scenario === 'engine' ? 'engine' : null);
     document.body.classList.toggle('parking-controls-right',!!plan?.lesson?.manoeuvre && (scenario?.progress?.target.x ?? player.x) < player.x - .5);
     $('backBtn').hidden = !!plan?.lesson?.manoeuvre;
-    $('assessParking').hidden = !plan?.lesson?.manoeuvre;
+    $('assessParking').hidden = !parking || op.gear !== 'P' || !op.parkingBrake || op.engine;
     $('parkingTask').hidden = !plan?.lesson?.manoeuvre; $('parkingTask').textContent = scenario?.progress?.message || '';
     $('trainingControls').hidden = document.body.dataset.mode !== 'drive' || (!player.operation.enabled && plan?.lesson?.scenario !== 'mirrors');
     $('cockpitControls').hidden = !player.operation.enabled;
+    $('cockpitState').hidden = parking;
     $('gearControls').hidden = player.operation.transmission !== 'automatic';
-    document.querySelectorAll('[data-gear]').forEach(b => b.setAttribute('aria-pressed', String(player.operation.gear === b.dataset.gear)));
-    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors' && !plan?.lesson?.manoeuvre;
-    document.querySelectorAll('[data-operation]').forEach(b => { b.hidden = !!plan?.lesson?.manoeuvre && !['engine','parkingBrake'].includes(b.dataset.operation); b.setAttribute('aria-pressed', String(!!player.operation[b.dataset.operation])); });
+    document.querySelectorAll('[data-gear]').forEach(b => { b.hidden = parking && b.dataset.gear === 'N'; b.setAttribute('aria-pressed', String(op.gear === b.dataset.gear)); });
+    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors';
+    document.querySelectorAll('[data-operation]').forEach(b => {
+      const action = b.dataset.operation;
+      b.hidden = !preparation && !['engine','parkingBrake'].includes(action);
+      if (preparation) b.hidden = action !== nextPreparation;
+      if (!preparation && action === 'engine') b.hidden = !parking || op.gear !== 'P' || !op.parkingBrake || !op.events.some(e => e.action === 'gear' && ['D','R'].includes(e.value));
+      if (!preparation && action === 'parkingBrake') b.hidden = op.gear === 'P' ? op.parkingBrake : !op.parkingBrake;
+      if (action === 'engine') b.textContent = op.engine ? 'Switch off engine' : 'Start engine';
+      if (action === 'parkingBrake') b.textContent = op.parkingBrake ? 'Release parking brake' : 'Apply parking brake';
+      b.setAttribute('aria-pressed', String(!!op[action]));
+    });
+    $('cockpitControls').hidden = !op.enabled || (parking && !Array.from(document.querySelectorAll('[data-operation]')).some(b => !b.hidden));
     $('cockpitState').textContent = `Engine ${player.operation.engine ? 'on' : 'off'} · Parking brake ${player.operation.parkingBrake ? 'on' : 'off'}${player.operation.gear ? ' · Selector ' + player.operation.gear : ''}`;
   }
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
@@ -259,7 +278,7 @@ async function boot() {
     }
     $('resultSheet').hidden = false; hub.render();
   }
-  function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; for (const k in key) key[k] = 0; $('pauseSheet').hidden = false; }
+  function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
