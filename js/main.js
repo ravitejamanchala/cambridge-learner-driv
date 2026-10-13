@@ -78,7 +78,15 @@ async function boot() {
 
   // ---------- drives ----------
   let route = null, nodes = null, plan = null, scenario = null;
-  const startPos = () => { const st = route.steps[0]; const p = along(st.e, Math.min(8, st.e.len / 3), st.dir, laneCentre(st.e, st.dir, 0)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz)); };
+  // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
+  const LEAD = 137;
+  const startS = (pl) => { if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startPos = (s0 = 0) => {
+    let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
+    const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
+    const p = along(st.e, ts, st.dir, laneCentre(st.e, st.dir, 0)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz));
+    return route.stepS[k] + ts;
+  };
   // examiner callouts for places the route builder can't describe (e.g. a one-way gyratory)
   function addCallouts(r, list) {
     for (const c of list) {
@@ -97,7 +105,10 @@ async function boot() {
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
-    startPos(); camInit = false; player.indicator = null;
+    const s0 = startPos(startS(pl)); camInit = false; player.indicator = null;
+    // clear any traffic sitting where the learner is placed; it comes back further away
+    if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
+    if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
     $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
@@ -125,11 +136,12 @@ async function boot() {
   let cam = 0; const CAMS = ['Chase view', 'Driver view', 'Overhead'];
   const KM = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
   const sigBtns = () => document.querySelectorAll('[data-sig]').forEach(b => b.classList.toggle('sig-on', b.dataset.sig === player.indicator));
+  const portrait = () => window.innerHeight > window.innerWidth && window.innerWidth <= 820;
   const setCam = (c, save) => {
     cam = c; $('camBtn').textContent = 'View: ' + CAMS[cam];
     document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.cam === cam));
     document.body.classList.toggle('cam-over', cam === 2); layoutSoon();
-    if (save) { prefs.cam = cam; savePrefs(); }
+    if (save) { if (portrait()) prefs.camP = cam; else prefs.cam = cam; savePrefs(); }
   };
   window.addEventListener('keydown', e => {
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -235,7 +247,9 @@ async function boot() {
   document.querySelectorAll('#miSeg [data-mi]').forEach(b => b.addEventListener('click', () => setMi(b.dataset.mi === '1')));
   const setGd = (on) => { guide.enabled = on; seg('#gdSeg [data-gd]', 'gd', on ? 1 : 0); prefs.gd = on ? 1 : 0; savePrefs(); };
   document.querySelectorAll('#gdSeg [data-gd]').forEach(b => b.addEventListener('click', () => setGd(b.dataset.gd === '1')));
-  $('portraitOk').addEventListener('click', () => { document.body.classList.add('allow-portrait'); layoutSoon(); });
+  // touch control size, 100-300% (capped so the controls always fit the screen)
+  const ctl = $('ctlSize'), setTs = (v) => { document.querySelector('.touch').style.setProperty('--ts', v / 100); $('ctlSizeV').textContent = v + '%'; ctl.value = v; };
+  setTs(prefs.ts || 300); ctl.addEventListener('input', () => { prefs.ts = +ctl.value; savePrefs(); setTs(prefs.ts); });
 
   // ---------- driver's-seat cockpit, attached to the camera (UK right-hand drive) ----------
   const cockpit = new T.Group(); scene.add(camera); camera.add(cockpit); cockpit.visible = false;
@@ -266,7 +280,7 @@ async function boot() {
     const lobby = document.body.dataset.mode === 'lobby';
     if (lookAnim > 0) lookAnim = Math.max(0, lookAnim - dt / 1.1);
     if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
-    else if (cam === 0) { px = player.x - fx * 9.2; py = 4.1; pz = player.z - fz * 9.2; lx = player.x + fx * 7; ly = 1.2; lz = player.z + fz * 7; }
+    else if (cam === 0) { const P = camera.aspect < 1, b = P ? 10.5 : 9.2, h = P ? 5.2 : 4.1, a = P ? 12 : 7; px = player.x - fx * b; py = h; pz = player.z - fz * b; lx = player.x + fx * a; ly = P ? 0.2 : 1.2; lz = player.z + fz * a; }
     else if (cam === 1) {
       const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z;
       const turn = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
@@ -285,9 +299,14 @@ async function boot() {
     camera.position.copy(camPos); camera.lookAt(camLook);
   }
   let layoutT = 0; function layoutSoon() { layoutT = 0.05; }
-  function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); layoutSoon(); }
+  let wasPortrait = null;
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.fov = w < h ? 72 : 58; camera.updateProjectionMatrix(); layoutSoon();
+    const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
+  }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(prefs.cam ?? 1); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
+  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
   function sim(dt) {

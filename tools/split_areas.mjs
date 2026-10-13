@@ -100,7 +100,8 @@ for (const id of Object.keys(LAYOUTS)) {
   fs.writeFileSync(path.join(OUT, file), txt);
   for (const p of mine) {
     const r = buildRoute(sub, p.wps.map(w => snapWaypoint(sub, w)));
-    index.plans[p.key] = { area: id, len: Math.round(r.len), n: r.instructions.length, first: r.instructions[0].text };
+    const f = r.instructions.find(i => !i.final), s0 = f ? Math.max(0, f.s - 137) : 0; // drives start 150 yards before the first junction (main.js)
+    index.plans[p.key] = { area: id, len: Math.round(r.len - s0), n: r.instructions.length, first: r.instructions[0].text };
     if (process.argv.includes('-v')) console.log(`  ${p.key} ${Math.round(r.len)} m\n${r.instructions.map(i => `     ${Math.round(i.s)}  ${i.text}${i.signal ? '  [signal ' + i.signal + ']' : ''}`).join('\n')}`);
   }
   index.areas.push({ id, file, kb: Math.round(txt.length / 1024), edges: area.edges.length, plans: mine.map(p => p.key) });
