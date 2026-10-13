@@ -120,6 +120,7 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
         s += w * 0.5 + (type === 'house' ? 0.4 + R() * 1.2 : 1 + R() * 3);
         if (!inChunk(x, z)) continue;
         const nr = nearest(net, x, z); if (nr && nr.d - nr.way.w / 2 < rad * 0.82 + 2.6) continue;
+        if (net.cycleRings.some(r => Math.hypot(x - r.x, z - r.z) < r.r + 4 + rad)) continue; // keep clear of a roundabout cycle track
         if (hit(x, z, rad)) continue; add(x, z, rad);
         const rot = Math.atan2(-pp.tz, pp.tx), front = side > 0 ? 1 : -1;
         B[type].push({ x, z, w, d, h, rot, c: pick(R, TY.tints) });

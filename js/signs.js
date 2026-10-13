@@ -2,7 +2,7 @@
 // give-way lines, triangles and signs at minor junctions and roundabouts, SLOW before roundabouts,
 // speed-limit roundels and terminal signs where the limit changes, no-entry signs on one-way streets,
 // and lane arrows on multi-lane approaches.
-import { along, laneInfo, laneCentre, stopsNear, nearest } from './net.js';
+import { along, laneInfo, laneCentre, stopsNear, nearest, laneArrows } from './net.js';
 
 const T = THREE;
 const RANK = { trunk: 6, trunk_link: 5.5, primary: 5, primary_link: 4.5, secondary: 4, secondary_link: 3.5, tertiary: 3, tertiary_link: 2.5, unclassified: 2, residential: 1, living_street: 0 };
@@ -125,16 +125,12 @@ export function buildSigns(scene, net) {
         if (hasRb || mini || maxO >= 3) signAt(B.gwSign, B.triBack, e, ts + 0.3, ad, e.way.w / 2 + 0.7, 0.9);
       }
       // lane arrows where there are two or more lanes towards the junction
-      const L = laneInfo(e, ad);
-      if (L.n >= 2 && e.len > 40) {
-        const outs = net.out[v].filter(p => p.e !== e).map(p => turn(tin, tangentOut(p)));
-        const left = outs.some(a => a < -0.5), right = outs.some(a => a > 0.5) || hasRb, ahead = outs.some(a => Math.abs(a) <= 0.5) || hasRb;
-        for (let i = 0; i < L.n; i++) {
-          let k = 'ahead';
-          if (i === 0) k = left && ahead ? 'aheadleft' : left ? 'left' : 'ahead';
-          if (i === L.n - 1) k = hasRb ? 'right' : right && ahead ? 'aheadright' : right ? 'right' : 'ahead';
-          for (const back of [10, 32]) paint(arrowB(k), e, e.len - stopDist - back, ad, laneCentre(e, ad, i), 1.1, 4.5);
-        }
+      // lane arrows (the same ones the examiner marks you on)
+      const L = laneInfo(e, ad), codes = L.n >= 2 && e.len > 40 ? laneArrows(net, e, ad) : null;
+      if (codes) {
+        const KIND = { L: 'left', S: 'ahead', R: 'right', LS: 'aheadleft', SR: 'aheadright' };
+        const back0 = signals ? 4 : 0;
+        codes.forEach((c, i) => { for (const back of [10, 32, 60]) if (back < e.len - 12) paint(arrowB(KIND[c] || 'ahead'), e, e.len - stopDist - back - back0, ad, laneCentre(e, ad, i), 1.1, 4.5); });
       }
     }
     // --- speed limit changes: roundel on the road and terminal signs on both sides ---

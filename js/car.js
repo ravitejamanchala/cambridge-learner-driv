@@ -105,6 +105,7 @@ export function createPlayer(scene) {
   p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); };
   p.place = (x, z, th) => Object.assign(p, { x, z, th, v: 0, steer: 0, delta: 0 });
   p.signal = (d) => { p.indicator = p.indicator === d ? null : d; p.indTh = p.th; };
+  p.lookAt = -1e9; // last time the driver checked mirrors and blind spot (B)
   // input: {throttle 0..1, brake 0..1, steer -1..1 (left +)}
   p.update = (dt, inp, surface) => {
     p.inp = inp;

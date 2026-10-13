@@ -241,15 +241,27 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .tipcard .h{display:flex;gap:8px;align-items:baseline;font:600 11px/1 var(--font-mono);color:#ffcf8a}
 .tipcard .h span{font-family:var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7)}
 .tipcard p{margin:0;font-size:12px;line-height:1.4;color:rgba(255,255,255,.9)}
-.fchips{display:flex;gap:8px}
-.fchip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;font:600 11.5px/1 var(--font-display)}
-.fchip b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--font-mono);background:#ffe9c2;color:#9a5a00}
-.fchip.s b{background:#ffd9da;color:#b4232a}
+.markboard{background:rgba(22,18,26,.9);color:#fff;border-radius:16px;padding:10px 12px 10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:2px solid transparent;transition:border-color .25s}
+.markboard.hit-d{border-color:#ffb21a}.markboard.hit-s{border-color:#ff5a5f}
+.mb-tally{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.mb-n{display:flex;align-items:center;gap:8px}
+.mb-n b{font:700 26px/1 var(--font-mono);min-width:30px;text-align:center;padding:4px 6px;border-radius:10px}
+.mb-n.d b{background:#ffb21a;color:#2a1b00}.mb-n.s b{background:rgba(255,255,255,.12);color:#fff}.mb-n.s.on b{background:#ff5a5f;color:#fff}
+.mb-n span{display:flex;flex-direction:column;font:600 12px/1.15 var(--font-display)}.mb-n small{font:500 10.5px/1.2 var(--font-display);color:rgba(255,255,255,.6)}
+.mb-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}.mb-bar i{display:block;height:100%;width:0;background:#ffb21a;transition:width .3s}.mb-bar.over i{background:#ff5a5f}
+.mb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mb-list li{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;font-size:12px;line-height:1.3;color:rgba(255,255,255,.92)}
+.mb-list li.ok{display:block;color:rgba(255,255,255,.6)}
+.mb-list li i{font:700 11px/22px var(--font-mono);text-align:center;border-radius:6px;background:#ffb21a;color:#2a1b00;font-style:normal}.mb-list li i.s{background:#ff5a5f;color:#fff}
+.mb-list li b{display:block;font:600 11px/1.2 var(--font-display);color:rgba(255,255,255,.62);text-transform:uppercase;letter-spacing:.04em}
+.mb-list li.new{animation:mbIn .35s ease-out}@keyframes mbIn{from{opacity:0;transform:translateY(-4px)}}
+.lookbtn{position:relative}.lookbtn kbd{position:absolute;right:3px;bottom:2px;font:600 9px/1 var(--font-mono);opacity:.65}.lookbtn.ask{box-shadow:0 0 0 3px #ffb21a}.lookbtn.done{box-shadow:0 0 0 3px #2fbf71}
+@media (prefers-reduced-motion:reduce){.mb-list li.new{animation:none}.markboard,.mb-bar i{transition:none}}
 .hud-road{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);padding:7px 14px;font:600 13px/1 var(--font-display)}
 .banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:4;padding:14px 26px;border-radius:20px;font:700 22px/1.1 var(--font-display);background:rgba(24,18,26,.86);color:#fff;pointer-events:none;text-align:center;max-width:80%}
 .banner.stop{background:#d2232a;font-size:48px;letter-spacing:.06em;padding:16px 36px;animation:pulse .6s var(--spring) infinite}
 .touch{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(12px + var(--safe-b));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
-@media (pointer:coarse){.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.hud-bl .fchips{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
+@media (pointer:coarse){.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.markboard{padding:7px 9px;gap:5px}.mb-n b{font-size:19px;min-width:24px}.mb-list li:nth-child(n+2){display:none}.mb-list li{font-size:11px}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
 .touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
 .touch .c{display:flex;flex-direction:column;gap:10px;align-items:center}
 .tb{width:70px;height:70px;border-radius:50%;border:0;background:rgba(24,18,26,.55);color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);display:grid;place-items:center;touch-action:none;transition:transform .3s var(--spring),background .2s}
@@ -344,6 +356,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
     <div class="glass hud-next"><div class="ico" id="hudIco"></div><div class="tx"><strong id="hudNext">Get ready</strong><span id="hudDist">–</span></div></div>
     <div class="hud-right">
       <div class="glass speedo"><div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div><div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div><div class="roundel" id="hudLimit">30</div></div>
+      <button class="glass pausebtn lookbtn" id="lookBtn" aria-label="Look round: mirrors and blind spot (B)" title="Look round: mirrors and blind spot (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><kbd>B</kbd></button>
       <button class="glass pausebtn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
     </div>
     <button class="recentre cam" id="camRecentre" hidden>Back to car</button>
@@ -353,7 +366,14 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
     </div>
     <div class="hud-bl">
       <button class="glass tipcard" id="tipCard" aria-expanded="false" title="Highway Code tip: tap to read"><div class="h"><b id="tipRule">Rule 160</b><span id="tipCtx">Normal driving</span></div><p id="tipTxt">Keep to the left unless road signs or markings tell you otherwise.</p></button>
-      <div class="fchips"><div class="glass fchip"><b id="dCount">0</b>Driving faults</div><div class="glass fchip s"><b id="sCount">0</b>Serious</div></div>
+      <section class="markboard" id="markBoard" aria-label="Examiner's marking" aria-live="polite">
+        <div class="mb-tally">
+          <div class="mb-n d"><b id="dCount">0</b><span>Driving faults<small id="dMax">15 allowed</small></span></div>
+          <div class="mb-n s"><b id="sCount">0</b><span>Serious<small>0 allowed</small></span></div>
+        </div>
+        <div class="mb-bar" aria-hidden="true"><i id="dBar"></i></div>
+        <ol class="mb-list" id="mbList"><li class="ok">No faults yet</li></ol>
+      </section>
     </div>
     <div class="glass hud-road" id="hudRoad">–</div>
     <div class="banner" id="banner" hidden role="alert"></div>

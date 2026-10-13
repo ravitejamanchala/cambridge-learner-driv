@@ -70,7 +70,7 @@ export function createTest(net, traffic, player) {
     if (!nr) return;
     const way = nr.way, limit = way.mph;
     // moving off from the kerb (Rule 159): look round first, and don't pull out in front of traffic coming from behind
-    if (t.parked && Math.abs(v) > 0.8) {
+    if (t.parked && v > 0.8) {
       t.parked = false;
       const looked = player.lookAt !== undefined && traffic.clock - player.lookAt < 10;
       if (!looked) t.fault('D', 'Move off – safety', 'Moved off without checking your mirrors and blind spot first');
@@ -180,11 +180,12 @@ export function createTest(net, traffic, player) {
     t.lightAhead = la ? { dist: la.dist, state: traffic.lightState(la.st) } : null;
     // collisions
     for (const c of traffic.cars) {
-      if (!c.alive) continue; const ex = c.x - player.x, ez = c.z - player.z; if (Math.abs(ex) > 6 || Math.abs(ez) > 6) continue;
+      if (!c.alive || c.ghost > 0) continue; // a car squeezing through a stand-off is not a collision you caused
+      const ex = c.x - player.x, ez = c.z - player.z; if (Math.abs(ex) > 6 || Math.abs(ez) > 6) continue;
       const fw = ex * fx + ez * fz, lt = ex * fz - ez * fx;
       if (Math.abs(fw) < 4.1 && Math.abs(lt) < 1.85) {
         // being run into from behind, or while stopped, is not the learner's fault
-        const theirFault = Math.abs(v) < 0.4 || (fw < -1.5 && c.v > v + 0.5);
+        const theirFault = Math.abs(v) < 0.4 || (fw < -1.2 && v > -0.3); // run into from behind (unless you were reversing)
         if (!theirFault) t.fault('S', 'Control – collision', 'Collided with another vehicle', 'col', 4);
         player.v = theirFault ? player.v : -Math.sign(fw || 1) * 1.5;
       }

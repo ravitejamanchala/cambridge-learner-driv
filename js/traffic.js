@@ -234,7 +234,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       const rx = o.x - a.x, rz = o.z - a.z, fwd = rx * fx + rz * fz; if (fwd <= 0 || fwd > look) continue;
       const lat = Math.abs(rx * fz - rz * fx), oBike = o.kind === 'bike';
       const oncoming = Math.cos((o.th || 0) - a.th) < -0.5; // passing in the other lane, not in our way
-      let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : 2.2);
+      let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
       if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
       if (lat < width) vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));

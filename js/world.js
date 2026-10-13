@@ -57,11 +57,20 @@ export function buildWorld(scene, net, traffic) {
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
     ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
     ribbon(road, e, -w / 2, w / 2, 0.04);
+    if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
+      const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
+    }
     if (!wy.rb && e.len > 16) {
-      // lane dividers within each direction
+      // lane dividers within each direction: dashed, then long solid-looking dashes on the last 30 m before a junction
       for (const dir of wy.oneway ? [1] : [1, -1]) {
         const L = laneInfo(e, dir);
-        for (let k = 1; k < L.n; k++) { const o = (L.outer - L.laneW * k) * dir; for (let s = 8; s < e.len - 8; s += 9) dash(white, e, s, 3, o, 0.07); }
+        for (let k = 1; k < L.n; k++) {
+          const o = (L.outer - L.laneW * k) * dir;
+          for (let s = 8; s < e.len - 8; s += 9) {
+            const toEnd = dir > 0 ? e.len - s : s; // distance to the junction you are driving towards
+            dash(white, e, s, toEnd < 38 ? 7 : 3, o, 0.07);
+          }
+        }
       }
       // centre line on two-way main roads, kept clear of junctions
       if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2)) for (let s = 9; s < e.len - 9; s += 9) dash(white, e, s, 3.2, 0, 0.07);
@@ -86,6 +95,29 @@ export function buildWorld(scene, net, traffic) {
     for (let o = -z.w / 2 + 0.3; o < z.w / 2 - 0.3; o += 1) {
       const o2 = Math.min(o + 0.5, z.w / 2 - 0.2), nx = z.tz, nz = -z.tx;
       white.quad(z.x + nx * o - z.tx * 1.6, z.z + nz * o - z.tz * 1.6, z.x + nx * o2 - z.tx * 1.6, z.z + nz * o2 - z.tz * 1.6, z.x + nx * o2 + z.tx * 1.6, z.z + nz * o2 + z.tz * 1.6, z.x + nx * o + z.tx * 1.6, z.z + nz * o + z.tz * 1.6, 0.07);
+    }
+  }
+  // Dutch-style roundabouts: red cycle track round the outside with white "elephant's footprint" edges where it crosses the roads
+  const annulus = (acc, ring, r0, r1, y) => { const N = 96; for (let i = 0; i < N; i++) { const a0 = i / N * 2 * Math.PI, a1 = (i + 1) / N * 2 * Math.PI, P = (r, a) => [ring.x + r * Math.sin(a), ring.z - r * Math.cos(a)];
+    const [x1, z1] = P(r0, a0), [x2, z2] = P(r1, a0), [x3, z3] = P(r1, a1), [x4, z4] = P(r0, a1); acc.quad(x1, z1, x2, z2, x3, z3, x4, z4, y); } };
+  for (const ring of net.cycleRings) {
+    const A = accFor(ring.x, ring.z);
+    annulus(A.pave, ring, ring.r - 3.4, ring.r + 3, 0.021);
+    annulus(A.cyc, ring, ring.r - 1.2, ring.r + 1.2, 0.055);
+    for (const c of ring.crossings) for (const side of [-1, 1]) {
+      const r = ring.r + side * 1.35, w = c.w / 2;
+      for (let o = -w; o < w - 0.3; o += 0.9) { // short white blocks along both edges of the crossing
+        const tx = Math.cos(c.ang), tz = Math.sin(c.ang), nx = Math.sin(c.ang), nz = -Math.cos(c.ang), cx = ring.x + nx * r + tx * (o + 0.25), cz = ring.z + nz * r + tz * (o + 0.25);
+        A.white.quad(cx - tx * 0.25 - nx * 0.2, cz - tz * 0.25 - nz * 0.2, cx + tx * 0.25 - nx * 0.2, cz + tz * 0.25 - nz * 0.2, cx + tx * 0.25 + nx * 0.2, cz + tz * 0.25 + nz * 0.2, cx - tx * 0.25 + nx * 0.2, cz - tz * 0.25 + nz * 0.2, 0.075);
+      }
+    }
+  }
+  // puffin crossings: two lines of studs across the road where people cross
+  for (const c of traffic.puffins) {
+    const white = accFor(c.x, c.z).white, nx = c.tz, nz = -c.tx, h = c.w / 2;
+    for (const al of [-1.4, 1.4]) for (let o = -h + 0.2; o < h - 0.2; o += 0.7) {
+      const x = c.x + c.tx * al + nx * o, z = c.z + c.tz * al + nz * o;
+      white.quad(x - 0.15, z - 0.15, x + 0.15, z - 0.15, x + 0.15, z + 0.15, x - 0.15, z + 0.15, 0.072);
     }
   }
   const pm = flatMat(W.pave), rm = flatMat(W.road), cm = flatMat(W.cycle);

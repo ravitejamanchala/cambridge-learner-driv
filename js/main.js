@@ -82,7 +82,7 @@ async function boot() {
   // examiner callouts for places the route builder can't describe (e.g. a one-way gyratory)
   function addCallouts(r, list) {
     for (const c of list) {
-      const p = ll2xz(A.net, c.lat, c.lon); let bi = 0, bd = Infinity;
+      const p = c.x !== undefined ? c : ll2xz(A.net, c.lat, c.lon); let bi = 0, bd = Infinity;
       for (let i = 0; i < r.xs.length; i++) { const dd = (r.xs[i] - p.x) ** 2 + (r.zs[i] - p.z) ** 2; if (dd < bd) { bd = dd; bi = i; } }
       r.instructions.push({ s: r.cum[bi], kind: 'straight', icon: c.icon || (c.signal === 'L' ? 'left' : c.signal === 'R' ? 'right' : 'straight'), text: c.text, short: c.short, signal: c.signal || null, road: c.road || '', callout: true });
     }
@@ -99,7 +99,7 @@ async function boot() {
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     startPos(); camInit = false; player.indicator = null;
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
-    ui.renderSteps(route, 0); ui.renderFaults(test);
+    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
     $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
     A.world.updateChunks(player.x, player.z, 4);
   }
@@ -139,6 +139,7 @@ async function boot() {
     if (k) { key[k] = 1; if (A.test && A.test.running) e.preventDefault(); }
     else if (e.code === 'KeyQ') { player.signal('L'); sigBtns(); } else if (e.code === 'KeyE') { player.signal('R'); sigBtns(); }
     else if (e.code === 'KeyC') setCam((cam + 1) % 3, true);
+    else if (e.code === 'KeyB') look();
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => { const k = KM[e.code]; if (k) key[k] = 0; });
@@ -150,9 +151,14 @@ async function boot() {
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault());
   });
   document.querySelectorAll('[data-sig]').forEach(b => b.addEventListener('click', () => { player.signal(b.dataset.sig); sigBtns(); }));
+  // look round: mirrors and over the shoulder (the driver view turns to look); the examiner notes when you did it
+  let lookAnim = 0;
+  function look() { if (!A.traffic) return; player.lookAt = A.traffic.clock; lookAnim = 1; }
+  $('lookBtn').addEventListener('click', look);
+  ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => extraInputs.push(fn), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
+  window.cambridgeDrive = { addInput: (fn) => extraInputs.push(fn), look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
   function readInput() {
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
     return { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
@@ -258,9 +264,14 @@ async function boot() {
   function updateCamera(dt) {
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th), rx = -fz, rz = fx; let px, py, pz, lx, ly, lz, k = 1 - Math.exp(-dt * 4.2);
     const lobby = document.body.dataset.mode === 'lobby';
+    if (lookAnim > 0) lookAnim = Math.max(0, lookAnim - dt / 1.1);
     if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
     else if (cam === 0) { px = player.x - fx * 9.2; py = 4.1; pz = player.z - fz * 9.2; lx = player.x + fx * 7; ly = 1.2; lz = player.z + fz * 7; }
-    else if (cam === 1) { const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z; lx = px + fx * 20; ly = 0.9; lz = pz + fz * 20; k = 1; }
+    else if (cam === 1) {
+      const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z;
+      const turn = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
+      lx = px + lfx * 20; ly = 0.9; lz = pz + lfz * 20; k = 1;
+    }
     else { lx = player.x + ov.px; ly = 0; lz = player.z + ov.pz; px = lx; py = ov.h; pz = lz + ov.h * 0.38; k = 1 - Math.exp(-dt * 12); }
     const mode = cam === 2 && !lobby ? Math.round(ov.h / 20) : -1;
     if (mode !== farMode && scene.fog) {
@@ -293,9 +304,16 @@ async function boot() {
   }
   // test hook: advance the simulation without rendering
   window.cambridgeDrive.step = (n, dt = 0.05) => { for (let i = 0; i < n; i++) if (A.net && route) sim(dt); };
+  let manual = false; // recording hook: frames are stepped by hand with a fixed time step
+  window.cambridgeDrive.manual = (on) => { manual = on; };
+  window.cambridgeDrive.frame = (dt) => tick(dt);
+  window.cambridgeDrive.setCam = (c) => setCam(c);
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!manual) tick(dt);
+  }
+  function tick(dt) {
     if (!A.net || !route) return;
     const { traffic, test, world } = A, drive = document.body.dataset.mode === 'drive';
     sim(dt);

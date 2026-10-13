@@ -9,11 +9,12 @@ const ICON = {
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 20v-7a3 3 0 0 1 3-3h8M15 6l4 4-4 4"/></svg>',
   rb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="10" r="4"/><path d="M12 20v-6M16 10h4M8 10H4M12 6V2"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 20V8a3 3 0 0 1 3-3h6M13 2l4 3-4 3"/><path d="M4 20h16"/></svg>',
+  look: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 16v.5"/></svg>'
 };
 const TIPS = {
-  keep: { rule: 'Rule 160', ctx: 'Normal driving', txt: 'Keep to the left unless road signs or markings tell you otherwise. Give cyclists plenty of room; Cambridge has a lot of them.' },
-  speed: { rule: 'Rule 124', ctx: 'Speed limits', txt: 'A limit is the most you may do, not a target. Much of central Cambridge is 20 mph. Go slower near parked cars, schools and crossings.' },
+  keep: { rule: 'Rule 160', ctx: 'Normal driving', txt: 'Keep to the left unless road signs or markings tell you otherwise. Give cyclists plenty of room.' },
+  speed: { rule: 'Rule 124', ctx: 'Speed limits', txt: 'A limit is the most you may do, not a target. Many town streets are 20 mph. Go slower near parked cars, schools and crossings.' },
   lights: { rule: 'Rule 175', ctx: 'Traffic lights', txt: 'Stop at the white line on red. Amber also means stop, unless you have already crossed the line or stopping could cause a collision. Red and amber together still means stop.' },
   rb: { rule: 'Rule 185', ctx: 'Roundabouts', txt: 'Give priority to traffic coming from your right. Go round clockwise, and check for cyclists on your left as you leave.' },
   zebra: { rule: 'Rule 195', ctx: 'Zebra crossings', txt: 'Watch for people waiting to cross and be ready to slow down or stop. Once someone has stepped onto the crossing, you must give way.' },
@@ -89,8 +90,16 @@ export function createUI(net) {
     $('nextTxt').textContent = ins[i].text;
     $('steps').innerHTML = ins.map((x, k) => `<li class="${k < i ? 'done' : k === i ? 'cur' : ''}"><b>${String(k + 1).padStart(2, '0')}</b><span>${esc(x.short)}</span></li>`).join('');
   }
-  function renderFaults(t) {
+  // marking board on the driving screen and the full sheet in the pause menu
+  let shown = 0, hitT = 0, allowD = 15;
+  function renderFaults(t, maxD) {
+    if (maxD !== undefined) allowD = maxD;
     const ul = $('flist'); $('dCount').textContent = t.D; $('sCount').textContent = t.S;
+    $('dMax').textContent = allowD + ' allowed'; $('sCount').parentElement.classList.toggle('on', t.S > 0);
+    const bar = $('dBar'); bar.style.width = Math.min(100, t.D / Math.max(1, allowD) * 100) + '%'; bar.parentElement.classList.toggle('over', t.D > allowD);
+    const fresh = t.faults.length > shown ? t.faults.length - shown : 0; shown = t.faults.length;
+    $('mbList').innerHTML = t.faults.length ? t.faults.slice(0, 2).map((f, i) => `<li class="${i < fresh ? 'new' : ''}"><i class="${f.kind === 'S' ? 's' : ''}">${f.kind}</i><span><b>${esc(f.cat)}</b>${esc(f.text)}</span></li>`).join('') : '<li class="ok">No faults yet</li>';
+    if (fresh) { const mb = $('markBoard'); mb.classList.remove('hit-d', 'hit-s'); mb.classList.add(t.faults[0].kind === 'S' ? 'hit-s' : 'hit-d'); clearTimeout(hitT); hitT = setTimeout(() => mb.classList.remove('hit-d', 'hit-s'), 1600); }
     if (!t.faults.length) { ul.innerHTML = '<li class="empty">No faults yet. Keep left, watch your speed and signal before turning.</li>'; return; }
     ul.innerHTML = t.faults.slice(0, 30).map(f => `<li><span class="badge ${f.kind === 'S' ? 's' : ''}">${f.kind}</span><div class="fx"><strong>${esc(f.cat)}</strong><span>${esc(f.text)}</span></div></li>`).join('');
   }
@@ -98,14 +107,21 @@ export function createUI(net) {
     const mph = Math.round(Math.abs(p.v) * MPH), ctx = t.ctx, way = ctx && ctx.d < 30 ? ctx.way : null;
     const limit = way ? way.mph : 30, over = mph > limit + 1;
     $('hudSpd').textContent = mph; $('hudLimit').textContent = limit; $('hudLimit').classList.toggle('over', over);
-    $('hudLimit').title = !way ? 'Off the road network' : way.assumed ? `No limit tagged for ${way.name || 'this road'}; ${limit} mph assumed` : `${limit} mph limit from OpenStreetMap`;
-    const rn = way ? (way.name || 'Unnamed road') : 'Off the road network';
+    $('hudLimit').title = !way ? 'Off the road network' : way.assumed ? `No limit tagged for ${way.name || 'this road'}; ${limit} mph assumed` : `${limit} mph limit`;
+    const rn = way ? (way.name || (way.rb ? 'Roundabout' : 'Unnamed road')) : 'Off the road network';
     $('hudRoad').textContent = rn;
     const R = t.route, ins = R.instructions, i = Math.min(t.step, ins.length - 1), s = ins[i];
     let short = s.short, ico = s.icon, dtxt;
     const yd = Math.max(0, s.s - t.sRoute) * YD; dtxt = yd < 15 ? 'now' : yd > 1700 ? 'in ' + (yd / 1760).toFixed(1) + ' miles' : 'in ' + Math.round(yd / 10) * 10 + ' yd';
     if (s.final && yd > 280) { short = 'Follow the road ahead'; ico = 'straight'; } // don't announce "pull up" a mile early
+    // roundabouts: once past the exit before yours, the prompt is to signal left
+    if (s.kind === 'rb' && s.exitSignal && t.sRoute > s.s && t.sRoute > s.prevExitS - 0.5 && t.sRoute < s.exitS) { short = p.indicator === 'L' ? 'Leave at the next exit' : 'Signal left now: your exit is next'; dtxt = 'now'; }
+    else if (s.kind === 'rb' && t.sRoute > s.s && t.sRoute < s.exitS) { short = s.exitN > 1 ? `Stay on · ${s.exitN}${['', 'st', 'nd', 'rd'][s.exitN] || 'th'} exit` : 'Leave at the 1st exit'; dtxt = 'on the roundabout'; }
     if (t.offRoute) { short = 'Finding a new route'; ico = 'off'; dtxt = 'follow the road'; }
+    // parked at the kerb: look round before moving off
+    const lb = $('lookBtn'), looked = clockSim() - p.lookAt < 10;
+    if (running && t.parked) { short = looked ? 'Move off when it is safe' : 'Look round (B), then move off'; ico = 'look'; dtxt = looked ? 'signal if anyone could benefit' : 'mirrors and blind spot'; }
+    lb.classList.toggle('ask', running && t.parked && !looked); lb.classList.toggle('done', running && t.parked && looked);
     if (!running && !t.done) dtxt = 'Press start';
     $('hudNext').textContent = short; $('hudDist').textContent = dtxt + ' · ' + rn;
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
@@ -130,7 +146,8 @@ export function createUI(net) {
   // show the lesson's own Highway Code rule for the first part of a drive
   let pinned = null; const clockNow = () => performance.now() / 1000;
   function pinTip(rule, title, secs = 20) { pinned = rule ? { tip: { rule: rule.n, ctx: title, txt: rule.t }, until: clockNow() + secs } : null; tipKey = ''; }
-  return { drawMap, renderSteps, renderFaults, hud, pinTip, setNet: (n) => { net = n; } };
+  let clockSim = () => 0;
+  return { drawMap, renderSteps, renderFaults, hud, pinTip, setNet: (n) => { net = n; }, setClock: (f) => { clockSim = f; } };
 }
 export function pointOnRoute(route, s) {
   const c = route.cum; let lo = 0, hi = c.length - 1; s = Math.max(0, Math.min(route.len, s));

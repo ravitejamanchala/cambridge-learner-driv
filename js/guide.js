@@ -22,10 +22,26 @@ export function createGuide() {
   const m4 = new T.Matrix4(), q = new T.Quaternion(), up = new T.Vector3(0, 1, 0), pos = new T.Vector3(), sc = new T.Vector3(1, 1, 1);
   let on = true;
 
-  // lane-centre point s metres along the route
+  // lane-centre point s metres along the route: the kerb lane, drifting into the lane the next junction needs
+  // over the 120 m before it (so the arrows show you when and where to change lane)
   function lanePoint(R, s) {
     let k = 0; while (k < R.steps.length - 1 && R.stepS[k + 1] <= s) k++;
-    const st = R.steps[k]; return along(st.e, Math.max(0, Math.min(st.e.len, s - R.stepS[k])), st.dir, laneCentre(st.e, st.dir, 0));
+    const st = R.steps[k], ts = Math.max(0, Math.min(st.e.len, s - R.stepS[k]));
+    let off = laneCentre(st.e, st.dir, 0);
+    const ins = R.instructions.find(i => i.laneOK && i.approach && i.approach.e === st.e && i.s >= s - 2);
+    if (ins && !ins.laneOK.includes(0)) {
+      const want = laneCentre(st.e, st.dir, ins.laneOK[0]), u = Math.max(0, Math.min(1, (s - (ins.s - 130)) / 45));
+      off += (want - off) * u;
+    }
+    // on a two-lane roundabout: came in from the right-hand lane, so keep to the inner lane until just before your exit
+    if (st.e.way.rb && st.e.way.lanes >= 2) {
+      const rb = R.instructions.find(i => i.kind === 'rb' && i.s <= s + 1 && s <= i.exitS);
+      if (rb && rb.laneOK && !rb.laneOK.includes(0)) {
+        const inner = laneCentre(st.e, 1, 9), u = Math.max(0, Math.min(1, (rb.exitS - s - 4) / 16));
+        off += (inner - off) * u;
+      }
+    }
+    return along(st.e, ts, st.dir, off);
   }
   let minis = [];
   function update(test, clock, net) {
@@ -33,7 +49,7 @@ export function createGuide() {
     group.visible = on && !!test.route && !test.offRoute;
     if (!group.visible) return;
     const R = test.route, s0 = test.sRoute + 7, ins = R.instructions[Math.min(test.step, R.instructions.length - 1)];
-    const stop = Math.min(R.len - 2, ins.s + 12);
+    const stop = Math.min(R.len - 2, (ins.exitS ?? ins.s) + 12);
     let n = 0;
     for (let i = 0; i < N; i++) {
       const s = s0 + i * GAP; if (s > stop) break;
@@ -44,10 +60,10 @@ export function createGuide() {
       m4.compose(pos, q, sc); chev.setMatrixAt(n++, m4);
     }
     chev.count = n; chev.instanceMatrix.needsUpdate = true;
-    const tp = lanePoint(R, ins.final ? Math.max(0, R.len - 6) : ins.s);
+    const tp = lanePoint(R, ins.final ? Math.max(0, R.len - 6) : ins.kind === 'rb' && test.sRoute > ins.s - 15 ? ins.exitS + 4 : ins.s);
     marker.position.set(tp.x, 0, tp.z);
     head.position.y = 7.6 + Math.sin(clock * 3) * 0.25; head.rotation.y = clock;
     ring.scale.setScalar(1 + (clock * 0.8 % 1) * 0.35); ring.material.opacity = 0.85 * (1 - (clock * 0.8 % 1));
   }
-  return { group, update, set enabled(b) { on = b; }, get enabled() { return on; } };
+  return { group, update, lanePoint, set enabled(b) { on = b; }, get enabled() { return on; } };
 }

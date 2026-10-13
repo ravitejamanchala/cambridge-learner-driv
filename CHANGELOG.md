@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.1 (13 Oct 2026): practice layouts, lanes and new marking
+- Lessons and puzzles now run on purpose-built practice layouts instead of Cambridge streets, each designed to teach one thing:
+  - Practice town: side roads, traffic lights, a two-lane road with lane arrows, a zebra, a puffin crossing, cycle lanes and a 30-to-20 change.
+  - Roundabout road: a mini, a normal roundabout, a two-lane one, a big one with traffic lights, and a Dutch-style one.
+  - Faster roads: a 40 mph road, a country lane at 60 and a dual carriageway at 70.
+  - Puzzle park: two minis, a staggered double mini, a five-arm roundabout with a one-way arm, a gyratory and a motorway interchange.
+  - Mock tests stay on real Cambridge roads.
+- Lanes: lane arrows are part of the map. The examiner tells you which lane to use (left, middle, right, or "left or middle") and marks you on it. The road arrows match.
+  - New lesson "Choosing your lane": straight on from the left lane at one set of lights and from the right lane at the next.
+  - The route guide arrows drift into the lane you need before the junction.
+- Roundabouts:
+  - Signal left after passing the exit before yours is now marked: missing it, or signalling left too early.
+  - Approach signals follow the exit's direction.
+  - On the roundabout the screen says "Stay on · 3rd exit", then "Signal left now: your exit is next".
+- New lesson "Roundabout with traffic lights": arrows on every entry, lane lines and lights on the ring.
+- Dutch-style roundabout: a red cycle track rings it, with cyclists riding round. Cars give way at the crossings, and you are marked if you cut across a cyclist. It is a new lesson and the puzzle.
+- Moving off: press B (or the eye button) to check your mirrors and blind spot.
+  - The examiner marks moving off without looking, pulling out in front of traffic, or not signalling when someone is coming.
+  - The moving-off lesson sends a car past you first.
+  - After the emergency stop you move off again.
+- Puffin crossings: people wait on amber and cross on red. Driving onto the crossing while someone is on it is a serious fault.
+- Marking board redesigned: big driving-fault and serious counts, how many this drive allows, a bar, and the latest faults written out. It flashes when a fault is marked and now shows on phones too.
+- Traffic keeps to its lane arrows and doesn't wait for a gap at roundabout entries controlled by lights.
+
 ## v1.0.1 (13 Oct 2026): fixes from tester feedback
 - Car can now reach 70 mph (it topped out at 38 mph); about 0–60 in 10 s.
 - Examiner progress follows the nearest route segment and can't jump ahead to a parallel road (Mitcham's Corner, Mill Road re-routes).
