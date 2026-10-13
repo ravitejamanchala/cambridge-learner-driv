@@ -92,14 +92,15 @@ export function createUI(net) {
   }
   // marking board on the driving screen and the full sheet in the pause menu
   let shown = 0, hitT = 0, allowD = 15;
+  const mbEl = document.getElementById('markBoard'); if (mbEl) mbEl.addEventListener('click', () => { clearTimeout(hitT); mbEl.classList.toggle('open'); });
   function renderFaults(t, maxD) {
     if (maxD !== undefined) allowD = maxD;
     const ul = $('flist'); $('dCount').textContent = t.D; $('sCount').textContent = t.S;
-    $('dMax').textContent = allowD + ' allowed'; $('sCount').parentElement.classList.toggle('on', t.S > 0);
+    $('dMax').textContent = '/' + allowD; $('sCount').parentElement.classList.toggle('on', t.S > 0);
     const bar = $('dBar'); bar.style.width = Math.min(100, t.D / Math.max(1, allowD) * 100) + '%'; bar.parentElement.classList.toggle('over', t.D > allowD);
     const fresh = t.faults.length > shown ? t.faults.length - shown : 0; shown = t.faults.length;
     $('mbList').innerHTML = t.faults.length ? t.faults.slice(0, 2).map((f, i) => `<li class="${i < fresh ? 'new' : ''}"><i class="${f.kind === 'S' ? 's' : ''}">${f.kind}</i><span><b>${esc(f.cat)}</b>${esc(f.text)}</span></li>`).join('') : '<li class="ok">No faults yet</li>';
-    if (fresh) { const mb = $('markBoard'); mb.classList.remove('hit-d', 'hit-s'); mb.classList.add(t.faults[0].kind === 'S' ? 'hit-s' : 'hit-d'); clearTimeout(hitT); hitT = setTimeout(() => mb.classList.remove('hit-d', 'hit-s'), 1600); }
+    if (fresh) { const mb = $('markBoard'); mb.classList.remove('hit-d', 'hit-s'); mb.classList.add(t.faults[0].kind === 'S' ? 'hit-s' : 'hit-d', 'open'); clearTimeout(hitT); hitT = setTimeout(() => mb.classList.remove('hit-d', 'hit-s', 'open'), 4500); }
     if (!t.faults.length) { ul.innerHTML = '<li class="empty">No faults yet. Keep left, watch your speed and signal before turning.</li>'; return; }
     ul.innerHTML = t.faults.slice(0, 30).map(f => `<li><span class="badge ${f.kind === 'S' ? 's' : ''}">${f.kind}</span><div class="fx"><strong>${esc(f.cat)}</strong><span>${esc(f.text)}</span></div></li>`).join('');
   }
@@ -123,7 +124,14 @@ export function createUI(net) {
     if (running && t.parked) { short = looked ? 'Move off when it is safe' : 'Look round (B), then move off'; ico = 'look'; dtxt = looked ? 'signal if anyone could benefit' : 'mirrors and blind spot'; }
     lb.classList.toggle('ask', running && t.parked && !looked); lb.classList.toggle('done', running && t.parked && looked);
     if (!running && !t.done) dtxt = 'Press start';
-    $('hudNext').textContent = short; $('hudDist').textContent = dtxt + ' · ' + rn;
+    // sign-first: the icon says what to do; show the distance, and words only for prompts that need them
+    const prompt = /Look round|Move off|Signal left|Finding|Pull up|Leave at/.test(short) ? short.replace('Look round (B), then move off', 'Look round · B').replace('Move off when it is safe', 'Move off').replace('Signal left now: your exit is next', 'Signal left').replace('Finding a new route', 'New route').replace('Leave at the next exit', 'Exit next').replace('Pull up on the left', 'Pull up left') : '';
+    $('hudNext').textContent = !running && !t.done ? 'Ready' : t.parked ? '' : (dtxt === 'now' || dtxt === 'on the roundabout' ? 'now' : dtxt.replace(/^in /, '').replace('follow the road', '…'));
+    $('hudDist').textContent = prompt;
+    $('hudNextBox').setAttribute('aria-label', s.text);
+    const ex = $('hudExit'), exN = s.kind === 'rb' && !t.offRoute && !t.parked ? s.exitN : 0; ex.hidden = !exN; ex.textContent = exN || '';
+    const ln = $('hudLanes'), showL = s.laneOK && s.lanes >= 2 && s.lanes <= 4 && !t.offRoute && s.s - t.sRoute < 250 && s.s > t.sRoute - 2;
+    ln.hidden = !showL; if (showL) { const k = s.lanes + ':' + s.laneOK.join(','); if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: s.lanes }, (_, i) => `<i class="${s.laneOK.includes(i) ? 'on' : ''}"></i>`).join(''); } }
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
     // tip
