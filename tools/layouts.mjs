@@ -230,8 +230,9 @@ function roads() {
   // Babraham Road (40) into a dual carriageway at 70, then back to a single road
   B.road({ name: 'Babraham Road', cls: 'primary', mph: 40, w: 7.3 }, [[-900, 0], [-700, 0], [0, 0]]);
   const dual = { name: 'Babraham Road', cls: 'trunk', mph: 70, w: 7.6, lanes: 2, oneway: 1 };
-  B.edge(dual, [[0, 0], [160, -6.5], [1400, -6.5], [2640, -6.5], [2800, 0]]);
-  B.edge(dual, [[2800, 0], [2640, 6.5], [1400, 6.5], [160, 6.5], [0, 0]]);
+  // the carriageways split apart quickly, so the two directions don't overlap where they meet the single road
+  B.edge(dual, [[0, 0], [12, -2.5], [30, -6.5], [1400, -6.5], [2770, -6.5], [2788, -2.5], [2800, 0]]);
+  B.edge(dual, [[2800, 0], [2788, 2.5], [2770, 6.5], [1400, 6.5], [30, 6.5], [12, 2.5], [0, 0]]);
   B.road({ name: 'Babraham Road', cls: 'primary', mph: 40, w: 7.3 }, [[2800, 0], [3300, 0], [3500, 0]]);
   // Grantchester Lane: narrow, national speed limit, bends you cannot see round
   const gl = []; for (let z = 0; z <= 1700; z += 12) gl.push([3500 + 50 * Math.sin(z / 130) * Math.min(1, z / 120), z]); // bends about 340 m radius: fine at 60 if you slow a little
