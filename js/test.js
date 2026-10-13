@@ -1,6 +1,6 @@
 // The examiner: follows progress along the route, re-routes when you go off it, and marks faults DVSA-style.
 import { MARKING, RULES } from './config.js';
-import { nearest, stopsNear, buildRoute, laneIndex } from './net.js';
+import { nearest, stopsNear, buildRoute, laneIndex, laneName } from './net.js';
 
 const MPH = 2.23694;
 
@@ -14,12 +14,12 @@ export function createTest(net, traffic, player) {
   t.fault = (kind, cat, text, key, cd = 8) => {
     if (!t.running) return; const now = traffic.clock;
     if (key) { if (t.cool[key] && now < t.cool[key]) return; t.cool[key] = now + cd; }
-    t.faults.unshift({ kind, cat, text }); if (kind === 'S') t.S++; else t.D++;
+    t.faults.unshift({ kind, cat, text, at: now }); if (kind === 'S') t.S++; else t.D++;
     t.onFault && t.onFault();
   };
   t.reset = () => {
-    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map() });
-    for (const i of t.route.instructions) { i.sigSeen = false; i.checked = false; i.laneSeen = undefined; i.laneChecked = false; }
+    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true });
+    for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
   t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
   const timer = (k, cond, dt) => (t.timers[k] = cond ? (t.timers[k] || 0) + dt : 0);
@@ -42,8 +42,8 @@ export function createTest(net, traffic, player) {
     t.offRoute = dist > 22;
     if (!t.offRoute) { t.idx = best; t.sRoute = Math.max(t.sRoute, s - 4); t.offT = 0; }
     else { t.offT += dt; if (t.offT > 2.5) reroute(); }
-    // current instruction
-    const ins = R.instructions; while (t.step < ins.length - 1 && t.sRoute > ins[t.step].s + 6) t.step++;
+    // current instruction (a roundabout stays current until you leave it at your exit)
+    const ins = R.instructions; while (t.step < ins.length - 1 && t.sRoute > (ins[t.step].exitS ?? ins[t.step].s) + 6) t.step++;
   }
   function reroute() {
     // continue from the road the car is on, in the direction it's facing, to the remaining waypoints
@@ -69,6 +69,22 @@ export function createTest(net, traffic, player) {
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;
     const way = nr.way, limit = way.mph;
+    // moving off from the kerb (Rule 159): look round first, and don't pull out in front of traffic coming from behind
+    if (t.parked && Math.abs(v) > 0.8) {
+      t.parked = false;
+      const looked = player.lookAt !== undefined && traffic.clock - player.lookAt < 10;
+      if (!looked) t.fault('D', 'Move off – safety', 'Moved off without checking your mirrors and blind spot first');
+      let close = null;
+      for (const c of traffic.cars) {
+        if (!c.alive || c.v < 2 || Math.cos(c.th - player.th) < 0.7) continue;
+        const dx = c.x - player.x, dz = c.z - player.z, fw = dx * fx + dz * fz, lt = Math.abs(dx * fz - dz * fx);
+        if (fw > 2 || fw < -90 || lt > 5.5) continue;
+        const ttc = -fw / Math.max(0.3, c.v - Math.max(0, v));
+        if (!close || ttc < close.ttc) close = { ttc, d: -fw };
+      }
+      if (close && close.ttc < 3) t.fault(close.d < 14 ? 'S' : 'D', 'Move off – safety', close.d < 14 ? 'Pulled out into the path of a vehicle coming from behind' : 'Moved off when a vehicle coming from behind had to slow down for you');
+      else if (close && close.d < 80 && player.indicator !== 'R') t.fault('D', 'Signals – necessary', 'Did not signal before moving off with a vehicle coming');
+    }
     // speed
     if (timer('spd', mph > limit + 2.5, dt) > 2) t.fault('D', 'Use of speed', `Went over the ${limit} mph limit on ${way.name || 'this road'}`, 'spd', 10);
     if (timer('spd2', mph > limit + 10, dt) > 1) t.fault('S', 'Use of speed', `Drove well over the ${limit} mph limit`, 'spd2', 14);
@@ -175,13 +191,15 @@ export function createTest(net, traffic, player) {
     }
     // lane discipline: be in the lane the examiner asked for before the junction
     for (const ins of t.route.instructions) {
-      if (!ins.laneReq || ins.laneChecked) continue;
+      if (!ins.laneOK || ins.laneChecked) continue;
       const ahead = ins.s - t.sRoute;
       if (ahead < 35 && ahead > 4 && nr.e === ins.approach.e) ins.laneSeen = laneIndex(nr.e, ins.approach.dir, nr.lat);
       if (ahead <= 3) {
         ins.laneChecked = true;
-        const want = ins.laneReq === 'L' ? 0 : ins.lanes - 1;
-        if (ins.laneSeen !== undefined && ins.laneSeen !== want) t.fault('D', 'Positioning – lane discipline', `Was not in the ${ins.laneReq === 'L' ? 'left' : 'right'}-hand lane for the ${ins.kind === 'rb' ? 'roundabout exit' : 'turn'}`);
+        if (ins.laneSeen !== undefined && !ins.laneOK.includes(ins.laneSeen)) {
+          const what = ins.kind === 'rb' ? `your exit (${ins.m === 'L' ? 'left' : ins.m === 'R' ? 'right' : 'straight on'})` : ins.kind === 'straight' ? 'going straight on' : 'the turn';
+          t.fault('D', 'Positioning – lane discipline', `Was not in the ${laneName(ins.lanes, ins.laneOK)} for ${what}: read the arrows on the road`);
+        }
       }
     }
     // signalling before turns
@@ -189,7 +207,36 @@ export function createTest(net, traffic, player) {
       if (!ins.signal || ins.checked) continue;
       const ahead = ins.s - t.sRoute;
       if (ahead < 90 && ahead > 3 && player.indicator === ins.signal) ins.sigSeen = true;
-      if (ahead <= 2) { ins.checked = true; if (!ins.sigSeen) t.fault('D', 'Signals – necessary', `Did not signal ${ins.signal === 'L' ? 'left' : 'right'} before turning${ins.road ? ' onto ' + ins.road : ''}`); }
+      if (ahead <= 2) { ins.checked = true; if (!ins.sigSeen) t.fault('D', 'Signals – necessary', `Did not signal ${ins.signal === 'L' ? 'left' : 'right'} before ${ins.kind === 'rb' ? 'the roundabout' : 'turning'}${ins.kind !== 'rb' && ins.road ? ' onto ' + ins.road : ''}`); }
+    }
+    // roundabouts (Rule 186): signal left after you pass the exit before yours, not before
+    for (const ins of t.route.instructions) {
+      if (ins.kind !== 'rb' || !ins.exitSignal || ins.exitChecked) continue;
+      const sr = t.sRoute;
+      if (ins.exitN >= 2 && sr > ins.prevExitS - 5 && sr < ins.prevExitS - 0.5 && player.indicator === 'L' && !ins.earlyFlag) {
+        ins.earlyFlag = true; t.fault('D', 'Signals – timed', 'Signalled left before passing the exit before yours: others will think you are leaving there');
+      }
+      if (sr > ins.prevExitS - 0.5 && sr < ins.exitS && player.indicator === 'L') ins.exitSigSeen = true;
+      if (sr >= ins.exitS - 0.5 && sr < ins.exitS + 20) { ins.exitChecked = true; if (!ins.exitSigSeen) t.fault('D', 'Signals – necessary', `Did not signal left after passing the exit before yours${ins.road ? ' (leaving onto ' + ins.road + ')' : ''}`); }
+    }
+    // Dutch-style roundabouts: cyclists on the outer ring have priority where you cross it, going in and coming out
+    for (const ring of net.cycleRings) {
+      const d = Math.hypot(player.x - ring.x, player.z - ring.z) - ring.r, k = 'ring' + ring.x, was = t.flags[k]; t.flags[k] = d;
+      if (was === undefined || Math.abs(d) > 30 || (was > 0) === (d > 0) || Math.abs(v) < 0.4) continue;
+      const ang = Math.atan2(player.x - ring.x, -(player.z - ring.z));
+      for (const b of traffic.ringBikes) {
+        if (b.ring !== ring) continue;
+        let da = b.ang - ang; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+        const arc = da * ring.r; // < 0: the cyclist is still coming towards where you cross
+        if (arc > -13 && arc < 2.5) { const bad = arc > -5; t.fault(bad ? 'S' : 'D', 'Junctions – observation', bad ? 'Cut across a cyclist on the roundabout cycle track' : 'Did not give way to a cyclist on the roundabout cycle track', 'ringgw', 4); break; }
+      }
+    }
+    for (const b of traffic.ringBikes) if (Math.hypot(b.x - player.x, b.z - player.z) < 1.6 && Math.abs(v) > 0.3) { t.fault('S', 'Control – collision', 'Collided with a cyclist', 'bcol', 4); player.v = 0; }
+    // puffin crossings: never drive onto the crossing while someone is on it
+    for (const c of traffic.puffins) {
+      if (c.ped.state !== 'walk') continue; const dx = player.x - c.x, dz = player.z - c.z; if (Math.abs(dx) > 20 || Math.abs(dz) > 20) continue;
+      const al = dx * c.tx + dz * c.tz, lt = dx * c.tz - dz * c.tx;
+      if (Math.abs(al) < 2 && Math.abs(lt) < c.w / 2 + 0.4 && Math.abs(v) > 0.8) t.fault('S', 'Pedestrian crossings', 'Drove onto the crossing while someone was crossing', 'pfn' + c.id, 8);
     }
     // finish: near the end, stopped, on the left
     const last = t.route.instructions[t.route.instructions.length - 1];

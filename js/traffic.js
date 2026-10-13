@@ -1,7 +1,7 @@
 // Traffic lights, other cars, cyclists, and pedestrians at zebra crossings.
 // Vehicles follow lane centres and take smooth curves through junctions.
 import { TRAFFIC } from './config.js';
-import { along, endNode, posAt, laneCentre, laneInfo, cycleLeft } from './net.js';
+import { along, endNode, posAt, laneCentre, laneInfo, cycleLeft, laneArrows, manoeuvre } from './net.js';
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -34,8 +34,24 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     g.add(body, head, legs); g.visible = false; scene.add(g); pedPool.push(g);
   }
   for (const z of net.zebras) z.ped = { state: 'idle', t: 2 + ((z.id * 7.1) % 9), p: 0, dir: 1 };
+  // puffin and pelican crossings (stand-alone lights): someone waits on amber and walks on red
+  const puffins = [], byCluster = new Map();
+  for (const st of net.stops) if (st.single) { let l = byCluster.get(st.cluster); if (!l) byCluster.set(st.cluster, l = []); l.push(st); }
+  for (const list of byCluster.values()) {
+    const st = list[0], p = posAt(st.e, st.s); let x = 0, z = 0;
+    for (const s of list) { x += s.x + s.tx * 2.5; z += s.z + s.tz * 2.5; }
+    puffins.push({ id: puffins.length, x: x / list.length, z: z / list.length, tx: p.tx, tz: p.tz, w: st.e.way.w, st, last: 'G', ped: { state: 'idle', p: 0, dir: 1 } });
+  }
   function updatePeds(dt, px, pz) {
     const active = [];
+    for (const c of puffins) {
+      const d = Math.hypot(c.x - px, c.z - pz), P = c.ped, L = lightState(c.st);
+      if (d > 220) { P.state = 'idle'; c.last = L; continue; }
+      if (P.state === 'idle' && (L === 'A' || (L === 'R' && c.last !== 'R'))) { P.state = 'wait'; P.p = 0; P.dir = (c.id + Math.floor(clock / 40)) % 2 ? 1 : -1; }
+      if (P.state === 'wait' && L === 'R') P.state = 'walk';
+      if (P.state === 'walk') { P.p += dt * 1.45 / (c.w + 3.2); if (P.p >= 1) P.state = 'idle'; }
+      c.last = L; if (P.state !== 'idle') active.push([d, c]);
+    }
     for (const z of net.zebras) {
       const d = Math.hypot(z.x - px, z.z - pz); if (d > 220) { z.ped.state = 'idle'; continue; }
       const P = z.ped; P.t -= dt;
@@ -68,15 +84,21 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     const v = endNode(a), opts = net.out[v].filter(o => o.e !== a.e && !(a.kind === 'bike' && /trunk/.test(o.e.way.cls)));
     if (!opts.length) return null;
     const p = along(a.e, a.e.len - 0.5, a.dir);
-    let tot = 0; const w = opts.map(o => {
+    // keep to the lane arrows: a car in a "left only" lane turns left
+    let use = opts;
+    if (a.kind === 'car' && !net.inc[v].some(o => o.e.way.rb)) {
+      const codes = laneArrows(net, a.e, a.dir), c = codes && codes[Math.min(a.lane, codes.length - 1)];
+      if (c) { const f = opts.filter(o => { const q = along(o.e, Math.min(5, o.e.len / 2), o.dir); return c.includes(manoeuvre(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz))); }); if (f.length) use = f; }
+    }
+    let tot = 0; const w = use.map(o => {
       const q = along(o.e, Math.min(5, o.e.len / 2), o.dir);
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
       let rank = isMain(o.e.way.cls) ? 2.2 : /tertiary/.test(o.e.way.cls) ? 1.6 : o.e.way.rb ? 3 : 0.7;
       if (a.kind === 'bike' && (o.e.way.cl || o.e.way.cr)) rank *= 2.5;
       const x = rank * (ang < 0.5 ? 3 : 1); tot += x; return x;
     });
-    let r = Math.random() * tot; for (let i = 0; i < opts.length; i++) { r -= w[i]; if (r <= 0) return opts[i]; }
-    return opts[opts.length - 1];
+    let r = Math.random() * tot; for (let i = 0; i < use.length; i++) { r -= w[i]; if (r <= 0) return use[i]; }
+    return use[use.length - 1];
   }
   // junction curve: quadratic Bezier from the lane on the incoming edge to the lane on the outgoing edge
   const jT = (e1, e2) => Math.min(7, e1.len / 3, e2.len / 3);
@@ -119,7 +141,41 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
   function init(px, pz, colours) {
     for (let i = 0; i < TRAFFIC.cars; i++) { const c = { kind: 'car', mesh: makeCarMesh(colours[i % colours.length]) }; cars.push(c); all.push(c); spawn(c, px, pz, true); }
     for (let i = 0; i < TRAFFIC.bikes; i++) { const b = { kind: 'bike', mesh: makeBikeMesh(i) }; bikes.push(b); all.push(b); spawn(b, px, pz, true); }
+    net.cycleRings.forEach((ring, ri) => { for (let i = 0; i < 3; i++) ringBikes.push({ kind: 'bike', ring, ang: i * 2.1 + ri, v: 4.4, cruise: 4.2 + i * 0.35, x: 0, z: 0, th: 0, alive: true, mesh: makeBikeMesh(TRAFFIC.bikes + i) }); });
   }
+  // cyclists riding round a Dutch-style roundabout's cycle track, clockwise; they stop only if something is in the way
+  const ringBikes = [];
+  function updateRingBikes(dt) {
+    for (const b of ringBikes) {
+      const r = b.ring.r, tx = Math.cos(b.ang), tz = Math.sin(b.ang); let vmax = b.cruise;
+      for (const o of player ? cars.concat([player]) : cars) {
+        if (o.alive === false) continue; const dx = o.x - b.x, dz = o.z - b.z, fw = dx * tx + dz * tz;
+        if (fw > 0 && fw < 6 && Math.abs(dx * tz - dz * tx) < 2.2) vmax = Math.min(vmax, brakeTo(0, fw - 3.2, 4));
+      }
+      if (b.pinned > 0) b.pinned -= dt;
+      b.v = b.v > vmax ? Math.max(vmax, b.v - 6 * dt) : Math.min(vmax, b.v + 1.2 * dt);
+      b.ang += b.v * dt / r;
+      b.x = b.ring.x + r * Math.sin(b.ang); b.z = b.ring.z - r * Math.cos(b.ang); b.th = Math.atan2(-tx, -tz);
+      b.mesh.position.set(b.x, 0, b.z); b.mesh.rotation.y = b.th; b.mesh.visible = true;
+      const u = b.mesh.userData; u.spin = (u.spin || 0) + b.v * dt / 0.34; for (const wh of u.wheels) wh.rotation.x = -u.spin; u.crank.rotation.x = -u.spin * 0.5;
+    }
+  }
+  // cars give way to cyclists on the cycle track where the road crosses it
+  function ringYield(a, rem, vmax) {
+    for (const ring of net.cycleRings) {
+      if (Math.abs(Math.hypot(a.x - ring.x, a.z - ring.z) - ring.r) > 30) continue;
+      for (const c of ring.crossings) {
+        let ds = null;
+        if (c.e === a.e) ds = (a.dir > 0 ? c.s : a.e.len - c.s) - a.s;
+        else if (a.next && c.e === a.next.e) ds = rem + (a.next.dir > 0 ? c.s : a.next.e.len - c.s);
+        if (ds === null || ds < 1.5 || ds > 30) continue;
+        const busy = ringBikes.some(b => { if (b.ring !== ring) return false; let da = b.ang - c.ang; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; const arc = da * ring.r; return arc > -12 && arc < 2.5; });
+        if (busy) vmax = Math.min(vmax, brakeTo(0, ds - 3.2));
+      }
+    }
+    return vmax;
+  }
+  const sigEntry = (e, dir) => (net.stopsByEdge.get(e.id) || []).some(s => s.dir === dir);
   // nodes at mini-roundabouts: traffic slows right down to go round them
   const miniNodes = new Set();
   for (let v = 0; v < net.nx.length; v++) if (net.minis.some(m => Math.abs(m.x - net.nx[v]) < 8 && Math.abs(m.z - net.nz[v]) < 8)) miniNodes.add(v);
@@ -164,7 +220,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 6));
       // minor-road give-way and mini-roundabouts: let the learner go first (the ghost timer breaks a stand-off)
       if (a.ghost <= 0 && rem < 24 && (giveKey.has(a.e.id + ':' + a.dir) || miniNodes.has(endNode(a))) && learnerApproaching(endNode(a))) vmax = Math.min(vmax, brakeTo(0, rem - 4));
-      if (a.ghost <= 0 && a.next.e.way.rb && !w.rb && rem < 22 && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 4));
+      if (a.ghost <= 0 && a.next.e.way.rb && !w.rb && rem < 22 && !sigEntry(a.e, a.dir) && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 4)); // lights decide at signalled entries
+      if (net.cycleRings.length && !bike) vmax = ringYield(a, rem, vmax);
       vmax = stopAhead(a, a.next.e, a.next.dir, rem, vmax);
     } else vmax = Math.min(vmax, brakeTo(0, rem - 2));
     vmax = stopAhead(a, a.e, a.dir, -1, vmax);
@@ -205,8 +262,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       a.mesh.position.set(a.x, 0, a.z); a.mesh.rotation.y = a.th;
       if (a.kind === 'bike') { const u = a.mesh.userData; u.spin = (u.spin || 0) + a.v * dt / 0.34; for (const wh of u.wheels) wh.rotation.x = -u.spin; u.crank.rotation.x = -u.spin * 0.5; }
     }
+    updateRingBikes(dt);
     updatePeds(dt, pl.x, pl.z);
   }
+  // put a cyclist on a cycle ring at an angle (used by lessons to have one arrive as the learner does)
+  function placeRingBike(ring, ang, speed) { const b = ringBikes.find(q => q.ring === ring); if (!b) return null; Object.assign(b, { ang, v: speed, cruise: speed, pinned: 30 }); return b; }
   // put a cyclist at a given spot (used by lessons)
   function placeBike(b, e, dir, s, speed) {
     Object.assign(b, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: speed });
@@ -218,5 +278,5 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     Object.assign(c, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
-  return { lightState, update, init, cars, bikes, overrides, placeBike, placeCar, miniNodes, get clock() { return clock; } };
+  return { lightState, update, init, cars, bikes, ringBikes, puffins, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };
 }

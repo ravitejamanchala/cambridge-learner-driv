@@ -1,16 +1,19 @@
-// Cuts the full road network into small map areas, one per group of nearby drives, so the sim only
-// downloads the part of the city a lesson, mock test or puzzle uses.
+// Builds every map area the sim can load, and the index that says which drive uses which area.
+//  - Mock tests run on real Cambridge roads: the full road network is cut into small areas, one per group
+//    of nearby routes, so the sim only downloads the part of the city a test uses.
+//  - Lessons and puzzles run on purpose-built practice layouts (tools/layouts.mjs), named by their `area`.
 //
-//   node tools/split_areas.mjs            (run from the project root after editing routes, lessons or puzzles)
+//   node tools/split_areas.mjs            (run from the project root after editing routes, lessons, puzzles or layouts)
 //
 // Reads data/cambridge.json (the full OpenStreetMap build), writes data/areas/<id>.json and data/areas/index.json.
-// Coordinates keep the full map's origin, so waypoints (lat/lon) work the same in every area.
+// Cambridge areas keep the full map's origin, so waypoints (lat/lon) work the same in every area.
 import fs from 'fs';
 import path from 'path';
 import { buildNet, buildRoute, snapWaypoint } from '../js/net.js';
 import { ROUTES } from '../js/config.js';
 import { LESSONS } from '../js/course.js';
 import { PUZZLES } from '../js/puzzles.js';
+import { buildLayout, LAYOUTS } from './layouts.mjs';
 
 const SRC = 'data/cambridge.json', OUT = 'data/areas';
 const MARGIN = 650;        // metres of surrounding streets kept round each route (fog hides what is beyond)
@@ -18,10 +21,10 @@ const MAX_AREA = 9e6;      // don't merge groups into areas bigger than ~9 km²
 const full = JSON.parse(fs.readFileSync(SRC, 'utf8'));
 const net = buildNet(full);
 
-const plans = [
-  ...ROUTES.map(r => ({ key: 'route:' + r.id, name: r.name, wps: r.waypoints })),
-  ...LESSONS.filter(l => l.waypoints).map(l => ({ key: 'lesson:' + l.id, name: l.title, wps: l.waypoints })),
-  ...PUZZLES.map(p => ({ key: 'puzzle:' + p.id, name: p.title, wps: p.waypoints }))
+const plans = ROUTES.map(r => ({ key: 'route:' + r.id, name: r.name, wps: r.waypoints }));
+const practice = [
+  ...LESSONS.filter(l => l.waypoints).map(l => ({ key: 'lesson:' + l.id, name: l.title, wps: l.waypoints, area: l.area })),
+  ...PUZZLES.map(p => ({ key: 'puzzle:' + p.id, name: p.title, wps: p.waypoints, area: p.area }))
 ];
 for (const p of plans) {
   const r = buildRoute(net, p.wps.map(w => snapWaypoint(net, w)));
@@ -91,5 +94,18 @@ groups.forEach((g, gi) => {
   index.areas.push({ id, file, kb: Math.round(txt.length / 1024), edges: edges.length, plans: g.plans.map(p => p.key) });
   console.log(`${id}: ${Math.round(txt.length / 1024)} KB, ${edges.length} edges, ${g.plans.map(p => p.key).join(', ')}`);
 });
+// practice layouts: every lesson and puzzle names its layout
+for (const id of Object.keys(LAYOUTS)) {
+  const area = buildLayout(id), sub = buildNet(area), mine = practice.filter(p => p.area === id), file = id + '.json', txt = JSON.stringify(area);
+  fs.writeFileSync(path.join(OUT, file), txt);
+  for (const p of mine) {
+    const r = buildRoute(sub, p.wps.map(w => snapWaypoint(sub, w)));
+    index.plans[p.key] = { area: id, len: Math.round(r.len), n: r.instructions.length, first: r.instructions[0].text };
+    if (process.argv.includes('-v')) console.log(`  ${p.key} ${Math.round(r.len)} m\n${r.instructions.map(i => `     ${Math.round(i.s)}  ${i.text}${i.signal ? '  [signal ' + i.signal + ']' : ''}`).join('\n')}`);
+  }
+  index.areas.push({ id, file, kb: Math.round(txt.length / 1024), edges: area.edges.length, plans: mine.map(p => p.key) });
+  console.log(`${id}: practice layout, ${Math.round(txt.length / 1024)} KB, ${area.edges.length} edges, ${mine.length} drives`);
+}
+const missing = practice.filter(p => !index.plans[p.key]); if (missing.length) throw new Error('No practice layout for ' + missing.map(p => p.key).join(', '));
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index));
 console.log(`${groups.length} areas from ${plans.length} drives (full map ${Math.round(fs.statSync(SRC).size / 1024)} KB).`);

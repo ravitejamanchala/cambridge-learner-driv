@@ -55,12 +55,30 @@ export function buildNet(d) {
   net.giveways = d.giveways.map(([ei, s, dir, stop]) => feature(net, { e: edges[ei], s: s / 10, dir, stop: !!stop }));
   net.minis = d.minis.map(([x, z]) => ({ x: x / 10, z: z / 10 }));
   net.rbs = d.rbs.map(([x, z, r, w]) => ({ x: x / 10, z: z / 10, r: r / 10, w: w / 10 }));
+  // lane arrows painted on an approach, kerb lane first: e.g. ['LS', 'R'] (L left, S straight on, R right)
+  net.arrows = new Map(); for (const [ei, dir, ...codes] of d.arrows || []) net.arrows.set(ei + ':' + dir, codes);
+  // Dutch-style roundabouts: a one-way (clockwise) cycle track ringing the carriageway, crossing every arm
+  net.cycleRings = (d.cycleRings || []).map(([x, z, r]) => ringCrossings(net, { x: x / 10, z: z / 10, r: r / 10 }));
   net.stopsByEdge = new Map(); net.zebrasByEdge = new Map();
   for (const s of net.stops) push(net.stopsByEdge, s.e.id, s);
   for (const z of net.zebras) push(net.zebrasByEdge, z.e.id, z);
   net.stopGrid = new Map();
   for (const s of net.stops) push(net.stopGrid, ck(Math.floor(s.x / CELL), Math.floor(s.z / CELL)), s);
   return net;
+}
+// where each road crosses a cycle ring: the crossing point, and which way is "into the roundabout"
+function ringCrossings(net, ring) {
+  ring.crossings = [];
+  for (const e of net.edges) {
+    if (e.way.rb) continue;
+    for (let i = 0; i < e.n - 1; i++) {
+      const d0 = Math.hypot(e.px[i] - ring.x, e.pz[i] - ring.z) - ring.r, d1 = Math.hypot(e.px[i + 1] - ring.x, e.pz[i + 1] - ring.z) - ring.r;
+      if ((d0 < 0) === (d1 < 0)) continue;
+      const u = d0 / (d0 - d1), x = e.px[i] + (e.px[i + 1] - e.px[i]) * u, z = e.pz[i] + (e.pz[i + 1] - e.pz[i]) * u;
+      ring.crossings.push({ x, z, e, s: e.cum[i] + (e.cum[i + 1] - e.cum[i]) * u, ang: Math.atan2(x - ring.x, -(z - ring.z)), w: e.way.w });
+    }
+  }
+  return ring;
 }
 function push(m, k, v) { let a = m.get(k); if (!a) m.set(k, a = []); a.push(v); }
 function feature(net, f) {
@@ -152,7 +170,7 @@ export function shortestPath(net, from, to, noFirstEdge = null) {
   return steps.reverse();
 }
 export function snapWaypoint(net, wp) {
-  const p = ll2xz(net, wp.lat, wp.lon); let best = -1, bd = 1e18;
+  const p = wp.x !== undefined ? wp : ll2xz(net, wp.lat, wp.lon); let best = -1, bd = 1e18;
   for (const e of net.edges) {
     if (wp.road && e.way.name !== wp.road) continue;
     for (const v of [e.a, e.b]) { const d = (net.nx[v] - p.x) ** 2 + (net.nz[v] - p.z) ** 2; if (d < bd) { bd = d; best = v; } }
@@ -193,8 +211,37 @@ export function buildRoute(net, nodes, meta = {}) {
   return route;
 }
 
-const laneText = (r) => r === 'L' ? 'Get into the left-hand lane. ' : r === 'R' ? 'Get into the right-hand lane. ' : '';
-const laneShort = (r) => r === 'L' ? 'Left lane · ' : r === 'R' ? 'Right lane · ' : '';
+// lane names, kerb lane first: "left-hand lane", "middle lane", "left or middle lane"
+export function laneName(n, ok) {
+  const nm = n === 2 ? ['left', 'right'] : n === 3 ? ['left', 'middle', 'right'] : null;
+  if (!nm) return ok.map(i => 'lane ' + (i + 1)).join(' or ') + ' (counting from the left)';
+  return ok.length === 1 ? (nm[ok[0]] === 'middle' ? 'middle lane' : nm[ok[0]] + '-hand lane') : ok.map(i => nm[i]).join(' or ') + ' lane';
+}
+const laneText = (n, ok) => ok ? `Get into the ${laneName(n, ok)}. ` : '';
+const laneShort = (n, ok) => ok ? laneName(n, ok).replace('-hand', '').replace(/^./, c => c.toUpperCase()) + ' · ' : '';
+// which lanes allow a manoeuvre ('L', 'S' or 'R'); null when every lane does (no lane to choose)
+function lanesFor(net, e, dir, m) {
+  const codes = laneArrows(net, e, dir); if (!codes) return null;
+  const ok = codes.map((c, i) => c.includes(m) ? i : -1).filter(i => i >= 0);
+  return ok.length && ok.length < codes.length ? ok : null;
+}
+// lane arrows for an approach: from the map data if painted there, otherwise the usual UK pattern
+// (kerb lane left and ahead, outer lane right; at roundabouts the outer lane is for exits to the right)
+export function laneArrows(net, e, dir) {
+  const k = e.id + ':' + dir; if (net.arrows.has(k)) return net.arrows.get(k);
+  if (!net.arrowCache) net.arrowCache = new Map(); if (net.arrowCache.has(k)) return net.arrowCache.get(k);
+  const L = laneInfo(e, dir); let codes = null;
+  if (L.n >= 2 && !e.way.rb) {
+    const v = dir > 0 ? e.b : e.a, tin = endTangent({ e, dir }), hasRb = net.inc[v].some(o => o.e.way.rb);
+    const outs = net.out[v].filter(p => p.e !== e).map(p => turnOf(tin, startTangent(p)));
+    const left = outs.some(a => a < -0.5), right = outs.some(a => a > 0.5) || hasRb, ahead = outs.some(a => Math.abs(a) <= 0.5) || hasRb;
+    codes = [];
+    for (let i = 0; i < L.n; i++) codes.push(i === 0 ? (left && ahead ? 'LS' : left ? 'L' : 'S') : i === L.n - 1 ? (hasRb ? 'R' : right && ahead ? 'SR' : right ? 'R' : 'S') : 'S');
+  }
+  net.arrowCache.set(k, codes); return codes;
+}
+// manoeuvre letter for a turn angle (radians, <0 left); roundabout exits use a wider "straight on" band
+export const manoeuvre = (ang, rb) => { const a = Math.abs(ang), lim = rb ? 0.8 : 0.5; return a <= lim ? 'S' : ang < 0 && a < 2.6 ? 'L' : 'R'; };
 // which lane (0 = nearest the kerb) a point at signed lateral offset `lat` (left of edge direction) is in, travelling `dir`
 export function laneIndex(e, dir, lat) {
   const L = laneInfo(e, dir), off = lat * dir;
@@ -219,7 +266,7 @@ function mergeDoubleMinis(S, out) {
     out.splice(j, 2, { ...a, kind, icon: kind === 'uturn' ? 'rb' : kind, double: true, road: nm,
       text: `At the double mini-roundabout, ${verb}${nm ? ' onto ' + nm : ''}. Give way to the right at each one.`,
       short: `Double mini · ${kind === 'straight' ? 'Straight on' : kind === 'uturn' ? 'All the way round' : 'Turn ' + kind}${nm ? ' · ' + nm : ''}`,
-      signal: lr, laneReq: a.lanes >= 2 ? lr : null });
+      signal: lr, laneOK: a.laneOK });
   }
 }
 
@@ -228,19 +275,23 @@ function makeInstructions(net, route) {
   for (let i = 0; i < S.length - 1; i++) {
     const A = S[i], B = S[i + 1], v = endNode(A), sAt = route.stepS[i + 1];
     if (B.e.way.rb && !A.e.way.rb) {
-      let k = i + 1, exits = 0;
+      let k = i + 1, exits = 0, prevExitS = sAt;
       while (k < S.length && S[k].e.way.rb) {
         const vk = endNode(S[k]);
         if (k + 1 >= S.length || !S[k + 1].e.way.rb) { exits++; break; }
-        if (net.out[vk].some(o => !o.e.way.rb)) exits++;
+        if (net.out[vk].some(o => !o.e.way.rb)) { exits++; prevExitS = route.stepS[k + 1]; }
         k++;
       }
       const ex = S[k + 1]; const nm = ex ? ex.e.way.name : '';
-      const L = laneInfo(A.e, A.dir), laneReq = L.n >= 2 ? (exits === 1 ? 'L' : exits >= 3 ? 'R' : null) : null;
-      out.push({ s: sAt, node: v, kind: 'rb', icon: 'rb', exitN: exits, exitS: route.stepS[Math.min(k + 1, S.length - 1)],
-        text: laneText(laneReq) + `At the roundabout, take the ${ord(exits)} exit${nm ? ' onto ' + nm : ''}.`, short: laneShort(laneReq) + `Roundabout · ${ord(exits)} exit`, road: nm,
-        laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir },
-        signal: exits === 1 ? 'L' : exits >= 3 ? 'R' : null }); // Rule 186: signal left for the 1st exit, right for exits past 12 o'clock
+      const m = ex ? manoeuvre(turnOf(endTangent(A), startTangent(ex)), true) : 'S';
+      const L = laneInfo(A.e, A.dir), ok = lanesFor(net, A.e, A.dir, m);
+      const lights = signalsAt(net, v, 30, false);
+      out.push({ s: sAt, node: v, kind: 'rb', icon: 'rb', exitN: exits, exitS: route.stepS[Math.min(k + 1, S.length - 1)], prevExitS, m,
+        text: laneText(L.n, ok) + `At the roundabout${lights ? ' (traffic lights on the way in and on the ring)' : ''}, take the ${ord(exits)} exit${nm ? ' onto ' + nm : ''}.`,
+        short: laneShort(L.n, ok) + `Roundabout · ${ord(exits)} exit`, road: nm,
+        laneOK: ok, lanes: L.n, approach: { e: A.e, dir: A.dir },
+        // Rule 186: signal left on approach for an exit to the left, right for an exit to the right; signal left after passing the exit before yours
+        signal: m === 'L' ? 'L' : m === 'R' ? 'R' : null, exitSignal: exits >= 2 || m !== 'L' });
       i = k; continue;
     }
     if (A.e.way.rb) continue;
@@ -253,7 +304,7 @@ function makeInstructions(net, route) {
     const lights = signalsAt(net, v, 32, deg < 28);
     let kind, verb, icon, short;
     if (deg < 28) {
-      if (!lights && !mini) continue;
+      if (!lights && !mini && !lanesFor(net, A.e, A.dir, 'S')) continue; // straight on only needs saying at lights, minis, or when the lane matters
       kind = 'straight'; verb = 'go straight ahead'; icon = 'straight'; short = 'Straight on';
     } else if (deg > 150) { kind = 'uturn'; verb = 'turn round'; icon = 'stop'; short = 'Turn round'; }
     else {
@@ -263,11 +314,11 @@ function makeInstructions(net, route) {
     }
     const where = mini ? 'At the mini-roundabout, ' : lights ? 'At the traffic lights, ' : (!straightOpt && kind !== 'straight' ? 'At the end of the road, ' : '');
     const onto = nm && (change || kind !== 'straight') ? ' onto ' + nm : '';
-    const L = laneInfo(A.e, A.dir), laneReq = L.n >= 2 && (kind === 'left' || kind === 'right') ? (kind === 'left' ? 'L' : 'R') : null;
-    let text = laneText(laneReq) + (where ? where + verb : verb.charAt(0).toUpperCase() + verb.slice(1)) + onto + '.';
-    out.push({ s: sAt, node: v, kind, icon, text, short: laneShort(laneReq) + short + (nm ? ' · ' + nm : (lights ? ' · lights' : '')), road: nm,
+    const L = laneInfo(A.e, A.dir), ok = lanesFor(net, A.e, A.dir, kind === 'left' ? 'L' : kind === 'straight' ? 'S' : 'R');
+    let text = laneText(L.n, ok) + (where ? where + verb : verb.charAt(0).toUpperCase() + verb.slice(1)) + onto + '.';
+    out.push({ s: sAt, node: v, kind, icon, text, short: laneShort(L.n, ok) + short + (nm ? ' · ' + nm : (lights ? ' · lights' : '')), road: nm,
       signal: (kind === 'left' || kind === 'right') && deg > 34 ? (kind === 'left' ? 'L' : 'R') : null,
-      laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir }, mini, stepI: i });
+      laneOK: ok, lanes: L.n, approach: { e: A.e, dir: A.dir }, mini, stepI: i });
   }
   mergeDoubleMinis(S, out);
   // one instruction per junction: drop "straight on" repeats from clustered lights and crossings a few metres apart
