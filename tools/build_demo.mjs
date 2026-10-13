@@ -8,7 +8,7 @@ html = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 for (const f of fs.readdirSync(path.join(SRC, 'data/areas'))) {
   const d = JSON.parse(fs.readFileSync(path.join(SRC, 'data/areas', f), 'utf8'));
-  if (f === 'index.json') delete d.source; else d.source = '© OpenStreetMap contributors (ODbL)';
+  if (f === 'index.json') delete d.source; else d.source = d.source === 'Practice layout' ? 'Practice layout' : '© OpenStreetMap contributors (ODbL)';
   fs.writeFileSync(path.join(OUT, 'data/areas', f), JSON.stringify(d));
 }
 for (const f of fs.readdirSync(path.join(SRC, 'models'))) fs.copyFileSync(path.join(SRC, 'models', f), path.join(OUT, 'models', f));
