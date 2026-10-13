@@ -85,6 +85,8 @@ export function buildWorld(scene, net, traffic) {
       for (let s = 12; s < e.len - 6; s += 40) { const p = posAt(e, s); const o = side * (w / 2 - wy.cw / 2); bikeMarks.push([p.x + p.tz * o, p.z - p.tx * o, Math.atan2(-p.tx * side, -p.tz * side)]); }
     }
   }
+  // rounded kerbs at junction corners (see net.js junctionFillets)
+  for (const f of net.fillets) { const road = accFor(f.C[0], f.C[1]).road; for (let k = 0; k < f.pts.length - 1; k++) road.quad(f.C[0], f.C[1], f.pts[k][0], f.pts[k][1], f.pts[k + 1][0], f.pts[k + 1][1], f.pts[k + 1][0], f.pts[k + 1][1], 0.04); }
   for (const st of net.stops) bar(accFor(st.x, st.z).white, st, st.e.way.oneway ? -st.w / 2 + 0.3 : 0.2, st.w / 2 - 0.3, 0.35);
   for (const g of net.giveways) {
     const white = accFor(g.x, g.z).white;

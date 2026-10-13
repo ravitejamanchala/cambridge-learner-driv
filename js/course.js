@@ -331,6 +331,7 @@ export function evaluate(lesson, test, scen) {
   // always say what the faults were, not just how many
   const others = test.faults.filter(f => !focus.includes(f));
   if (others.length) reasons.push(`Also marked: ${others.slice(0, 4).map(f => `${f.text} (${f.kind === 'S' ? 'serious' : 'driving fault'})`).join('; ')}${others.length > 4 ? '; …' : ''}.`);
+  if (test.hits && test.hits.length) reasons.push(`Other road users ran into you ${test.hits.length === 1 ? 'once' : test.hits.length + ' times'}. Not marked as your fault.`);
   if (pass && test.faults.length === 0 && !(r && r.why)) reasons.push('Clean drive: no faults recorded.');
   return { pass, reasons };
 }

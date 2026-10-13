@@ -75,9 +75,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
   function offsetFor(a, e, dir) {
     if (a.kind === 'car') return laneCentre(e, dir, a.lane);
     const c = cycleLeft(e, dir), w = e.way;
-    if (c === 1 || c === 2) return w.w / 2 - w.cw / 2;
+    const sw = a.swing || 0; // moved out to pass a stopped car
+    if (c === 1 || c === 2) return w.w / 2 - w.cw / 2 - sw;
     if (c === 3) return w.w / 2 + 1.7; // separate track beside the road
-    return w.w / 2 - 0.85;
+    return w.w / 2 - 0.85 - sw;
   }
   function chooseNext(a) {
     if (a.path) { const i = a.path.findIndex(st => st.e === a.e && st.dir === a.dir); if (i >= 0 && a.path[i + 1]) return a.path[i + 1]; }
@@ -228,7 +229,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     const fx = -Math.sin(a.th), fz = -Math.cos(a.th);
     const others = player ? all.concat([player]) : all;
     // look further ahead at speed so fast traffic can stop behind a slower learner
-    const look = Math.max(20, a.v * a.v / 10 + 12);
+    const look = Math.max(20, a.v * a.v / 10 + 12); let blocked = false;
     for (const o of others) {
       if (o === a || o.alive === false) continue; if (a.ghost > 0 && !o.isPlayer) continue;
       const rx = o.x - a.x, rz = o.z - a.z, fwd = rx * fx + rz * fz; if (fwd <= 0 || fwd > look) continue;
@@ -237,7 +238,22 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
       if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
-      if (lat < width) vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
+      if (lat < width) {
+        vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
+        if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true; // a cyclist behind a stopped learner
+      }
+    }
+    // cyclists pass a stopped car with room to spare (or wait until they can)
+    if (bike) a.swing = blocked ? Math.min(1.9, (a.swing || 0) + dt * 1.2) : Math.max(0, (a.swing || 0) - dt * 0.6);
+    // predict where the learner will be over the next 2 s and give way to them
+    if (player && !(a.ghost > 0) && Math.abs(player.v) + a.v > 0.5) {
+      const pfx = -Math.sin(player.th), pfz = -Math.cos(player.th), pv = player.v;
+      const rx0 = player.x - a.x, rz0 = player.z - a.z, ahead = rx0 * fx + rz0 * fz, side = Math.abs(rx0 * fz - rz0 * fx), cosH = pfx * fx + pfz * fz;
+      const passing = cosH < -0.7 && side > 2; // oncoming in the other lane
+      if (!passing && ahead > -2) for (const T of [0.5, 1, 1.5, 2]) {
+        const ax = a.x + fx * a.v * T, az = a.z + fz * a.v * T, px = player.x + pfx * pv * T, pz = player.z + pfz * pv * T;
+        if (Math.hypot(ax - px, az - pz) < (bike ? 2.3 : 3.3)) { vmax = Math.min(vmax, brakeTo(0, Math.max(0, a.v * T - (bike ? 2.5 : 4)), 6)); break; }
+      }
     }
     if (a.v < 0.2 && vmax < 0.4) a.stuck += dt; else a.stuck = 0;
     if (a.stuck > 8) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;

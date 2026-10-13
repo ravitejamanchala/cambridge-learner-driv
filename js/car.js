@@ -111,16 +111,18 @@ export function createPlayer(scene) {
     p.inp = inp;
     const H = HANDLING, st = clamp(inp.steer, -1, 1) * H.steerSensitivity;
     const rate = Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
-    const delta = p.steer * H.maxSteer / (1 + Math.abs(p.v) * 0.075); p.delta = delta;
+    const delta = p.steer * H.maxSteer / (1 + Math.max(0, Math.abs(p.v) - 4) * 0.08); p.delta = delta; // full lock at walking pace; less lock as speed builds
     let acc = 0; const thr = inp.throttle > 0.05, brk = inp.brake > 0.05;
     // power fades towards top speed; light drag so a car can reach 70 mph on a dual carriageway (about 0–60 in 10 s)
     if (thr) acc = p.v < -0.1 ? 8 : H.accel * inp.throttle * (1 - (Math.max(0, p.v) / H.topSpeed) ** 2);
     if (brk) { if (p.v > 0.25) { acc = -H.brake * inp.brake; p.hold = 0; } else { p.hold += dt; if (p.hold > 0.6) acc = -2.2; else p.v = Math.min(p.v, 0) * 0.9; } } else p.hold = 0;
-    if (!thr && !brk) acc = -Math.sign(p.v) * 0.55;
+    // off the accelerator while rolling forward: the car settles at a slow creep (like the clutch biting point) instead of
+    // rolling to a stop, so corners can be taken slowly; brake to stop. A stopped car stays where it is.
+    if (!thr && !brk) acc = p.v > 0.3 && p.v < H.creep ? Math.min(1.2, (H.creep - p.v) * 2) : -Math.sign(p.v) * 0.55;
     acc -= H.drag * p.v * Math.abs(p.v);
     if (surface === 'off') acc -= Math.sign(p.v) * 2.4;
     const nv = p.v + acc * dt;
-    if (!thr && !brk && Math.abs(nv) < 0.12) p.v = 0; else if (brk && p.v > 0 && nv < 0) p.v = 0; else p.v = nv;
+    if (!thr && !brk && Math.abs(nv) < 0.12 && p.v <= 0.3) p.v = 0; else if (brk && p.v > 0 && nv < 0) p.v = 0; else p.v = nv;
     p.v = clamp(p.v, -H.reverseSpeed, H.topSpeed);
     // bicycle model about the rear axle: the back wheels follow, the front swings out, like a real car
     const half = H.wheelbase / 2;

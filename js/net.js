@@ -62,6 +62,7 @@ export function buildNet(d) {
   net.stopsByEdge = new Map(); net.zebrasByEdge = new Map();
   for (const s of net.stops) push(net.stopsByEdge, s.e.id, s);
   for (const z of net.zebras) push(net.zebrasByEdge, z.e.id, z);
+  net.fillets = junctionFillets(net);
   net.stopGrid = new Map();
   for (const s of net.stops) push(net.stopGrid, ck(Math.floor(s.x / CELL), Math.floor(s.z / CELL)), s);
   return net;
@@ -79,6 +80,49 @@ function ringCrossings(net, ring) {
     }
   }
   return ring;
+}
+// Rounded kerbs at junctions: where two roads meet, the sharp kerb corner is replaced by a curve of radius R
+// (6 m on side streets, 9 m on main roads), so a car can actually turn from its lane into the next one.
+// Each fillet: corner C, tangent points A (on road i's kerb) and B (on road j's kerb), and the curve between them.
+function junctionFillets(net) {
+  const out = [];
+  for (let v = 0; v < net.nx.length; v++) {
+    const inc = net.inc[v]; if (inc.length < 2) continue;
+    if (inc.length === 2 && !inc.some(o => o.e.way.rb)) continue; // a bend in one road, not a junction
+    const x = net.nx[v], z = net.nz[v];
+    const arms = inc.map(o => { const e = o.e, d = Math.min(10, e.len * 0.5), p = posAt(e, o.dir > 0 ? d : e.len - d), ux = p.x - x, uz = p.z - z, L = Math.hypot(ux, uz) || 1; return { e, ux: ux / L, uz: uz / L, h: e.way.w / 2, ang: Math.atan2(uz / L, ux / L), len: e.len }; })
+      .sort((a, b) => a.ang - b.ang);
+    for (let i = 0; i < arms.length; i++) {
+      const a = arms[i], b = arms[(i + 1) % arms.length];
+      let gap = b.ang - a.ang; if (gap <= 0) gap += 2 * Math.PI;
+      if (gap > Math.PI * 0.95 || gap < 0.35) continue; // nearly straight on, or too tight a wedge to round
+      if (a.e.way.rb && b.e.way.rb) continue;
+      // kerb lines: road a offset towards b by its half width, road b offset towards a
+      const na = [-a.uz, a.ux], nb = [b.uz, -b.ux]; // a's left side faces b (counter-clockwise order); b's right side faces a
+      const pa = [x + na[0] * a.h, z + na[1] * a.h], pb = [x + nb[0] * b.h, z + nb[1] * b.h];
+      const det = a.ux * (-b.uz) - a.uz * (-b.ux); if (Math.abs(det) < 1e-3) continue;
+      const t = ((pb[0] - pa[0]) * (-b.uz) - (pb[1] - pa[1]) * (-b.ux)) / det;
+      const C = [pa[0] + a.ux * t, pa[1] + a.uz * t];
+      const main = /^(trunk|primary|secondary)/.test(a.e.way.cls) || /^(trunk|primary|secondary)/.test(b.e.way.cls) || a.e.way.rb || b.e.way.rb;
+      const R = Math.min(main ? 9 : 6, a.len * 0.35, b.len * 0.35);
+      const ca = Math.hypot(C[0] - x, C[1] - z); if (ca > 40) continue;
+      const A = [C[0] + a.ux * R, C[1] + a.uz * R], B = [C[0] + b.ux * R, C[1] + b.uz * R];
+      const pts = []; for (let k = 0; k <= 10; k++) { const u = k / 10, m = 1 - u; pts.push([m * m * A[0] + 2 * u * m * C[0] + u * u * B[0], m * m * A[1] + 2 * u * m * C[1] + u * u * B[1]]); }
+      out.push({ node: v, C, A, B, pts, R, w: Math.max(a.e.way.w, b.e.way.w) });
+    }
+  }
+  return out;
+}
+// is (x, z) on the rounded part of a junction corner (road surface the edge ribbons don't cover)?
+export function inFillet(net, x, z) {
+  for (const f of net.fillets) {
+    if (Math.abs(x - f.C[0]) > f.R + 1 || Math.abs(z - f.C[1]) > f.R + 1) continue;
+    // inside polygon C, A, curve…, B
+    const poly = [f.C, ...f.pts]; let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside; }
+    if (inside) return true;
+  }
+  return false;
 }
 function push(m, k, v) { let a = m.get(k); if (!a) m.set(k, a = []); a.push(v); }
 function feature(net, f) {

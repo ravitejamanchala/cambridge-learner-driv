@@ -1,7 +1,7 @@
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
 import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
-import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz } from './net.js';
+import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
 import { createTraffic } from './traffic.js';
@@ -324,7 +324,7 @@ async function boot() {
     if (test.running && scenario) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
-      player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 ? 'off' : 'road');
+      player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       test.update(dt);
       test.nearZebra = net.zebras.some(z => Math.abs(z.x - player.x) < 70 && Math.abs(z.z - player.z) < 70);
       test.nearLights = test.ctx && net.stopsByEdge.has(test.ctx.e.id);

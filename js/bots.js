@@ -148,9 +148,10 @@ export function createBotLab(api) {
     $('blCount').textContent = runs.length + ' runs';
     const rows = [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([key, g]) => {
       const n = g.runs.length, pass = g.runs.filter(r => r.pass).length, avgD = g.runs.reduce((a, r) => a + r.D, 0) / n, S = g.runs.reduce((a, r) => a + r.S, 0), stuck = g.runs.filter(r => r.end !== 'done').length;
-      const fc = new Map(); for (const r of g.runs) for (const f of r.faults) fc.set(f, (fc.get(f) || 0) + 1);
-      const top = [...fc.entries()].sort((a, b) => b[1] - a[1])[0];
-      return `<tr><td>${esc(g.title)}<br><span style="color:#888">${esc(key)}</span></td><td class="n">${n}</td><td class="n ${pass === n ? 'ok' : 'bad'}">${Math.round(pass / n * 100)}%</td><td class="n">${avgD.toFixed(1)}</td><td class="n ${S ? 'bad' : ''}">${S}</td><td class="n ${stuck ? 'bad' : ''}">${stuck}</td><td>${top ? esc(top[0]) + ' ×' + top[1] : '<span class="ok">none</span>'}</td></tr>`;
+      const fc = new Map(), at = new Map(); for (const r of g.runs) { for (const f of r.faults) fc.set(f, (fc.get(f) || 0) + 1); for (const w of r.where || []) at.set(w[1], w); }
+      const top = [...fc.entries()].sort((a, b) => b[1] - a[1])[0], hits = g.runs.reduce((a, r) => a + (r.hitBy ? r.hitBy.length : 0), 0);
+      const loc = top && at.get(top[0]) ? ` <span style="color:#9fd3ff">@ ${at.get(top[0])[2]}, ${at.get(top[0])[3]}</span>` : '';
+      return `<tr><td>${esc(g.title)}<br><span style="color:#888">${esc(key)}</span></td><td class="n">${n}</td><td class="n ${pass === n ? 'ok' : 'bad'}">${Math.round(pass / n * 100)}%</td><td class="n">${avgD.toFixed(1)}</td><td class="n ${S ? 'bad' : ''}">${S}</td><td class="n ${stuck ? 'bad' : ''}">${stuck}</td><td>${top ? esc(top[0]) + ' ×' + top[1] + loc : '<span class="ok">none</span>'}${hits ? `<br><span style="color:#888">hit by others ×${hits}</span>` : ''}</td></tr>`;
     });
     $('blBody').innerHTML = rows.join('') || '<tr><td colspan="7" style="color:#888">No runs yet.</td></tr>';
   }
@@ -185,7 +186,7 @@ export function createBotLab(api) {
     const res = t.done ? api.result() : { pass: false, why: end };
     const pl = api.player;
     saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind, at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
-      faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
+      faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
       simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)] });
     render();
   }
@@ -207,8 +208,8 @@ export function createBotLab(api) {
   $('blStop').onclick = () => { stopReq = true; $('blLive').textContent = 'Stopping after this step…'; };
   $('blJson').onclick = () => download('bot-runs.json', JSON.stringify({ runs: allRuns(), notes: allNotes() }, null, 1), 'application/json');
   $('blCsv').onclick = () => {
-    const cols = ['key', 'title', 'at', 'tab', 'end', 'pass', 'D', 'S', 'len', 'reached', 'simT', 'wallT', 'rerouted', 'faults'];
-    const q = (v) => '"' + String(Array.isArray(v) ? v.join(' | ') : v ?? '').replace(/"/g, '""') + '"';
+    const cols = ['key', 'title', 'at', 'tab', 'end', 'pass', 'D', 'S', 'len', 'reached', 'simT', 'wallT', 'rerouted', 'faults', 'where', 'hitBy'];
+    const q = (v) => '"' + String(Array.isArray(v) ? v.map(x => Array.isArray(x) ? x.join(' ') : x).join(' | ') : v ?? '').replace(/"/g, '""') + '"';
     const notes = allNotes().map(n => ['note', n.drive, new Date(n.at).toISOString(), n.area, `x ${n.x} z ${n.z}`, n.picked ? `point x ${n.picked.x} z ${n.picked.z}` : '', n.road, n.s, n.text].map(q).join(','));
     download('bot-notes.csv', ['type,drive,at,area,car,point,road,route_m,text'].concat(notes).join('\n'), 'text/csv');
     download('bot-runs.csv', [cols.join(',')].concat(allRuns().map(r => cols.map(c => q(c === 'at' ? new Date(r.at).toISOString() : r[c])).join(','))).join('\n'), 'text/csv');
