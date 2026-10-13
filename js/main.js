@@ -270,7 +270,11 @@ async function boot() {
     if (cam !== 2 || document.body.dataset.mode !== 'drive') return;
     const mpp = 2 * Math.hypot(ov.h, ov.h * 0.38) * Math.tan(camera.fov * Math.PI / 360) / (stage.clientHeight || 1);
     ov.px -= dx * mpp; ov.pz -= dy * mpp; showCamRecentre();
-  }, (f) => { if (cam !== 2) return; ov.h = Math.min(380, Math.max(25, ov.h / f)); showCamRecentre(); });
+  }, (f) => {
+    if (cam === 0) { chaseZ = Math.min(2.2, Math.max(0.6, chaseZ / f)); prefs.cz = +chaseZ.toFixed(2); savePrefs(); return; } // chase view: pinch or scroll to zoom
+    if (cam !== 2) return; ov.h = Math.min(380, Math.max(25, ov.h / f)); showCamRecentre();
+  });
+  let chaseZ = prefs.cz || 1;
   $('camRecentre').addEventListener('click', () => { ov.px = ov.pz = 0; ov.h = 95; showCamRecentre(); });
 
   // ---------- camera ----------
@@ -280,7 +284,7 @@ async function boot() {
     const lobby = document.body.dataset.mode === 'lobby';
     if (lookAnim > 0) lookAnim = Math.max(0, lookAnim - dt / 1.1);
     if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
-    else if (cam === 0) { const P = camera.aspect < 1, b = P ? 10.5 : 9.2, h = P ? 5.2 : 4.1, a = P ? 12 : 7; px = player.x - fx * b; py = h; pz = player.z - fz * b; lx = player.x + fx * a; ly = P ? 0.2 : 1.2; lz = player.z + fz * a; }
+    else if (cam === 0) { const P = camera.aspect < 1, z = chaseZ, b = (P ? 7 : 6.2) * z, h = 1.25 + (P ? 2.4 : 1.4) * z, a = P ? 4 : 6; px = player.x - fx * b; py = h; pz = player.z - fz * b; lx = player.x + fx * a; ly = P ? -1.6 : 1.1; lz = player.z + fz * a; k = 1 - Math.exp(-dt * 7); } // close behind the car, so it fills the view
     else if (cam === 1) {
       const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z;
       const turn = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
