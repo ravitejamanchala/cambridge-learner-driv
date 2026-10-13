@@ -1,7 +1,7 @@
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
-import { posAt, laneInfo } from './net.js';
+import { posAt, laneInfo, nearest } from './net.js';
 import { buildChunkContent } from './city.js';
 import { buildSigns } from './signs.js';
 
@@ -180,9 +180,17 @@ export function buildWorld(scene, net, traffic) {
   const poles = new T.InstancedMesh(poleG, new T.MeshLambertMaterial({ color: 0x2a2e31 }), nS);
   const heads = new T.InstancedMesh(headG, new T.MeshLambertMaterial({ color: 0x15181a }), nS);
   const lamps = [0, 1, 2].map(() => new T.InstancedMesh(lampG, new T.MeshBasicMaterial({ color: 0xffffff }), nS));
+  // a pole must stand on the pavement or an island, never in a carriageway or on a cycle track
+  const clear = (x, z) => { const nr = nearest(net, x, z); if (nr && nr.d < nr.way.w / 2 + 0.6) return false; return !net.cycleRings.some(r => Math.abs(Math.hypot(x - r.x, z - r.z) - r.r) < 1.8); };
   S.forEach((st, i) => {
-    const off = st.w / 2 + 1.0, nx = st.tz, nz = -st.tx; // left of travel
-    const px = st.x + nx * off, pz = st.z + nz * off; st.px = px; st.pz = pz;
+    const nx = st.tz, nz = -st.tx; // left of travel
+    let px = st.x + nx * (st.w / 2 + 1.0), pz = st.z + nz * (st.w / 2 + 1.0);
+    // left kerb first; then a little further back; then the right-hand side (a central island or the far kerb)
+    for (const [side, back] of [[1, 0], [1, 2.5], [1, 5], [-1, 0], [-1, 2.5], [1, -2]]) {
+      const o = side * (st.w / 2 + 1.0), x = st.x + nx * o - st.tx * back, z = st.z + nz * o - st.tz * back;
+      if (clear(x, z)) { px = x; pz = z; break; }
+    }
+    st.px = px; st.pz = pz;
     M4.makeTranslation(px, 0, pz); poles.setMatrixAt(i, M4);
     E.set(0, Math.atan2(-st.tx, -st.tz), 0); Q.setFromEuler(E);
     M4.compose(V.set(px, 3.35, pz), Q, SC); heads.setMatrixAt(i, M4);
@@ -195,7 +203,8 @@ export function buildWorld(scene, net, traffic) {
   const globeMat = new T.MeshBasicMaterial({ color: 0xffb21a });
   const globes = new T.InstancedMesh(new T.SphereGeometry(0.28, 12, 8), globeMat, Z.length * 2);
   Z.forEach((z, i) => [-1, 1].forEach((sd, k) => {
-    const bx = z.x + z.tz * sd * (z.w / 2 + 1.3), bz = z.z - z.tx * sd * (z.w / 2 + 1.3);
+    let bx = z.x + z.tz * sd * (z.w / 2 + 1.3), bz = z.z - z.tx * sd * (z.w / 2 + 1.3);
+    for (const along of [0, -1.2, 1.2, -2.4, 2.4]) { const x = bx + z.tx * along, y = bz + z.tz * along; if (clear(x, y)) { bx = x; bz = y; break; } } // step along the kerb until clear of other roads
     M4.makeTranslation(bx, 0, bz); bPole.setMatrixAt(i * 2 + k, M4); M4.makeTranslation(bx, 2.75, bz); globes.setMatrixAt(i * 2 + k, M4);
   }));
   for (const m of [bPole, globes]) { m.frustumCulled = false; scene.add(m); }

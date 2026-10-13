@@ -13,6 +13,9 @@ import { createScenario, evaluate } from './course.js';
 import { createMirrors } from './mirrors.js';
 import { createGuide } from './guide.js';
 import { STAR } from './icons.js';
+import { createBotLab } from './bots.js';
+import { LESSONS } from './course.js';
+import { PUZZLES } from './puzzles.js';
 
 const T = THREE, $ = id => document.getElementById(id);
 const shadowed = (o) => { o.traverse(c => { if (c.isMesh) c.castShadow = true; }); return o; };
@@ -171,7 +174,9 @@ async function boot() {
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
   window.cambridgeDrive = { addInput: (fn) => extraInputs.push(fn), look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
+  let botInput = null, botMode = false, pinMesh = null;
   function readInput() {
+    if (botInput) { const r = botInput(); if (r) return r; }
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
     return { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
   }
@@ -184,7 +189,7 @@ async function boot() {
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
       const res = evaluate(plan.lesson, test, scenario), pz = plan.kind === 'puzzle';
-      hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S });
+      if (!botMode) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
@@ -195,7 +200,7 @@ async function boot() {
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
       const pass = test.passed();
-      hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S });
+      if (!botMode) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
       $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
@@ -355,6 +360,30 @@ async function boot() {
   requestAnimationFrame(frame);
 
   setMode('lobby'); hub.open();
+  // bot lab: open the sim with ?bots to run and watch the test driver on any lesson, puzzle or mock test
+  if (/[?&]bots\b/.test(location.search)) createBotLab({
+    get A() { return A; }, player, look, frame: (dt) => tick(dt), step: (n, dt) => window.cambridgeDrive.step(n, dt),
+    // screenshot of the 3D view (rendered now, so the drawing buffer is still there to read)
+    snapshot: () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); },
+    // ground point under a click on the 3D view
+    pick: (cx, cy) => {
+      const r = renderer.domElement.getBoundingClientRect(), ray = new T.Raycaster();
+      ray.setFromCamera(new T.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
+      const p = new T.Vector3(); if (!ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), p)) return null;
+      const nr = nearest(A.net, p.x, p.z); return { x: p.x, z: p.z, road: nr && nr.d < nr.way.w / 2 + 1 ? nr.way.name || (nr.way.rb ? 'roundabout' : 'unnamed') : '' };
+    },
+    pin: (x, z) => { if (!pinMesh) { pinMesh = new T.Mesh(new T.ConeGeometry(0.3, 1.2, 12), new T.MeshBasicMaterial({ color: 0xff3b30 })); pinMesh.rotation.x = Math.PI; } scene.add(pinMesh); pinMesh.position.set(x, 0.75, z); },
+    lanePoint: (s) => guide.lanePoint(A.test.route, s),
+    estopBanner: () => { const b = $('banner'); return !b.hidden && /STOP/.test(b.textContent); },
+    setInput: (fn) => { botInput = fn; },
+    botMode: (on) => { botMode = on; manual = on; },
+    async start(kind, id) {
+      const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
+      await pickPlan(pl, true); await areaChain;
+    },
+    result: () => plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
+    plans: [...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]
+  });
   await areaChain; await new Promise(r => setTimeout(r, 0));
   $('loadOv').hidden = true;
 }
