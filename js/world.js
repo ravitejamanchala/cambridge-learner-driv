@@ -1,3 +1,4 @@
+import { buildParkingWorld } from './parking-view.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
@@ -32,6 +33,7 @@ function ribbon(acc, e, o1, o2, y, s0 = 0, s1 = e.len) {
 function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, side: T.DoubleSide }); m.depthWrite = false; return m; }
 
 export function buildWorld(scene, net, traffic) {
+  if (net.parking) return buildParkingWorld(scene, net.parking);
   const W = WORLD;
   scene.background = new T.Color(W.sky); scene.fog = new T.Fog(W.sky, W.fogNear, W.fogFar);
   scene.add(new T.HemisphereLight(0xe3ecf5, 0x7d7666, 0.78));

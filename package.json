@@ -6,7 +6,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "build": "node tools/build_demo.mjs . dist",
-    "dev": "python3 -m http.server 8000 --bind 127.0.0.1"
+    "dev": "python3 -m http.server 8000 --bind 127.0.0.1",
+    "test:parking": "node tests/parking-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",

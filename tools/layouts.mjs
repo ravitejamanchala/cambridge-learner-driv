@@ -1,3 +1,4 @@
+import { PARKING_LAYOUT } from '../js/parking-layout.js';
 // Purpose-built practice layouts for the course and the puzzles (the mock tests stay on real Cambridge roads).
 // Each layout is drawn here in metres (x east, z south, so north is -z) and written out in the same
 // format as the OpenStreetMap areas, so the sim loads it the same way. Built by tools/split_areas.mjs.
@@ -92,6 +93,7 @@ class Builder {
   }
   toJSON() {
     return {
+      ...(this.parking ? { parking: this.parking } : {}),
       version: 1, source: 'Practice layout', origin: [52.2, 0.12], kx: 68226.76517048452, kz: 110574, classes: CLASSES,
       area: { id: this.id }, names: this.names, ways: this.ways, nodes: this.nodes, edges: this.edges.map(e => e.slice(0, 4)),
       stops: this.stops, zebras: this.zebras, giveways: this.giveways, minis: this.minis, rbs: this.rbs, arrows: this.arrows, cycleRings: this.cycleRings
@@ -298,5 +300,10 @@ function park() {
   return B;
 }
 
-export const LAYOUTS = { town, rbs, roads, park };
+function parking() {
+  const B = new Builder('parking'); B.parking = PARKING_LAYOUT;
+  B.road({name:'Training aisle',cls:'living_street',mph:5,w:30}, PARKING_LAYOUT.aisle.map(p=>[p.x,p.z]));
+  return B;
+}
+export const LAYOUTS = { town, rbs, roads, park, parking };
 export function buildLayout(id) { return LAYOUTS[id]().toJSON(); }

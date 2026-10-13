@@ -120,12 +120,12 @@ try {
  await page.locator('[data-operation="doorClosed"]').click();
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.operation.doorClosed),true);
  // A failed area switch must not start a new lesson on the stale town network.
- await page.route('**/data/areas/roads.json',r=>r.fulfill({status:503,body:'unavailable'}));
+ await page.route('**/data/areas/roads.json*',r=>r.fulfill({status:503,body:'unavailable'}));
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','country',true);});
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.test.running),false);
  assert.equal(await page.locator('body').getAttribute('data-mode'),'lobby');
  assert.equal(await page.locator('#areaLoad').isVisible(),true);
- await page.unroute('**/data/areas/roads.json');
+ await page.unroute('**/data/areas/roads.json*');
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','country',true);});
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.area),'roads');
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.test.running),true);
@@ -142,7 +142,7 @@ try {
  }
  assert.equal(await page.evaluate(()=>localStorage.getItem('cambridge-learner-drive.v1')),beforeBots);
  // A failed required map request yields the application error, not fake readiness.
- await page.route('**/data/areas/index.json',r=>r.fulfill({status:503,body:'unavailable'}));await page.reload();await page.waitForFunction(()=>!document.querySelector('#loadErr').hidden);
+ await page.route('**/data/areas/index.json*',r=>r.fulfill({status:503,body:'unavailable'}));await page.reload();await page.waitForFunction(()=>!document.querySelector('#loadErr').hidden);
  assert.ok((await page.locator('#loadMsg').textContent()).includes('503'));
  assert.ok(errors.every(e=>e.includes('Map index did not load (503)')),errors.join('\n'));
  console.log('Browser checks passed: prerequisite enforcement, cockpit/engine completion, physical control lessons, legacy startup, persisted reports and failed map requests.');

@@ -1,3 +1,4 @@
+import { createParkingDriver } from './parking-driver.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -12,10 +13,12 @@ const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI
 // Follows the route guide's lane line, keeps to limits, stops for lights, crossings and traffic,
 // gives way at side roads, minis, roundabouts and cycle rings, signals, looks round before moving off.
 export function makeDriver(api) {
+  const parkingInput = createParkingDriver(api);
   const st = { lookedAt: -1e9, waitT: 0 };
   return function input() {
     const A = api.A, t = A.test, pl = api.player, R = t.route, tr = A.traffic, net = A.net; if (!t.running) return null;
     const lesson = api.lesson?.(), status = api.scenarioStatus?.();
+    if (lesson?.manoeuvre) return parkingInput();
     if (pl.operation?.enabled && pl.operation.transmission !== 'automatic') {
       const missing = ['doorClosed', 'seatSet', 'mirrorsSet', 'belt'].find(k => !pl.operation[k]);
       if (missing) api.operate(missing);

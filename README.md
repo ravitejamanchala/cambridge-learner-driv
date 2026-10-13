@@ -6,7 +6,7 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
 
 ## What's in it
 
-- **Course.** 37 modules in six units (including eight new control exercises), each with a goal, Highway Code rule and its own pass check:
+- **Course.** 40 modules in seven units (including control and parking exercises), each with a goal, Highway Code rule and its own pass check:
   - *Getting started:* moving off and stopping, speed limits, emergency stop
   - *Junctions and traffic lights:* turning left and right into side roads, traffic lights, stopping at amber, emerging left and right from a side road, turning right at lights
   - *Roundabouts:* mini-roundabout, 1st, 2nd and 3rd exits, a big two-lane roundabout
@@ -27,11 +27,12 @@ On your own machine, open `http://localhost:8000`. In cloud onboarding, the serv
 npm test
 npm run build
 npm run test:browser
+npm run test:parking
 ```
 
 Browser checks require Python and Chromium (set `CHROMIUM_PATH` if needed). They use the exact Three.js version from npm in place of CDN requests. The app itself continues to use the existing CDN assets.
 
-The first development batch adds cockpit preparation, engine start/stop, explicit mirror inputs, controlled stopping and acceleration/deceleration. The second batch adds assessed steering through bends and automatic forward/reverse exercises with a working P/R/N/D selector. Existing lesson IDs and saved learner progress are preserved. See [the audit and roadmap](docs/development/audit-and-roadmap.md) for actual coverage and remaining work towards 80+ lessons and secure AI coaching.
+The first development batch adds cockpit preparation, engine start/stop, explicit mirror inputs, controlled stopping and acceleration/deceleration. The second batch adds assessed steering through bends and automatic forward/reverse exercises with a working P/R/N/D selector. The third batch adds a closed parking area with assessed forward/reverse bay parking and safe departure. Existing lesson IDs and saved learner progress are preserved. See [the audit and roadmap](docs/development/audit-and-roadmap.md) for actual coverage and remaining work towards 80+ lessons and secure AI coaching.
 
 ## Demo build
 

@@ -62,6 +62,7 @@ export function createTest(net, traffic, player) {
 
   t.update = (dt, inputSteer) => {
     if (!t.running) return;
+    if (t.mode === 'manoeuvre') { t.ctx = nearest(net, player.x, player.z); if (Math.abs(player.v) > 0.3) t.parked = false; return; }
     const v = player.v, mph = Math.abs(v) * MPH, fx = -Math.sin(player.th), fz = -Math.cos(player.th);
     const nr = nearest(net, player.x, player.z); t.ctx = nr;
     progress(dt);

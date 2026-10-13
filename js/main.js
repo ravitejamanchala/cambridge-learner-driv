@@ -1,3 +1,5 @@
+import { parkingPlan } from './parking-layout.js';
+import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
 import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
@@ -29,7 +31,9 @@ const setLoad = (msg) => { const el = $('loadMsg'); if (el) el.textContent = msg
 async function boot() {
   if (!window.THREE) throw new Error('The 3D library did not load. Check your connection and reload.');
   setLoad('Loading…');
-  const ix = await fetch(AREAS_URL + 'index.json'); if (!ix.ok) throw new Error('Map index did not load (' + ix.status + ')');
+  const release = document.querySelector('meta[name="app-release"]')?.content;
+  const assetURL = url => release ? url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(release) : url;
+  const ix = await fetch(assetURL(AREAS_URL + 'index.json')); if (!ix.ok) throw new Error('Map index did not load (' + ix.status + ')');
   const index = await ix.json();
   const meta = (key) => index.plans[key] || { len: 0, n: 0, first: '' };
 
@@ -66,7 +70,7 @@ async function boot() {
       $('areaLoad').textContent = 'Loading map…';
       const info = index.areas.find(a => a.id === id); if (!info) throw new Error('Unknown map area ' + id);
       $('areaLoad').hidden = false;
-      const r = await fetch(AREAS_URL + info.file); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
+      const r = await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
       const d = await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
@@ -115,7 +119,10 @@ async function boot() {
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
-    const s0 = startPos(startS(pl)); camInit = false; player.indicator = null;
+    const s0 = startPos(startS(pl));
+    if (pl.lesson?.manoeuvre) { const start = parkingPlan(pl.lesson.parkingKind, A.net.parking).start; player.place(start.x,start.z,start.th); }
+    test.ctx = nearest(A.net,player.x,player.z);
+    test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
@@ -138,11 +145,11 @@ async function boot() {
     loadPlan(pl); if (start) begin();
   }
   const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
-  const setMode = (m) => { document.body.dataset.mode = m; camInit = false; layoutSoon(); };
+  const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
 
-  loadCarModel(CAR.url).then(m => { player.setModel(shadowed(m)); }).catch(err => console.warn('Car model did not load; using the placeholder car.', err));
+  loadCarModel(assetURL(CAR.url)).then(m => { player.setModel(shadowed(m)); }).catch(err => console.warn('Car model did not load; using the placeholder car.', err));
 
   // ---------- input ----------
   const key = { up: 0, down: 0, left: 0, right: 0 }, tch = { up: 0, down: 0, left: 0, right: 0 };
@@ -195,13 +202,18 @@ async function boot() {
   document.querySelectorAll('[data-gear]').forEach(b => b.addEventListener('click', () => gearAction(b.dataset.gear)));
   document.querySelectorAll('[data-operation]').forEach(b => b.addEventListener('click', () => cockpitAction(b.dataset.operation)));
   document.querySelectorAll('[data-observe]').forEach(b => b.addEventListener('click', () => look(b.dataset.observe)));
+  $('assessParking').addEventListener('click', () => { if (A.test?.running && plan?.lesson?.manoeuvre) scenario?.finishAttempt(); });
   function renderTrainingControls() {
+    document.body.classList.toggle('parking-controls-right',!!plan?.lesson?.manoeuvre && (scenario?.progress?.target.x ?? player.x) < player.x - .5);
+    $('backBtn').hidden = !!plan?.lesson?.manoeuvre;
+    $('assessParking').hidden = !plan?.lesson?.manoeuvre;
+    $('parkingTask').hidden = !plan?.lesson?.manoeuvre; $('parkingTask').textContent = scenario?.progress?.message || '';
     $('trainingControls').hidden = document.body.dataset.mode !== 'drive' || (!player.operation.enabled && plan?.lesson?.scenario !== 'mirrors');
     $('cockpitControls').hidden = !player.operation.enabled;
     $('gearControls').hidden = player.operation.transmission !== 'automatic';
     document.querySelectorAll('[data-gear]').forEach(b => b.setAttribute('aria-pressed', String(player.operation.gear === b.dataset.gear)));
-    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors';
-    document.querySelectorAll('[data-operation]').forEach(b => b.setAttribute('aria-pressed', String(!!player.operation[b.dataset.operation])));
+    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors' && !plan?.lesson?.manoeuvre;
+    document.querySelectorAll('[data-operation]').forEach(b => { b.hidden = !!plan?.lesson?.manoeuvre && !['engine','parkingBrake'].includes(b.dataset.operation); b.setAttribute('aria-pressed', String(!!player.operation[b.dataset.operation])); });
     $('cockpitState').textContent = `Engine ${player.operation.engine ? 'on' : 'off'} · Parking brake ${player.operation.parkingBrake ? 'on' : 'off'}${player.operation.gear ? ' · Selector ' + player.operation.gear : ''}`;
   }
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
@@ -253,14 +265,18 @@ async function boot() {
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
   }
+  let parkingCamera = null;
   function begin() {
     paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);
+    if (plan.lesson?.manoeuvre) { if (!parkingCamera) parkingCamera = { cam, height: ov.h, portrait: portrait() }; setCam(2); ov.h = 55; }
+    else if (parkingCamera) { setCam(parkingCamera.portrait === portrait() ? parkingCamera.cam : portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); ov.h = parkingCamera.height; parkingCamera = null; }
     if (plan.kind !== 'mock') scenario = createScenario(plan.lesson, { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner } });
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
   }
   $('pauseBtn').addEventListener('click', pause);
@@ -271,6 +287,7 @@ async function boot() {
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('backBtn').addEventListener('click', () => {
+    if (plan?.lesson?.manoeuvre) return;
     const test = A.test, r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
     let best = 0; for (let k = 0; k < r.cum.length; k++) if (r.cum[k] <= s) best = k;
     const a = best, b = Math.min(r.xs.length - 1, best + 1), tx = r.xs[b] - r.xs[a], tz = r.zs[b] - r.zs[a], L = Math.hypot(tx, tz) || 1;
@@ -350,7 +367,7 @@ async function boot() {
   function resize() {
     const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h;
     camera.fov = w < h ? 72 : 58; camera.updateProjectionMatrix(); layoutSoon();
-    const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
+    const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(plan?.lesson?.manoeuvre ? 2 : p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
   }
   new ResizeObserver(resize).observe(stage); resize();
   setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
@@ -360,11 +377,12 @@ async function boot() {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
     if (test.running) test.elapsed = (test.elapsed || 0) + dt;
-    if (test.running && scenario) scenario.update(dt, traffic.clock);
+    if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
       player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       test.update(dt);
+      if (test.running && plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
       test.nearZebra = net.zebras.some(z => Math.abs(z.x - player.x) < 70 && Math.abs(z.z - player.z) < 70);
       test.nearLights = test.ctx && net.stopsByEdge.has(test.ctx.e.id);
     }
@@ -390,7 +408,8 @@ async function boot() {
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
-    guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive;
+    guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive && !plan?.lesson?.manoeuvre;
+    if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }
     if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
     renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }

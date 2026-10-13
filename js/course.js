@@ -1,3 +1,5 @@
+import { PARKING_LESSONS } from './parking-lessons.js';
+import { createParkingScenario } from './parking-scenario.js';
 import { along } from './net.js';
 import { QUIZZES } from './quiz.js';
 import { enrichLesson } from './curriculum.js';
@@ -15,6 +17,7 @@ export const UNITS = [
   { id: 'roundabouts', title: 'Roundabouts' },
   { id: 'sharing', title: 'Sharing the road' },
   { id: 'faster', title: 'Faster roads' },
+  { id: 'parking', title: 'Manoeuvres and parking' },
   { id: 'theory', title: 'Theory and show me, tell me' }
 ];
 
@@ -151,12 +154,14 @@ export const LESSONS = [
     waypoints: [pt(-700, 0, 'Babraham Road'), pt(3300, 0, 'Babraham Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 }
 ];
 LESSONS.unshift(...BASIC_LESSONS);
-LESSONS.push(...QUIZZES);
+LESSONS.push(...PARKING_LESSONS, ...QUIZZES);
 for (let i = 0; i < LESSONS.length; i++) LESSONS[i] = enrichLesson(LESSONS[i]); // theory modules: quizzes, no driving (see quiz.js)
 
 // ---------- scripted events ----------
 // deps: { net, traffic, test, player, ui: { banner(text|null, kind) } }
 export function createScenario(lesson, deps) {
+  const parking = createParkingScenario(lesson, deps);
+  if (parking) return parking;
   const control = createControlScenario(lesson, deps);
   if (control) return control;
   const basic = createBasicScenario(lesson, deps);

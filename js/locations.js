@@ -1,6 +1,8 @@
+import { PARKING_LAYOUT } from './parking-layout.js';
 // Verified practice-layout locations. Curriculum records refer to these IDs rather than owning coordinates.
 // Synthetic layouts are not surveyed roads or verified real test routes.
 export const PRACTICE_LOCATIONS = {
+  'parking-aisle': { areaId: 'parking', waypoints: PARKING_LAYOUT.aisle },
   'country-bends': { areaId: 'roads', waypoints: [
     { x: 3500, z: 48, road: 'Grantchester Lane' }, { x: 3500, z: 1650, road: 'Grantchester Lane' }
   ] },

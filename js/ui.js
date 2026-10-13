@@ -134,6 +134,9 @@ export function createUI(net) {
     ln.hidden = !showL; if (showL) { const k = s.lanes + ':' + s.laneOK.join(','); if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: s.lanes }, (_, i) => `<i class="${s.laneOK.includes(i) ? 'on' : ''}"></i>`).join(''); } }
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
+    if (t.mode === 'manoeuvre' && t.manoeuvreStatus) {
+      const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = m.short; $('hudNextBox').setAttribute('aria-label',m.message); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
+    }
     // tip
     let key = 'keep';
     if (mph > limit + 1) key = 'speed';
@@ -148,7 +151,7 @@ export function createUI(net) {
     // traffic light ahead
     const la = running ? t.lightAhead : null, tl = $('hudLight'); tl.hidden = !la;
     if (la) { const st = la.state; tl.dataset.s = st; tl.setAttribute('aria-label', { R: 'Red light', RA: 'Red and amber', A: 'Amber light', G: 'Green light' }[st] + ' ahead'); }
-    if (pinned && clockNow() < pinned.until) key = 'lesson';
+    if (pinned && (t.mode === 'manoeuvre' || clockNow() < pinned.until)) key = 'lesson';
     if (key !== tipKey) { tipKey = key; const tp = key === 'lesson' ? pinned.tip : TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; if (running && !matchMedia('(pointer:coarse)').matches) openTip(5000); } // phones: chip only, tap to read
   }
   // show the lesson's own Highway Code rule for the first part of a drive
