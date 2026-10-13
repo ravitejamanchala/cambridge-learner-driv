@@ -5,7 +5,6 @@ Uses existing Git/gh authentication. Never writes credentials or rewrites main.
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import tempfile
 
@@ -62,6 +61,10 @@ with tempfile.TemporaryDirectory(prefix='driving-pages-') as temp:
             raise SystemExit('Assets were pushed, but Pages settings access failed: ' + probe.stderr.strip())
         method = 'POST'
     else:
+        site = json.loads(probe.stdout)
+        if site.get('source') == {'branch': 'gh-pages', 'path': '/'} and site.get('build_type') == 'legacy':
+            print('Pages already uses gh-pages / (root). Wait for its build, then verify release.json.')
+            raise SystemExit(0)
         method = 'PUT'
     payload = Path(temp) / 'pages.json'
     payload.write_text(json.dumps({'build_type': 'legacy', 'source': {'branch': 'gh-pages', 'path': '/'}}))

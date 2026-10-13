@@ -33,3 +33,8 @@ Extended: `js/vehicle-state.js`, `js/basic-lessons.js`, `js/locations.js`, `js/c
 ## Remaining scope and next batch
 
 The 80+ curriculum and secure external AI backend remain incomplete. Next: angled moving-off and assessed steering/low-speed target exercises, followed by parking target geometry and manoeuvre assessment. Manual/clutch and hill-start lessons require their actual physics first. Production instructor/DVSA review and full cross-browser/device testing remain outstanding.
+
+
+## Publication
+
+Source and generated assets have been pushed with user authorization. GitHub Pages reported a successful build from `gh-pages` and the existing site URL `http://manchala.co.uk/cambridge-learner-driv/`. The repository API credentials can read Pages but cannot update its settings; publication works with the already configured `gh-pages / (root)` source. The publisher skips unnecessary settings writes when the configuration already matches. Public release metadata and browser behaviour must still be checked after deployment.
