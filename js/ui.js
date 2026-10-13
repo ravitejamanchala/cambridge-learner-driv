@@ -14,11 +14,12 @@ const ICON = {
 const TIPS = {
   keep: { rule: 'Rule 160', ctx: 'Normal driving', txt: 'Keep to the left unless road signs or markings tell you otherwise. Give cyclists plenty of room; Cambridge has a lot of them.' },
   speed: { rule: 'Rule 124', ctx: 'Speed limits', txt: 'A limit is the most you may do, not a target. Much of central Cambridge is 20 mph. Go slower near parked cars, schools and crossings.' },
-  lights: { rule: 'Rule 175', ctx: 'Traffic lights', txt: 'Stop at the white line on red. Amber also means stop, unless you have already crossed the line or stopping could cause a crash. Red and amber together still means stop.' },
+  lights: { rule: 'Rule 175', ctx: 'Traffic lights', txt: 'Stop at the white line on red. Amber also means stop, unless you have already crossed the line or stopping could cause a collision. Red and amber together still means stop.' },
   rb: { rule: 'Rule 185', ctx: 'Roundabouts', txt: 'Give priority to traffic coming from your right. Go round clockwise, and check for cyclists on your left as you leave.' },
   zebra: { rule: 'Rule 195', ctx: 'Zebra crossings', txt: 'Watch for people waiting to cross and be ready to slow down or stop. Once someone has stepped onto the crossing, you must give way.' },
   signal: { rule: 'Rule 103', ctx: 'Signals', txt: 'Signal clearly and in good time so others know what you plan to do. Cancel the indicator once you have turned.' },
-  oneway: { rule: 'Rule 143', ctx: 'One-way streets', txt: 'Traffic moves in one direction only. Choose your lane early for where you want to go, and never reverse the wrong way along it.' },
+  oneway: { rule: 'Rule 143', ctx: 'One-way streets', txt: 'Traffic moves in one direction only. Choose your lane early for where you want to go, and stay in your lane unless you need to change.' },
+  dual: { rule: 'Rule 137', ctx: 'Dual carriageways', txt: 'On a two-lane dual carriageway, stay in the left-hand lane. Use the right-hand lane for overtaking or turning right, then move back to the left.' },
   cyclist: { rule: 'Rule 163', ctx: 'Cyclists', txt: 'When overtaking a cyclist at up to 30 mph, leave at least 1.5 metres, and more at higher speeds. If you cannot, wait behind until it is safe.' },
   cyclelane: { rule: 'Rule 140', ctx: 'Cycle lanes', txt: 'Do not drive in a cycle lane marked by a solid white line. Avoid one marked by a broken line unless it is unavoidable. Check for cyclists before turning left across it.' }
 };
@@ -103,6 +104,7 @@ export function createUI(net) {
     const R = t.route, ins = R.instructions, i = Math.min(t.step, ins.length - 1), s = ins[i];
     let short = s.short, ico = s.icon, dtxt;
     const yd = Math.max(0, s.s - t.sRoute) * YD; dtxt = yd < 15 ? 'now' : yd > 1700 ? 'in ' + (yd / 1760).toFixed(1) + ' miles' : 'in ' + Math.round(yd / 10) * 10 + ' yd';
+    if (s.final && yd > 280) { short = 'Follow the road ahead'; ico = 'straight'; } // don't announce "pull up" a mile early
     if (t.offRoute) { short = 'Finding a new route'; ico = 'off'; dtxt = 'follow the road'; }
     if (!running && !t.done) dtxt = 'Press start';
     $('hudNext').textContent = short; $('hudDist').textContent = dtxt + ' · ' + rn;
@@ -117,13 +119,18 @@ export function createUI(net) {
     else if (t.nearZebra) key = 'zebra';
     else if (t.nearLights || t.lightAhead) key = 'lights';
     else if (t.inCycleLaneRoad) key = 'cyclelane';
+    else if (way && way.oneway && way.mph >= 50) key = 'dual';
     else if (way && way.oneway) key = 'oneway';
     // traffic light ahead
     const la = running ? t.lightAhead : null, tl = $('hudLight'); tl.hidden = !la;
     if (la) { const st = la.state; tl.dataset.s = st; tl.setAttribute('aria-label', { R: 'Red light', RA: 'Red and amber', A: 'Amber light', G: 'Green light' }[st] + ' ahead'); }
-    if (key !== tipKey) { tipKey = key; const tp = TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; if (running && !matchMedia('(pointer:coarse)').matches) openTip(5000); } // phones: chip only, tap to read
+    if (pinned && clockNow() < pinned.until) key = 'lesson';
+    if (key !== tipKey) { tipKey = key; const tp = key === 'lesson' ? pinned.tip : TIPS[key]; $('tipRule').textContent = tp.rule; $('tipCtx').textContent = tp.ctx; $('tipTxt').textContent = tp.txt; if (running && !matchMedia('(pointer:coarse)').matches) openTip(5000); } // phones: chip only, tap to read
   }
-  return { drawMap, renderSteps, renderFaults, hud, setNet: (n) => { net = n; } };
+  // show the lesson's own Highway Code rule for the first part of a drive
+  let pinned = null; const clockNow = () => performance.now() / 1000;
+  function pinTip(rule, title, secs = 20) { pinned = rule ? { tip: { rule: rule.n, ctx: title, txt: rule.t }, until: clockNow() + secs } : null; tipKey = ''; }
+  return { drawMap, renderSteps, renderFaults, hud, pinTip, setNet: (n) => { net = n; } };
 }
 export function pointOnRoute(route, s) {
   const c = route.cum; let lo = 0, hi = c.length - 1; s = Math.max(0, Math.min(route.len, s));

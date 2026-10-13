@@ -4,8 +4,8 @@
 const Q = (q, options, a, why) => ({ q, options, a, why });
 
 export const QUIZZES = [
-  { id: 'q-showme', unit: 'theory', title: 'Show me, tell me', road: 'Quiz · 10 questions', pass: 0.8,
-    goal: 'At the start of the test the examiner asks one "tell me" question; during the drive you are asked one "show me" question. Get 8 of 10 right to pass.',
+  { id: 'q-showme', unit: 'theory', title: 'Show me, tell me', road: 'Quiz · 12 questions', pass: 0.8,
+    goal: 'At the start of the test the examiner asks one "tell me" question; during the drive you are asked one "show me" question. Get 10 of 12 right to pass.',
     steps: ['Read every option before you answer', 'Wrong answers show the right one and why', 'Retry as often as you like'],
     rule: { n: 'DVSA', t: 'Getting a show me, tell me question wrong gives you 1 driving fault on the real test.' },
     questions: [
@@ -18,7 +18,9 @@ export const QUIZZES = [
       Q('How would you know if there was a problem with the anti-lock braking system (ABS)?', ['The car pulls to the left', 'A warning light comes on in the dashboard', 'The brake pedal goes hard', 'The horn stops working'], 1, 'If the ABS warning light stays on, get it checked.'),
       Q('When should you use a rear fog light?', ['Whenever it is dark', 'When visibility is seriously reduced, generally to less than 100 metres', 'In heavy traffic', 'When it is raining lightly'], 1, 'Switch it off when visibility improves, or it dazzles drivers behind and hides your brake lights.'),
       Q('How do you know the headlights are on main beam?', ['A green light on the dashboard', 'A blue warning light on the dashboard', 'The indicators flash', 'An orange light'], 1, 'Blue light = main beam. Dip them for oncoming traffic and when following another car.'),
-      Q('With the bonnet open, how would you check the engine has enough oil?', ['Look at the oil filler cap', 'Use the dipstick: the oil level should be between the minimum and maximum marks', 'Check the coolant tank', 'Start the engine and watch the smoke'], 1, 'Pull the dipstick, wipe it, push it back in, pull again and read the level.')
+      Q('With the bonnet open, how would you check the engine has enough oil?', ['Look at the oil filler cap', 'Use the dipstick: the oil level should be between the minimum and maximum marks', 'Check the coolant tank', 'Start the engine and watch the smoke'], 1, 'Pull the dipstick, wipe it, push it back in, pull again and read the level.'),
+      Q('Show me (while driving) how you would wash and clean the front windscreen.', ['Stop and wipe it with a cloth', 'Use the windscreen washer and wiper control', 'Open the window and lean out', 'Turn on the rear demister'], 1, 'Operate the washer and wipers. Show me questions are asked while you drive, so do it without looking away from the road for long.'),
+      Q('Show me (while driving) how you would switch on your dipped headlights.', ['Flash the main beam', 'Operate the light switch to dipped beam and check the dashboard indicator', 'Turn on the hazard lights', 'Switch on the front fog lights'], 1, 'Use the light switch; a green dashboard light shows dipped headlights are on.')
     ] },
   { id: 'q-signs', unit: 'theory', title: 'Road signs', road: 'Quiz · 10 questions', pass: 0.8,
     goal: 'Signs have shapes and colours with meanings. Learn the shapes and most signs read themselves.',
@@ -33,7 +35,7 @@ export const QUIZZES = [
       Q('A red circle with a white horizontal bar means…', ['No stopping', 'No entry for vehicular traffic', 'End of restriction', 'One-way street'], 1, 'You often see it at the exit end of one-way streets.'),
       Q('A white circle with a black diagonal stripe means…', ['No overtaking', 'The national speed limit applies', 'Road closed', 'End of the motorway'], 1, '60 mph on single carriageways and 70 mph on dual carriageways and motorways, for cars.'),
       Q('What is the national speed limit for a car on a single carriageway road?', ['50 mph', '60 mph', '70 mph', '40 mph'], 1, '60 mph for cars and motorcycles on single carriageways.'),
-      Q('In a built-up area with street lights and no signs, the speed limit is usually…', ['20 mph', '30 mph', '40 mph', '60 mph'], 1, '30 mph unless signs say otherwise. Much of central Cambridge is signed 20.'),
+      Q('In England, on a road with street lights and no speed limit signs, the limit is usually…', ['20 mph', '30 mph', '40 mph', '60 mph'], 1, '30 mph in England unless signs say otherwise (in Wales the default is 20 mph). Much of central Cambridge is signed 20.'),
       Q('What colour are signs on primary routes (not motorways)?', ['Blue with white text', 'Green with white and yellow text', 'White with black text', 'Brown'], 1, 'Green for primary routes, blue for motorways, white for local roads, brown for tourist signs.')
     ] },
   { id: 'q-stopping', unit: 'theory', title: 'Stopping distances', road: 'Quiz · 8 questions', pass: 0.75,
@@ -58,7 +60,7 @@ export const QUIZZES = [
       Q('At a junction, a pedestrian is waiting to cross the side road you want to turn into. What should you do?', ['Turn first, you have priority', 'Give way to them', 'Sound your horn', 'Flash your lights to let them cross'], 1, 'Since 2022, you should give way to people crossing or waiting to cross a road you are turning into.'),
       Q('At a roundabout, who normally has priority?', ['Traffic joining from the left', 'Traffic coming from your right', 'The bigger vehicle', 'Whoever arrives first'], 1, 'Give priority to traffic approaching from your right unless signs, markings or lights say otherwise.'),
       Q('You are turning left and a cyclist is going straight on in the cycle lane beside you. What should you do?', ['Turn in front of them quickly', 'Give way and let them go ahead', 'Signal and turn: you signalled first', 'Sound your horn'], 1, 'Do not cut across cyclists going ahead when you turn (Rule H3).'),
-      Q('Someone has stepped onto a zebra crossing. What must you do?', ['Carry on if they are on the other half', 'Give way to them', 'Wave them across', 'Flash your headlights'], 1, 'You must give way once someone has moved onto a zebra crossing.'),
+      Q('Someone has stepped onto a zebra crossing. What must you do?', ['Carry on if you think you can get past them', 'Give way to them', 'Wave them across', 'Flash your headlights'], 1, 'You must give way once someone has moved onto a zebra crossing.'),
       Q('At a junction with no road markings, who has priority?', ['The car on the bigger road', 'Nobody has priority: take care and be ready to give way', 'Whoever signals first', 'Traffic on the right always'], 1, 'Unmarked junctions give nobody priority. Slow down and look.'),
       Q('What does a flashing amber light at a pelican crossing mean?', ['Stop and wait', 'Give way to pedestrians on the crossing; go if it is clear', 'Speed up before red', 'The lights are broken'], 1, 'Flashing amber: go only if nobody is still crossing.'),
       Q('How much room should you give a cyclist when overtaking at up to 30 mph?', ['50 cm', 'At least 1.5 metres', 'One car width', 'It does not matter if they are in a cycle lane'], 1, 'At least 1.5 m at up to 30 mph, more at higher speeds.'),

@@ -27,7 +27,9 @@ export function createGuide() {
     let k = 0; while (k < R.steps.length - 1 && R.stepS[k + 1] <= s) k++;
     const st = R.steps[k]; return along(st.e, Math.max(0, Math.min(st.e.len, s - R.stepS[k])), st.dir, laneCentre(st.e, st.dir, 0));
   }
-  function update(test, clock) {
+  let minis = [];
+  function update(test, clock, net) {
+    minis = net ? net.minis : [];
     group.visible = on && !!test.route && !test.offRoute;
     if (!group.visible) return;
     const R = test.route, s0 = test.sRoute + 7, ins = R.instructions[Math.min(test.step, R.instructions.length - 1)];
@@ -36,12 +38,13 @@ export function createGuide() {
     for (let i = 0; i < N; i++) {
       const s = s0 + i * GAP; if (s > stop) break;
       const p = lanePoint(R, s);
+      for (const m of minis) { const dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz); if (d < 3) { const k = 3 / (d || 1); p.x = m.x + dx * k; p.z = m.z + dz * k; } } // go round the painted disc
       q.setFromAxisAngle(up, Math.atan2(-p.tx, -p.tz)); pos.set(p.x, 0.07, p.z);
       const fade = 1 - i / N; sc.set(fade * 0.5 + 0.6, 1, fade * 0.5 + 0.6);
       m4.compose(pos, q, sc); chev.setMatrixAt(n++, m4);
     }
     chev.count = n; chev.instanceMatrix.needsUpdate = true;
-    const tp = ins.final ? lanePoint(R, Math.max(0, R.len - 6)) : pointOnRoute(R, ins.s);
+    const tp = lanePoint(R, ins.final ? Math.max(0, R.len - 6) : ins.s);
     marker.position.set(tp.x, 0, tp.z);
     head.position.y = 7.6 + Math.sin(clock * 3) * 0.25; head.rotation.y = clock;
     ring.scale.setScalar(1 + (clock * 0.8 % 1) * 0.35); ring.material.opacity = 0.85 * (1 - (clock * 0.8 % 1));

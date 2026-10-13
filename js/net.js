@@ -132,7 +132,7 @@ export function ll2xz(net, lat, lon) { return { x: (lon - net.origin[1]) * net.k
 
 // ---------- routing ----------
 const COST = { residential: 1.6, living_street: 2.6, unclassified: 1.3 };
-export function shortestPath(net, from, to) {
+export function shortestPath(net, from, to, noFirstEdge = null) {
   if (from === to) return [];
   const n = net.nx.length, dist = new Float64Array(n).fill(Infinity), prev = new Array(n);
   const heap = [[0, from]]; dist[from] = 0;
@@ -141,6 +141,7 @@ export function shortestPath(net, from, to) {
   while (heap.length) {
     const [d, u] = popH(); if (d > dist[u]) continue; if (u === to) break;
     for (const o of net.out[u]) {
+      if (u === from && o.e === noFirstEdge) continue;
       const v = o.dir > 0 ? o.e.b : o.e.a, nd = d + o.e.len * (COST[o.e.way.cls] || 1);
       if (nd < dist[v]) { dist[v] = nd; prev[v] = o; pushH([nd, v]); }
     }
@@ -163,7 +164,7 @@ export function buildRoute(net, nodes, meta = {}) {
   let steps = [];
   const wpS = [];
   for (let i = 0; i < nodes.length - 1; i++) {
-    const leg = shortestPath(net, nodes[i], nodes[i + 1]);
+    const leg = (i === 0 && meta.noUturnEdge && shortestPath(net, nodes[i], nodes[i + 1], meta.noUturnEdge)) || shortestPath(net, nodes[i], nodes[i + 1]);
     if (!leg) throw new Error('No road route between waypoints ' + i + ' and ' + (i + 1));
     steps = steps.concat(leg);
     // a waypoint past the turn makes the route drive on and come straight back: cut that spur out
@@ -238,7 +239,8 @@ function makeInstructions(net, route) {
       const L = laneInfo(A.e, A.dir), laneReq = L.n >= 2 ? (exits === 1 ? 'L' : exits >= 3 ? 'R' : null) : null;
       out.push({ s: sAt, node: v, kind: 'rb', icon: 'rb', exitN: exits, exitS: route.stepS[Math.min(k + 1, S.length - 1)],
         text: laneText(laneReq) + `At the roundabout, take the ${ord(exits)} exit${nm ? ' onto ' + nm : ''}.`, short: laneShort(laneReq) + `Roundabout · ${ord(exits)} exit`, road: nm,
-        laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir } });
+        laneReq, lanes: L.n, approach: { e: A.e, dir: A.dir },
+        signal: exits === 1 ? 'L' : exits >= 3 ? 'R' : null }); // Rule 186: signal left for the 1st exit, right for exits past 12 o'clock
       i = k; continue;
     }
     if (A.e.way.rb) continue;

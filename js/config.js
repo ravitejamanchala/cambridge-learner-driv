@@ -18,7 +18,7 @@ export const CAR = {
 // Steering and pedals. `steerSensitivity` 1 = default; lower is calmer.
 export const HANDLING = {
   steerSensitivity: 1, maxSteer: 0.6, wheelbase: 2.6,
-  accel: 3.3, brake: 7.6, topSpeed: 27, reverseSpeed: 4
+  accel: 3.6, brake: 7.6, topSpeed: 34, drag: 0.0004, reverseSpeed: 4 // topSpeed m/s (about 76 mph); real cruising tops out near 72 mph
 };
 
 // Test routes: waypoints are snapped to the nearest junction on the named road.

@@ -53,13 +53,15 @@ const inBox = (b, x, z) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
 groups.forEach((g, gi) => {
   const id = 'a' + (gi + 1), b = g.box, used = new Set(g.plans.flatMap(p => [...p.used]));
   // keep edges that touch the box; drop fast trunk roads that only pass over or under it (A14 flyovers)
-  const keepE = [];
+  const keepE = [], rbNodes = new Set();
+  full.edges.forEach(ed => { if (full.ways[ed[2]][6]) { rbNodes.add(ed[0]); rbNodes.add(ed[1]); } });
   full.edges.forEach((ed, ei) => {
     const f = ed[3]; let inside = false;
     for (let k = 0; k < f.length && !inside; k += 2) inside = inBox(b, f[k] / 10, f[k + 1] / 10);
     if (!inside) return;
     const w = full.ways[ed[2]], cls = full.classes[w[1]];
-    if (!used.has(ei) && /^(motorway|trunk)/.test(cls) && w[2] >= 60 && !w[6]) return;
+    // keep slip roads that join a roundabout, so exit counts stay right (Histon / Milton interchanges)
+    if (!used.has(ei) && /^(motorway|trunk)/.test(cls) && w[2] >= 60 && !w[6] && !rbNodes.has(ed[0]) && !rbNodes.has(ed[1])) return;
     keepE.push(ei);
   });
   const nodeMap = new Map(), wayMap = new Map(), nameMap = new Map(), edgeMap = new Map();
@@ -81,7 +83,8 @@ groups.forEach((g, gi) => {
   const sub = buildNet(area);
   for (const p of g.plans) {
     const r = buildRoute(sub, p.wps.map(w => snapWaypoint(sub, w)));
-    const ok = Math.abs(r.len - p.route.len) < 2 && r.instructions.length === p.route.instructions.length;
+    const txt = (x) => x.instructions.map(i => i.text).join('|');
+    const ok = Math.abs(r.len - p.route.len) < 2 && txt(r) === txt(p.route); // same route and the same examiner instructions
     if (!ok) console.warn(`  ! ${p.key}: route differs on area map (${Math.round(r.len)} m vs ${Math.round(p.route.len)} m)`);
     index.plans[p.key] = { area: id, len: Math.round(r.len), n: r.instructions.length, first: r.instructions[0].text };
   }

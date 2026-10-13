@@ -68,6 +68,7 @@ async function boot() {
       const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
+      test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
       Object.assign(A, { id, net, traffic, world, test, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
@@ -196,6 +197,7 @@ async function boot() {
     paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);
     if (plan.kind !== 'mock') scenario = createScenario(plan.lesson, { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner } });
+    ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     sigBtns(); A.test.running = true; banner(null);
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     lastStep = -1;
@@ -303,7 +305,7 @@ async function boot() {
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
-    guide.update(test, traffic.clock); guide.group.visible = guide.group.visible && drive;
+    guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive;
     if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
     renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }

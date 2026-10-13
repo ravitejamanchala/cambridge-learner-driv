@@ -57,6 +57,7 @@ body:not([data-mode="drive"]) #hud{display:none}
 .xpbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#7ff0df);border-radius:9px;transition:width .8s var(--spring)}
 .stats{display:flex;align-items:center;gap:10px}
 .pill{display:flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 4px;border-radius:999px;background:var(--plum-a);color:#fff;font:600 15px/1 var(--font-mono);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.pill .pl{font:600 10px/1 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-left:-3px}
 .pill .ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;margin-left:-2px}
 .pill .ic svg{width:26px;height:26px}
 .iconbtn{width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;background:var(--plum-a);display:grid;place-items:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .4s var(--spring)}
@@ -304,9 +305,9 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
         <span class="meta"><span class="nm" id="whoName">Learner</span><span class="xp"><span class="lv" id="whoLv">1</span><span class="xpbar"><i id="whoXp"></i></span></span></span>
       </button>
       <div class="stats">
-        <div class="pill" title="Lessons passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M16 3l3.9 8 8.6 1.2-6.3 6 1.5 8.6L16 22.7 8.3 26.8l1.5-8.6-6.3-6L12.1 11z" fill="#ffc23d" stroke="#c98a0e" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statLessons">0/13</span></div>
-        <div class="pill" title="Puzzle stars"><span class="ic"><svg viewBox="0 0 32 32"><path d="M6 6h9v4a3 3 0 1 0 0 6v4H6zM17 6h9v9h-4a3 3 0 1 0-6 0" fill="#b49cf5" stroke="#6a4fc4" stroke-width="1.5" stroke-linejoin="round"/><path d="M17 17h9v9h-9v-4a3 3 0 1 0 0-6" fill="#38cbb9" stroke="#14857a" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statStars">0</span></div>
-        <div class="pill" title="Mock tests passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M9 5h14v6a7 7 0 0 1-14 0z" fill="#ef4f97" stroke="#a52a63" stroke-width="1.5"/><path d="M9 7H5v2a5 5 0 0 0 5 5M23 7h4v2a5 5 0 0 1-5 5" fill="none" stroke="#a52a63" stroke-width="1.5"/><path d="M16 18v4M11 27h10l-1.5-5h-7z" fill="#ffc23d" stroke="#a52a63" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statMocks">0</span></div>
+        <div class="pill" title="Course modules passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M4 8c4-2 8-2 12 1v17c-4-3-8-3-12-1z" fill="#ffd28a" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/><path d="M28 8c-4-2-8-2-12 1v17c4-3 8-3 12-1z" fill="#ffe7bd" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/></svg></span><span id="statLessons">0/13</span><span class="pl">course</span></div>
+        <div class="pill" title="Puzzle stars"><span class="ic"><svg viewBox="0 0 32 32"><path d="M16 3l3.9 8 8.6 1.2-6.3 6 1.5 8.6L16 22.7 8.3 26.8l1.5-8.6-6.3-6L12.1 11z" fill="#ffc23d" stroke="#c98a0e" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statStars">0</span><span class="pl">stars</span></div>
+        <div class="pill" title="Mock tests passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M9 5h14v6a7 7 0 0 1-14 0z" fill="#ef4f97" stroke="#a52a63" stroke-width="1.5"/><path d="M9 7H5v2a5 5 0 0 0 5 5M23 7h4v2a5 5 0 0 1-5 5" fill="none" stroke="#a52a63" stroke-width="1.5"/><path d="M16 18v4M11 27h10l-1.5-5h-7z" fill="#ffc23d" stroke="#a52a63" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statMocks">0</span><span class="pl">mocks</span></div>
         <button class="iconbtn" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg></button>
       </div>
     </div>

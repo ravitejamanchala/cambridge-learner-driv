@@ -11,7 +11,8 @@ export const TIERS = [
   { id: 'hardest', title: 'Hardest', colour: '#8a6ae3', maxD: 0 }
 ];
 
-const P = (o) => ({ focus: ['Junctions', 'Positioning', 'Response to signals'], maxD: TIERS.find(t => t.id === o.tier).maxD, ...o });
+// fail outright for not giving way or running a red; anything else counts towards the tier's allowance
+const P = (o) => ({ focus: ['Junctions – observation', 'Response to signals – traffic lights'], maxD: TIERS.find(t => t.id === o.tier).maxD, ...o });
 
 export const PUZZLES = [
   P({ id: 'pz-sturton', tier: 'easy', icon: 'mini2', title: 'Two minis in a row', road: 'Sturton Street → New Street',
@@ -44,7 +45,7 @@ export const PUZZLES = [
   P({ id: 'pz-eastroad', tier: 'hard', icon: 'rblights', title: 'Roundabout with traffic lights', road: 'Newmarket Road → Elizabeth Way',
     goal: 'This roundabout has traffic lights on the way in and on the ring. Right-hand lane, 3rd exit, and stop for every red.',
     steps: ['Get into the right-hand lane early', 'Obey the lights on the ring as well as on the approach', 'Signal left after the 2nd exit and leave in the correct lane'],
-    rule: { n: 'Rule 186', t: 'Some roundabouts have traffic lights on the approach and on the circulating carriageway. Obey every signal.' },
+    rule: { n: 'Rule 185', t: 'When reaching the roundabout you should give priority to traffic approaching from your right, unless directed otherwise by signs, road markings or traffic lights.' },
     waypoints: [wp(52.20905, 0.14161, 'Newmarket Road'), wp(52.21203, 0.13637, 'Elizabeth Way')] }),
   P({ id: 'pz-mitcham', tier: 'hard', icon: 'gyratory', title: "Mitcham's Corner one-way system", road: 'Victoria Avenue → Milton Road',
     goal: 'A one-way gyratory: to go ahead onto Milton Road you have to go all the way round it. Follow the arrows and pick lanes early.',
@@ -60,7 +61,7 @@ export const PUZZLES = [
   P({ id: 'pz-milton', tier: 'hardest', icon: 'interchange', title: 'Milton Interchange', road: 'A14 junction · Milton Road → Cambridge Road',
     goal: 'A huge signal-controlled roundabout over the A14 at up to 50 mph. Right-hand lane, 3rd exit, lights all the way round.',
     steps: ['Right-hand lane from the start', 'Stop at every red on the ring; lanes are marked for exits', 'Check mirrors and signal left before you move across to leave'],
-    rule: { n: 'Rule 186', t: 'Watch out for traffic crossing in front of you on the roundabout, especially vehicles intending to leave by the next exit.' },
+    rule: { n: 'Rule 187', t: 'Watch out for traffic crossing in front of you on the roundabout, especially vehicles intending to leave by the next exit.' },
     waypoints: [wp(52.23422, 0.15063, 'Milton Road'), wp(52.23797, 0.15482, 'Cambridge Road')] }),
   P({ id: 'pz-histon', tier: 'hardest', icon: 'interchange', title: 'Histon Interchange', road: 'A14 junction · Histon Road → Bridge Road',
     goal: 'Another signal-controlled interchange over the A14. Ten sets of lights; take the 2nd exit to Bridge Road.',

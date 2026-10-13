@@ -8,7 +8,7 @@ export function createTest(net, traffic, player) {
   const t = {
     running: false, done: false, route: null, waypoints: [], wpIndex: 1,
     sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0,
-    faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), onRb: false, ctx: null, onFault: null
+    faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), onRb: false, ctx: null, onFault: null
   };
   t.setRoute = (route, nodes) => { t.route = route; t.waypoints = nodes; };
   t.fault = (kind, cat, text, key, cd = 8) => {
@@ -18,23 +18,25 @@ export function createTest(net, traffic, player) {
     t.onFault && t.onFault();
   };
   t.reset = () => {
-    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map() });
+    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map() });
     for (const i of t.route.instructions) { i.sigSeen = false; i.checked = false; i.laneSeen = undefined; i.laneChecked = false; }
   };
   t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
   const timer = (k, cond, dt) => (t.timers[k] = cond ? (t.timers[k] || 0) + dt : 0);
 
+  // where the car is along the route: nearest route SEGMENT (not vertex), searched only a short way
+  // ahead of the last known position, so a parallel road later in the route can't make progress jump
   function progress(dt) {
-    const R = t.route; let best = -1, bd = 1e18;
-    const lo = Math.max(0, t.idx - 20), hi = Math.min(R.xs.length - 1, t.idx + 80);
-    for (let i = lo; i <= hi; i++) { const d = (R.xs[i] - player.x) ** 2 + (R.zs[i] - player.z) ** 2; if (d < bd) { bd = d; best = i; } }
-    // project onto the segment for a smooth distance
-    let s = R.cum[best];
-    for (const j of [best - 1, best]) {
-      if (j < 0 || j >= R.xs.length - 1) continue;
+    const R = t.route, n = R.xs.length; let best = Math.min(t.idx, n - 2), bd = 1e18, s = t.sRoute, bscore = 1e18;
+    const sMin = t.sRoute - 40, sMax = t.sRoute + 45;
+    for (let j = Math.max(0, t.idx - 30); j < n - 1; j++) {
+      if (R.cum[j] > sMax) break;
+      if (R.cum[j + 1] < sMin) continue;
       const ax = R.xs[j], az = R.zs[j], dx = R.xs[j + 1] - ax, dz = R.zs[j + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
-      const u = ((player.x - ax) * dx + (player.z - az) * dz) / L2;
-      if (u >= 0 && u <= 1) { const qx = ax + dx * u, qz = az + dz * u, d = (player.x - qx) ** 2 + (player.z - qz) ** 2; if (d <= bd + 1e-6) { bd = d; s = R.cum[j] + u * Math.sqrt(L2); } }
+      const u = Math.max(0, Math.min(1, ((player.x - ax) * dx + (player.z - az) * dz) / L2));
+      const qx = ax + dx * u, qz = az + dz * u, d = (player.x - qx) ** 2 + (player.z - qz) ** 2, sj = R.cum[j] + u * Math.sqrt(L2);
+      const score = Math.sqrt(d) + Math.max(0, sj - t.sRoute) * 0.02; // tie-break towards the nearer, earlier piece
+      if (score < bscore) { bscore = score; bd = d; best = j; s = sj; }
     }
     const dist = Math.sqrt(bd);
     t.offRoute = dist > 22;
@@ -50,8 +52,10 @@ export function createTest(net, traffic, player) {
     const dir = fwd >= 0 ? 1 : -1, from = (nr.e.way.oneway ? 1 : dir) > 0 ? nr.e.b : nr.e.a;
     const remaining = t.waypoints.slice(t.wpIndex);
     try {
-      const r = buildRoute(net, [from, ...remaining.length ? remaining : [t.waypoints[t.waypoints.length - 1]]]);
+      // don't send the learner straight back along the road they are on: no U-turn at the first node
+      const r = buildRoute(net, [from, ...remaining.length ? remaining : [t.waypoints[t.waypoints.length - 1]]], { noUturnEdge: nr.e });
       if (!r.steps.length || r.len < 20) { t.offT = 0; return; }
+      if (t.onReroute) t.onReroute(r); // e.g. re-add the examiner's hand-written callouts
       t.route = r; t.idx = 0; t.sRoute = 0; t.step = 0; t.offT = 0; t.rerouted++;
     } catch (e) { t.offT = 0; }
   }
@@ -80,7 +84,9 @@ export function createTest(net, traffic, player) {
     else if (nr.d < way.w / 2) t.flags.kerb = false;
     // roundabout entry
     if (way.rb && !t.onRb && v > 3.2) {
-      const busy = traffic.cars.concat(traffic.bikes).some(c => c.alive && c.e.way.rb && Math.hypot(c.x - player.x, c.z - player.z) < 20 && ((player.x - c.x) * -Math.sin(c.th) + (player.z - c.z) * -Math.cos(c.th)) > 0);
+      // traffic lights control this entry: priority is set by the lights, not give-way
+      const signalled = stopsNear(net, player.x, player.z).some(st => Math.hypot(st.x - player.x, st.z - player.z) < 28 && (fx * st.tx + fz * st.tz) > 0.3);
+      const busy = !signalled && traffic.cars.concat(traffic.bikes).some(c => c.alive && c.v > 1.5 && c.e.way.rb && Math.hypot(c.x - player.x, c.z - player.z) < 20 && ((player.x - c.x) * -Math.sin(c.th) + (player.z - c.z) * -Math.cos(c.th)) > 0);
       if (busy) t.fault('D', 'Junctions – observation', 'Did not give way to traffic already on the roundabout', 'rbgw', 6);
     }
     t.onRb = way.rb; player.onRb = way.rb;
@@ -104,11 +110,18 @@ export function createTest(net, traffic, player) {
     for (const st of stopsNear(net, player.x, player.z)) {
       const rx = player.x - st.x, rz = player.z - st.z, a = rx * st.tx + rz * st.tz, lat = rx * st.tz - rz * st.tx;
       const prev = t.stopPrev.get(st.id); t.stopPrev.set(st.id, a);
+      // remember where the car was when the light first showed amber (to judge whether it could have stopped)
+      const Ls = traffic.lightState(st);
+      if (Ls === 'A' && a < 0 && !t.amberAt.has(st.id)) t.amberAt.set(st.id, { d: -a, v: Math.max(0, v) });
+      else if (Ls !== 'A') t.amberAt.delete(st.id);
       if (prev === undefined || Math.abs(a) > 30) continue;
       if (prev < 0 && a >= 0 && fx * st.tx + fz * st.tz > 0.3 && lat > (st.e.way.oneway ? -st.w / 2 - 0.5 : -0.8) && lat < st.w / 2 + 0.8) {
         const L = traffic.lightState(st);
         if (L === 'R' || L === 'RA') t.fault('S', 'Response to signals – traffic lights', 'Crossed the stop line on a red light', 'red' + st.cluster, 6);
-        else if (L === 'A') t.fault('D', 'Response to signals – traffic lights', 'Went through on amber when there was time to stop', 'amb' + st.cluster, 6);
+        else if (L === 'A') {
+          const seen = t.amberAt.get(st.id); // stopping distance at a firm (not emergency) 5 m/s² plus 0.6 s reaction
+          if (seen && seen.d > seen.v * seen.v / 10 + seen.v * 0.6 + 1) t.fault('D', 'Response to signals – traffic lights', 'Went through on amber when there was time to stop', 'amb' + st.cluster, 6);
+        }
       }
     }
     // zebra crossings
@@ -153,7 +166,12 @@ export function createTest(net, traffic, player) {
     for (const c of traffic.cars) {
       if (!c.alive) continue; const ex = c.x - player.x, ez = c.z - player.z; if (Math.abs(ex) > 6 || Math.abs(ez) > 6) continue;
       const fw = ex * fx + ez * fz, lt = ex * fz - ez * fx;
-      if (Math.abs(fw) < 4.1 && Math.abs(lt) < 1.85) { t.fault('S', 'Control – collision', 'Collided with another vehicle', 'col', 4); player.v = -Math.sign(fw || 1) * 1.5; }
+      if (Math.abs(fw) < 4.1 && Math.abs(lt) < 1.85) {
+        // being run into from behind, or while stopped, is not the learner's fault
+        const theirFault = Math.abs(v) < 0.4 || (fw < -1.5 && c.v > v + 0.5);
+        if (!theirFault) t.fault('S', 'Control – collision', 'Collided with another vehicle', 'col', 4);
+        player.v = theirFault ? player.v : -Math.sign(fw || 1) * 1.5;
+      }
     }
     // lane discipline: be in the lane the examiner asked for before the junction
     for (const ins of t.route.instructions) {
@@ -175,7 +193,7 @@ export function createTest(net, traffic, player) {
     }
     // finish: near the end, stopped, on the left
     const last = t.route.instructions[t.route.instructions.length - 1];
-    if (t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 60 && Math.abs(v) < 0.3) {
+    if (t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 35 && Math.abs(v) < 0.3) {
       const offL = nr.lat * (way.oneway ? 1 : (Math.sign(along) || 1));
       if (offL > (way.oneway ? -0.5 : 0.3)) finish();
     }

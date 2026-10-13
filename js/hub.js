@@ -94,7 +94,7 @@ export function createHub({ meta, onPick, onStart }) {
     $('puzzleDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[z.icon]}</span><div><h3>${esc(z.title)}</h3><span class="tag" style="background:${t.colour};color:#fff">${esc(t.title)}</span> ${stars(starsFor(L))}</div></div>
       <p>${esc(z.goal)}</p><ul>${z.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(z.rule.n)}</b><span>${esc(z.rule.t)}</span></div>
-      <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · ${t.maxD ? `up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''}` : 'no faults allowed'}. 3 stars for a clean drive.</p>
+      <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · not giving way or going through a red fails it; ${t.maxD ? `otherwise up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''} allowed` : 'no other faults allowed'}. 3 stars for a clean drive.</p>
       <div class="btns">${open ? '<button class="cbtn go" data-start>Start puzzle</button>' : `<p class="muted" style="margin:0">Locked. Solve any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} puzzle first.</p>`}</div>`;
   }
   $('puzzleList').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b) return; st.kind = 'puzzle'; st.puzzle = b.dataset.z; pick(); });
@@ -154,6 +154,7 @@ export function createHub({ meta, onPick, onStart }) {
 
   // ---------- quiz runner (theory modules) ----------
   const qz = { quiz: null, i: 0, right: 0, answered: false };
+  const shuffled = (n) => { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }; // new order every attempt
   function startQuiz(q) { closeSheets(); Object.assign(qz, { quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
   function drawQuiz() {
     const q = qz.quiz, n = q.questions.length;
@@ -169,7 +170,7 @@ export function createHub({ meta, onPick, onStart }) {
     }
     const it = q.questions[qz.i];
     $('quizBody').innerHTML = `<div class="qprog"><span>Question ${qz.i + 1} of ${n}</span><span class="bar"><i style="width:${qz.i / n * 100}%"></i></span></div>
-      <p class="qq">${esc(it.q)}</p><div class="qopts">${it.options.map((o, k) => `<button class="qopt" data-k="${k}"><b>${'ABCD'[k]}</b><span>${esc(o)}</span></button>`).join('')}</div>
+      <p class="qq">${esc(it.q)}</p><div class="qopts">${shuffled(it.options.length).map((k, pos) => `<button class="qopt" data-k="${k}"><b>${'ABCD'[pos]}</b><span>${esc(it.options[k])}</span></button>`).join('')}</div>
       <div class="qwhy" id="qwhy" hidden></div><div class="btns"><button class="cbtn go" id="qnextBtn" hidden>${qz.i === n - 1 ? 'See result' : 'Next question'}</button></div>`;
     qz.answered = false;
   }

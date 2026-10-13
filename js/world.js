@@ -107,7 +107,33 @@ export function buildWorld(scene, net, traffic) {
 
   // roundabout islands and mini-roundabouts
   const grass = new T.MeshLambertMaterial({ color: 0x7ea463 }), kerb = new T.MeshLambertMaterial({ color: 0xd8d6cf });
+  // island = the ring road's own shape pulled in by half its width, so oval interchanges (Milton) fit the carriageway
+  function islandOutline(r, inset) {
+    const pts = [];
+    for (const e of net.edges) {
+      if (!e.way.rb) continue;
+      for (let i = 0; i < e.n; i++) if (Math.hypot(e.px[i] - r.x, e.pz[i] - r.z) < r.r + 25) pts.push([e.px[i], e.pz[i], e.way.w]);
+    }
+    if (pts.length < 6) return null;
+    const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+    pts.sort((p, q) => Math.atan2(p[1] - cz, p[0] - cx) - Math.atan2(q[1] - cz, q[0] - cx));
+    const out = [];
+    for (const [x, z, w] of pts) {
+      const dx = x - cx, dz = z - cz, L = Math.hypot(dx, dz), nl = L - w / 2 - inset;
+      if (nl < 1.2) return null;
+      const p = [cx + dx / L * nl, cz + dz / L * nl];
+      if (!out.length || Math.hypot(p[0] - out[out.length - 1][0], p[1] - out[out.length - 1][1]) > 0.8) out.push(p);
+    }
+    return out.length >= 6 ? out : null;
+  }
+  const islandMesh = (outline, depth, mat) => {
+    const sh = new T.Shape(); outline.forEach(([x, z], i) => i ? sh.lineTo(x, -z) : sh.moveTo(x, -z)); sh.closePath();
+    const g = new T.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
+    return new T.Mesh(g, mat);
+  };
   for (const r of net.rbs) {
+    const inner = islandOutline(r, 0.8), edge = inner && islandOutline(r, 0.4);
+    if (inner && edge) { scene.add(islandMesh(edge, 0.16, kerb), islandMesh(inner, 0.3, grass)); continue; }
     const ir = r.r - r.w / 2 - 0.4; if (ir < 1.5) continue;
     const k = new T.Mesh(new T.CylinderGeometry(ir + 0.4, ir + 0.4, 0.16, 40), kerb); k.position.set(r.x, 0.08, r.z); scene.add(k);
     const g = new T.Mesh(new T.CylinderGeometry(ir, ir, 0.3, 40), grass); g.position.set(r.x, 0.15, r.z); scene.add(g);
@@ -180,7 +206,7 @@ export function buildWorld(scene, net, traffic) {
       lamps[1].setColorAt(i, col.setHex(st === 'A' || st === 'RA' ? LAMP.A[0] : LAMP.A[1]));
       lamps[2].setColorAt(i, col.setHex(st === 'G' ? LAMP.G[0] : LAMP.G[1]));
     }
-    for (const l of lamps) l.instanceColor.needsUpdate = true;
+    for (const l of lamps) if (l.instanceColor) l.instanceColor.needsUpdate = true; // an area with no traffic lights has none
     globeMat.color.setHex(Math.floor(clock * 1.6) % 2 ? 0x7a5a1c : 0xffb21a);
   }
   function setShadows(on) { sun.castShadow = !!on; }

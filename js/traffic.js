@@ -123,13 +123,21 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
   // nodes at mini-roundabouts: traffic slows right down to go round them
   const miniNodes = new Set();
   for (let v = 0; v < net.nx.length; v++) if (net.minis.some(m => Math.abs(m.x - net.nx[v]) < 8 && Math.abs(m.z - net.nz[v]) < 8)) miniNodes.add(v);
+  // give-way lines: traffic on a minor road gives way to the learner at the junction
+  const giveKey = new Set(net.giveways.map(g => g.e.id + ':' + g.dir));
+  function learnerApproaching(v) {
+    if (!player) return false;
+    const x = net.nx[v], z = net.nz[v], dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz);
+    if (d > 26) return false; if (d < 7) return true;
+    return Math.abs(player.v) > 1 && (dx * -Math.sin(player.th) + dz * -Math.cos(player.th)) / d > 0.3;
+  }
   const brakeTo = (target, dist, dec = 3.4) => Math.sqrt(Math.max(0, target * target + 2 * dec * Math.max(0, dist)));
   function ringBusy(v, self) {
     const x = net.nx[v], z = net.nz[v];
     for (const o of cars) if (o !== self && o.alive && o.e.way.rb && Math.hypot(o.x - x, o.z - z) < 18) {
       const ex = x - o.x, ez = z - o.z; if (ex * -Math.sin(o.th) + ez * -Math.cos(o.th) > -2) return true;
     }
-    if (player && player.onRb && Math.hypot(player.x - x, player.z - z) < 16) return true;
+    if (player && player.onRb && Math.abs(player.v) > 1 && Math.hypot(player.x - x, player.z - z) < 16) return true; // a learner stopped on the ring doesn't block entry for ever
     return false;
   }
   function stopAhead(a, e, dir, offset, vmax) {
@@ -154,18 +162,25 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
       if (miniNodes.has(endNode(a))) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 3));
       if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 6));
-      if (a.next.e.way.rb && !w.rb && rem < 22 && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 4));
+      // minor-road give-way and mini-roundabouts: let the learner go first (the ghost timer breaks a stand-off)
+      if (a.ghost <= 0 && rem < 24 && (giveKey.has(a.e.id + ':' + a.dir) || miniNodes.has(endNode(a))) && learnerApproaching(endNode(a))) vmax = Math.min(vmax, brakeTo(0, rem - 4));
+      if (a.ghost <= 0 && a.next.e.way.rb && !w.rb && rem < 22 && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 4));
       vmax = stopAhead(a, a.next.e, a.next.dir, rem, vmax);
     } else vmax = Math.min(vmax, brakeTo(0, rem - 2));
     vmax = stopAhead(a, a.e, a.dir, -1, vmax);
     const fx = -Math.sin(a.th), fz = -Math.cos(a.th);
     const others = player ? all.concat([player]) : all;
+    // look further ahead at speed so fast traffic can stop behind a slower learner
+    const look = Math.max(20, a.v * a.v / 10 + 12);
     for (const o of others) {
       if (o === a || o.alive === false) continue; if (a.ghost > 0 && !o.isPlayer) continue;
-      const rx = o.x - a.x, rz = o.z - a.z, fwd = rx * fx + rz * fz; if (fwd <= 0 || fwd > 20) continue;
+      const rx = o.x - a.x, rz = o.z - a.z, fwd = rx * fx + rz * fz; if (fwd <= 0 || fwd > look) continue;
       const lat = Math.abs(rx * fz - rz * fx), oBike = o.kind === 'bike';
-      const width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : 2.2);
-      if (lat < width) vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5)));
+      const oncoming = Math.cos((o.th || 0) - a.th) < -0.5; // passing in the other lane, not in our way
+      let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : 2.2);
+      if (oncoming) width = Math.min(width, 1.4);
+      if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
+      if (lat < width) vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
     }
     if (a.v < 0.2 && vmax < 0.4) a.stuck += dt; else a.stuck = 0;
     if (a.stuck > 8) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;

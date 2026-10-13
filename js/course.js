@@ -49,14 +49,14 @@ export const LESSONS = [
   { id: 'amber', unit: 'junctions', title: 'Stopping at amber', road: 'Lensfield Road → Gonville Place',
     goal: 'The light will change to amber as you approach. You have room to stop, so stop at the line and wait for green.',
     steps: ['Approach at a speed that lets you stop', 'Amber means stop unless you have crossed the line or it is unsafe to stop', 'Wait through red and red-and-amber; go on green'],
-    rule: { n: 'Rule 175', t: 'Amber also means stop at the stop line. You may go on only if the amber appears after you have crossed the stop line or are so close that pulling up might cause an accident.' },
+    rule: { n: 'Rule 175', t: 'Amber also means stop at the stop line. You may go on only if the amber appears after you have crossed the stop line or are so close that pulling up might cause a collision.' },
     waypoints: [wp(52.1984, 0.1236, 'Lensfield Road'), wp(52.2010, 0.1294, 'Gonville Place')], scenario: 'amber', focus: ['Response to signals'], maxD: 2 },
 
   { id: 'emerge-left', unit: 'junctions', title: 'Emerging left from a side road', road: 'Herbert Street → Milton Road',
     goal: 'At the end of Herbert Street, give way to traffic on Milton Road, then turn left when there is a safe gap. A car will be coming from your right.',
     steps: ['Signal left and slow down early', 'Creep up to the give-way line and look right, left, right', 'Only pull out when the gap is big enough that nobody has to slow down for you'],
     rule: { n: 'Rule 170', t: 'Watch out for traffic coming from either direction, and do not join a road until there is a gap large enough for you to do so safely.' },
-    waypoints: [wp(52.21594, 0.12764, 'Herbert Street'), wp(52.21601, 0.12597, 'Milton Road')], scenario: 'yield', yieldAny: true, focus: ['Junctions', 'Signals'], maxD: 2 },
+    waypoints: [wp(52.21594, 0.12764, 'Herbert Street'), wp(52.2168, 0.12675, 'Milton Road')], scenario: 'yield', yieldAny: true, focus: ['Junctions', 'Signals'], maxD: 2 },
   { id: 'emerge-right', unit: 'junctions', title: 'Emerging right from a side road', road: 'Hurst Park Avenue → Milton Road',
     goal: 'Turn right out of Hurst Park Avenue onto busy Milton Road. You need a gap in both directions.',
     steps: ['Signal right, position just left of the middle of your road', 'Give way at the line; look right, left, right', 'Go when both lanes are clear, and do not cut the corner'],
@@ -66,7 +66,7 @@ export const LESSONS = [
     goal: 'Turn right at the Catholic Church lights. Get in the right lane, go on green, and give way to oncoming traffic before you turn.',
     steps: ['Mirrors, signal right, and move into the right-hand lane early', 'On green, move forward to the turning point if it is clear', 'Wait for a safe gap in oncoming traffic, then turn'],
     rule: { n: 'Rule 180', t: 'Wait until there is a safe gap between you and any oncoming vehicle. Watch out for cyclists, motorcyclists and pedestrians.' },
-    waypoints: [wp(52.1981, 0.12381, 'Lensfield Road'), wp(52.19338, 0.13292, 'Hills Road')], focus: ['Response to signals', 'Signals', 'Junctions'], maxD: 2 },
+    waypoints: [wp(52.1981, 0.12381, 'Lensfield Road'), wp(52.19611, 0.13027, 'Hills Road')], focus: ['Response to signals', 'Signals', 'Junctions'], maxD: 2 },
 
   { id: 'mini', unit: 'roundabouts', title: 'Mini-roundabout', road: "Queen's Road → Madingley Road",
     goal: 'Give way to traffic from the right, then turn left at the mini-roundabout onto Madingley Road.',
@@ -77,17 +77,17 @@ export const LESSONS = [
     goal: 'Signal left on approach, stay in the left lane, give way to the right, and take the 1st exit.',
     steps: ['Signal left as you approach', 'Left-hand lane, give way to traffic from the right', 'Keep the left signal on as you leave'],
     rule: { n: 'Rule 186', t: 'When taking the first exit, unless signs or markings indicate otherwise: signal left and approach in the left-hand lane; keep to the left on the roundabout.' },
-    waypoints: [wp(52.1880, 0.1530, 'Perne Road'), wp(52.1928, 0.1495, 'Radegund Road')], focus: ['Junctions', 'Positioning', 'Signals'], maxD: 2 },
+    waypoints: [wp(52.18985, 0.15368, 'Perne Road'), wp(52.1928, 0.1495, 'Radegund Road')], focus: ['Junctions', 'Positioning', 'Signals'], maxD: 2 },
   { id: 'rb-ahead', unit: 'roundabouts', title: 'Roundabout: going ahead (2nd exit)', road: 'Perne Road roundabout',
     goal: 'No signal on approach. Give way to the right, then signal left after the exit before yours and leave at the 2nd exit.',
     steps: ['No signal on approach', 'Left lane unless markings say otherwise', 'Signal left as you pass the exit before yours'],
     rule: { n: 'Rule 186', t: 'When going straight ahead, select the appropriate lane, stay in that lane on the roundabout, and signal left after you have passed the exit before the one you want.' },
-    waypoints: [wp(52.1880, 0.1530, 'Perne Road'), wp(52.1950, 0.1555, 'Perne Road')], focus: ['Junctions', 'Positioning'], maxD: 2 },
+    waypoints: [wp(52.18985, 0.15368, 'Perne Road'), wp(52.1950, 0.1555, 'Perne Road')], focus: ['Junctions', 'Positioning'], maxD: 2 },
   { id: 'rb-right', unit: 'roundabouts', title: 'Roundabout: turning right (3rd exit)', road: 'Perne Road roundabout',
     goal: 'Signal right, approach in the right-hand lane, keep right on the roundabout, and take the 3rd exit.',
     steps: ['Signal right and use the right-hand lane', 'Give way to traffic from the right', 'Change to a left signal after the exit before yours'],
     rule: { n: 'Rule 186', t: 'When taking an exit to the right: signal right and approach in the right-hand lane; keep to the right on the roundabout until you need to change lanes to exit.' },
-    waypoints: [wp(52.1880, 0.1530, 'Perne Road'), wp(52.1918, 0.1570, 'Birdwood Road')], focus: ['Junctions', 'Positioning'], maxD: 2 },
+    waypoints: [wp(52.18985, 0.15368, 'Perne Road'), wp(52.1918, 0.1570, 'Birdwood Road')], focus: ['Junctions', 'Positioning'], maxD: 2 },
 
   { id: 'rb-big', unit: 'roundabouts', title: 'Big roundabout: right-hand lane', road: 'Elizabeth Way → High Street, Chesterton',
     goal: 'A two-lane roundabout at the end of Elizabeth Way bridge. Right-hand lane, 3rd exit, and keep your lane all the way round.',
@@ -98,39 +98,39 @@ export const LESSONS = [
   { id: 'zebra', unit: 'sharing', title: 'Zebra crossings', road: "Queen's Road · 30 mph",
     goal: 'Someone will step onto the zebra crossing ahead. Slow down, stop before the crossing and let them cross.',
     steps: ['Look for flashing Belisha beacons', 'Slow down and be ready to stop for anyone waiting', 'Once someone is on the crossing you must give way'],
-    rule: { n: 'Rule 195', t: 'As you approach a zebra crossing, look out for pedestrians waiting to cross and be ready to slow down or stop. You must give way when someone has moved onto a crossing.' },
+    rule: { n: 'Rule 195', t: 'Look out for pedestrians waiting to cross and be ready to slow down or stop. You should give way to people waiting to cross, and you must give way once someone has moved onto the crossing.' },
     waypoints: [wp(52.2040, 0.1135, "Queen's Road"), wp(52.2095, 0.1112, "Queen's Road")], scenario: 'zebra', focus: ['Pedestrian crossings'], maxD: 2 },
   { id: 'cyclists', unit: 'sharing', title: 'Passing cyclists', road: 'Huntingdon Road · cycle lanes',
     goal: 'A cyclist is riding ahead of you. Stay out of the cycle lane and only overtake with at least 1.5 m clearance.',
     steps: ['Hang back if there is no room to pass', 'Leave at least 1.5 m at up to 30 mph', 'Do not drive in a mandatory cycle lane'],
-    rule: { n: 'Rule 163', t: 'Give motorcyclists, cyclists, horse riders and horse drawn vehicles at least as much room as you would when overtaking a car; at least 1.5 metres at speeds under 30 mph.' },
+    rule: { n: 'Rule 163', t: 'Give cyclists at least as much room as you would a car when overtaking. As a guide, leave at least 1.5 metres at speeds up to 30 mph, and more at higher speeds.' },
     waypoints: [wp(52.2145, 0.1085, 'Huntingdon Road'), wp(52.2190, 0.1000, 'Huntingdon Road')], scenario: 'cyclist', focus: ['Clearance', 'Control – collision', 'Positioning – lane'], maxD: 2 },
   { id: 'ped-crossing', unit: 'sharing', title: 'Pedestrian light crossing', road: 'Hills Road · puffin crossings',
     goal: 'Someone presses the button as you approach. The light will turn red: stop at the line and wait until it is green again.',
     steps: ['Watch for people waiting at the crossing', 'Stop at the white line on red', 'Do not wave pedestrians across, and go only on green'],
-    rule: { n: 'Rule 196', t: 'You must stop when the red light shows. At a pelican crossing, when the amber light is flashing, you must give way to anyone on the crossing.' },
+    rule: { n: 'Rule 199', t: 'Puffin crossings have no flashing amber: the lights follow the same sequence as traffic lights. You must stop at the line on red and wait for green.' },
     waypoints: [wp(52.19338, 0.13292, 'Hills Road'), wp(52.19819, 0.12839, 'Hills Road')], scenario: 'crossing', focus: ['Response to signals'], maxD: 2 },
   { id: 'cycle-left', unit: 'sharing', title: 'Turning left across a cycle lane', road: 'Histon Road → Linden Close',
     goal: 'Histon Road has a cycle lane. A cyclist is riding in it: let them go past before you turn left across the lane.',
     steps: ['Check your left mirror and blind spot before signalling', 'Do not overtake a cyclist just before you turn left', 'Wait for them to pass the side road, then turn'],
-    rule: { n: 'Rule 183', t: 'When turning, give way to any vehicles using a cycle lane, cycle track or bus lane from either direction. Do not cut across cyclists going ahead.' },
+    rule: { n: 'Rule 183 and H3', t: 'When turning, give way to vehicles using a cycle lane, cycle track or bus lane from either direction (Rule 183). Do not cut across cyclists going ahead when you turn into or out of a junction (H3).' },
     waypoints: [wp(52.221, 0.112, 'Histon Road'), wp(52.21742, 0.11341, 'Linden Close')], scenario: 'cyclist', focus: ['Clearance', 'Control – collision', 'Signals'], maxD: 2 },
 
-  { id: 'follow', unit: 'faster', title: 'Two-second rule', road: 'Madingley Road · 40 mph',
+  { id: 'follow', unit: 'faster', title: 'Two-second rule', road: 'Madingley Road · 30–40 mph',
     goal: 'Follow the car in front all the way along Madingley Road. Keep at least a two-second gap; more in the wet.',
     steps: ['Pick a fixed point; when the car ahead passes it, say "only a fool breaks the two-second rule"', 'If you pass the point before you finish, drop back', 'Never sit close behind to make someone speed up'],
-    rule: { n: 'Rule 126', t: 'Allow at least a two-second gap between you and the vehicle in front on roads carrying faster-moving traffic. Double it on wet roads.' },
+    rule: { n: 'Rule 126', t: 'Allow at least a two-second gap between you and the vehicle in front on high-speed roads and in tunnels. The gap should be at least doubled on wet roads.' },
     waypoints: [wp(52.21353, 0.08511, 'Madingley Road'), wp(52.21137, 0.10342, 'Madingley Road')], scenario: 'follow', focus: ['Use of speed'], maxD: 2 },
   { id: 'country', unit: 'faster', title: 'Country road at 60', road: 'Grantchester Road · national limit',
     goal: 'A narrow country road where the national speed limit (60 mph) applies. 60 is the most you may do, not a speed to aim for: slow for bends you cannot see round.',
     steps: ['The white sign with a black stripe means 60 on a road like this', 'Slow down before bends, not in them', 'Keep left: oncoming traffic may be close to the middle'],
     rule: { n: 'Rule 154', t: 'Take extra care on country roads and reduce your speed at approaches to bends, which can be sharper than they appear.' },
-    waypoints: [wp(52.19555, 0.10049, 'Grantchester Road'), wp(52.18441, 0.09499, 'Grantchester Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 },
+    waypoints: [wp(52.19182, 0.09958, 'Grantchester Road'), wp(52.18441, 0.09499, 'Grantchester Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 },
   { id: 'dual', unit: 'faster', title: 'Dual carriageway at 70', road: 'Babraham Road · dual carriageway',
     goal: 'Build up to a safe speed and stay in the left-hand lane. Use the right-hand lane only to overtake, then move back.',
     steps: ['Get up to the speed of the traffic, up to the 70 mph limit', 'Keep left unless overtaking', 'Leave a two-second gap; check mirrors before changing lanes'],
     rule: { n: 'Rule 137', t: 'On a two-lane dual carriageway you should stay in the left-hand lane. Use the right-hand lane for overtaking or turning right.' },
-    waypoints: [wp(52.16572, 0.16027, 'Babraham Road'), wp(52.15112, 0.18971, 'Babraham Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 }
+    waypoints: [wp(52.15917, 0.17472, 'Babraham Road'), wp(52.15112, 0.18971, 'Babraham Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 }
 ];
 LESSONS.push(...QUIZZES); // theory modules: quizzes, no driving (see quiz.js)
 
@@ -196,15 +196,24 @@ export function createScenario(lesson, deps) {
     const R = route(); let placed = false;
     // turn lessons wait until the learner is near the turn, so the cyclist is beside them as they get there
     const turn = lesson.id === 'cycle-left' ? R.instructions.find(i => i.kind === 'left') : null;
+    let bike = null, hooked = false, judged = false;
     S.update = () => {
+      // left hook: as the learner reaches the turn, was the cyclist alongside or just behind them?
+      if (turn && bike && !judged && test.sRoute >= turn.s - 2) {
+        judged = true;
+        const fx = -Math.sin(player.th), fz = -Math.cos(player.th), dx = bike.x - player.x, dz = bike.z - player.z, fw = dx * fx + dz * fz;
+        if (bike.alive && fw > -14 && fw < 4 && Math.abs(dx * fz - dz * fx) < 4 && Math.abs(player.v) > 0.5) hooked = true;
+      }
       if (placed || !traffic.bikes.length) return;
       if (turn && turn.s - test.sRoute > 95) return;
       // put a cyclist ahead on the route, riding the same way
       let s = test.sRoute + (turn ? 24 : 55), k = 0; while (k < R.steps.length - 1 && R.stepS[k + 1] <= s) k++;
-      const st = R.steps[k]; traffic.placeBike(traffic.bikes[0], st.e, st.dir, Math.min(st.e.len - 2, s - R.stepS[k]), 4.4);
+      const st = R.steps[k]; bike = traffic.bikes[0]; traffic.placeBike(bike, st.e, st.dir, Math.min(st.e.len - 2, s - R.stepS[k]), 4.4);
       placed = true;
     };
-    S.result = () => ({ ok: true, why: '' });
+    S.result = () => !placed ? { ok: false, why: 'The cyclist never appeared: drive the whole route.' }
+      : hooked ? { ok: false, why: 'You turned left across the cyclist. Wait for them to pass the junction first (H3).' }
+      : { ok: true, why: turn ? 'You let the cyclist go before turning.' : '' };
   }
   // puzzles: send a car (or cyclist) at the junction from the learner's right, timed to arrive with them
   if (lesson.scenario === 'yield') {
@@ -239,7 +248,7 @@ export function createScenario(lesson, deps) {
       if (!placed && test.sRoute > 30) {
         const R = route(); let s = test.sRoute + 40, k = 0; while (k < R.steps.length - 1 && R.stepS[k + 1] <= s) k++;
         const st = R.steps[k], pool = traffic.cars.slice().sort((p, q) => Math.hypot(q.x - player.x, q.z - player.z) - Math.hypot(p.x - player.x, p.z - player.z));
-        lead = pool[0]; if (lead) traffic.placeCar(lead, st.e, st.dir, Math.min(st.e.len - 2, s - R.stepS[k]), 8, 0.5, R.steps); placed = true; // lead car follows the route at about 20 mph on a 40 road, so you catch up
+        lead = pool[0]; if (lead) traffic.placeCar(lead, st.e, st.dir, Math.min(st.e.len - 2, s - R.stepS[k]), 8, 0.72, R.steps); placed = true; // lead car follows the route a bit under the limit, so you catch up
       }
       if (!lead || !lead.alive || player.v < 6) return;
       const fx = -Math.sin(player.th), fz = -Math.cos(player.th), dx = lead.x - player.x, dz = lead.z - player.z, fw = dx * fx + dz * fz;
@@ -278,6 +287,9 @@ export function evaluate(lesson, test, scen) {
   if (test.D > (lesson.maxD ?? 2)) { pass = false; reasons.push(`${test.D} driving faults; this drive allows ${lesson.maxD ?? 2}.`); }
   const r = scen && scen.result ? scen.result() : null;
   if (r) { if (!r.ok) pass = false; if (r.why) reasons.push(r.why); }
-  if (pass && !reasons.length) reasons.push('Clean drive: no faults in what this drive is testing.');
+  // always say what the faults were, not just how many
+  const others = test.faults.filter(f => !focus.includes(f));
+  if (others.length) reasons.push(`Also marked: ${others.slice(0, 4).map(f => `${f.text} (${f.kind === 'S' ? 'serious' : 'driving fault'})`).join('; ')}${others.length > 4 ? '; …' : ''}.`);
+  if (pass && test.faults.length === 0 && !(r && r.why)) reasons.push('Clean drive: no faults recorded.');
   return { pass, reasons };
 }
