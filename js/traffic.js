@@ -269,30 +269,35 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh) {
     a.x += (p.x - a.x) * k; a.z += (p.z - a.z) * k;
     a.th += wrap(Math.atan2(-p.tx, -p.tz) - a.th) * Math.min(1, dt * 14);
   }
+  let density = 'normal';
+  function setDensity(value) { if (!['normal', 'light', 'none'].includes(value)) throw new Error('Unsupported traffic density'); density = value; all.forEach(a => a.scripted = false); }
   function update(dt, pl) {
     clock += dt; player = pl;
     for (const a of all) {
+      const pool = a.kind === 'bike' ? bikes : cars;
+      if (!a.scripted && (density === 'none' || (density === 'light' && pool.indexOf(a) >= Math.ceil(pool.length / 3)))) { a.alive = false; a.mesh.visible = false; continue; }
       if (a.pinned > 0) a.pinned -= dt;
       else if (!a.alive || Math.hypot(a.x - pl.x, a.z - pl.z) > TRAFFIC.despawn) { if (!spawn(a, pl.x, pl.z, false)) continue; }
       updateAgent(a, dt);
       a.mesh.position.set(a.x, 0, a.z); a.mesh.rotation.y = a.th;
       if (a.kind === 'bike') { const u = a.mesh.userData; u.spin = (u.spin || 0) + a.v * dt / 0.34; for (const wh of u.wheels) wh.rotation.x = -u.spin; u.crank.rotation.x = -u.spin * 0.5; }
     }
-    updateRingBikes(dt);
+    if (density === 'none') for (const b of ringBikes) { b.alive = false; b.mesh.visible = false; }
+    else { for (const b of ringBikes) { b.alive = true; b.mesh.visible = true; } updateRingBikes(dt); }
     updatePeds(dt, pl.x, pl.z);
   }
   // put a cyclist on a cycle ring at an angle (used by lessons to have one arrive as the learner does)
   function placeRingBike(ring, ang, speed) { const b = ringBikes.find(q => q.ring === ring); if (!b) return null; Object.assign(b, { ang, v: speed, cruise: speed, pinned: 30 }); return b; }
   // put a cyclist at a given spot (used by lessons)
   function placeBike(b, e, dir, s, speed) {
-    Object.assign(b, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: speed });
+    Object.assign(b, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise: speed });
     const p = trackPoint(b); b.x = p.x; b.z = p.z; b.th = Math.atan2(-p.tx, -p.tz); b.next = chooseNext(b); b.mesh.visible = true; b.pinned = 60;
   }
   // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
   // path (optional): route steps the car should follow instead of choosing turns at random
   function placeCar(c, e, dir, s, speed, cruise = 1, path = null) {
-    Object.assign(c, { e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
+    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
-  return { lightState, update, init, cars, bikes, ringBikes, puffins, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };
+  return { setDensity, lightState, update, init, cars, bikes, ringBikes, puffins, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };
 }

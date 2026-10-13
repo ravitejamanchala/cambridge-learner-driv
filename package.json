@@ -1,0 +1,16 @@
+{
+  "name": "cambridge-learner-drive",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "build": "node tools/build_demo.mjs . dist",
+    "dev": "python3 -m http.server 8000 --bind 127.0.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "playwright": "1.56.1",
+    "three": "0.128.0"
+  }
+}

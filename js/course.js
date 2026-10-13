@@ -1,5 +1,9 @@
 import { along } from './net.js';
 import { QUIZZES } from './quiz.js';
+import { enrichLesson } from './curriculum.js';
+import { BASIC_LESSONS } from './basic-lessons.js';
+import { createControlScenario } from './control-scenarios.js';
+import { createBasicScenario } from './basic-scenarios.js';
 // The learner course: units of short lessons on practice layouts built to teach one thing each
 // (tools/layouts.mjs). Each has a goal, a Highway Code rule, an optional scripted event, and its own pass check.
 // `area` names the practice layout; waypoints are x/z metres on it, snapped to the nearest junction on the named road.
@@ -146,11 +150,17 @@ export const LESSONS = [
     rule: { n: 'Rule 137', t: 'On a two-lane dual carriageway you should stay in the left-hand lane. Use the right-hand lane for overtaking or turning right.' },
     waypoints: [pt(-700, 0, 'Babraham Road'), pt(3300, 0, 'Babraham Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 }
 ];
-LESSONS.push(...QUIZZES); // theory modules: quizzes, no driving (see quiz.js)
+LESSONS.unshift(...BASIC_LESSONS);
+LESSONS.push(...QUIZZES);
+for (let i = 0; i < LESSONS.length; i++) LESSONS[i] = enrichLesson(LESSONS[i]); // theory modules: quizzes, no driving (see quiz.js)
 
 // ---------- scripted events ----------
 // deps: { net, traffic, test, player, ui: { banner(text|null, kind) } }
 export function createScenario(lesson, deps) {
+  const control = createControlScenario(lesson, deps);
+  if (control) return control;
+  const basic = createBasicScenario(lesson, deps);
+  if (basic) return basic;
   const { net, traffic, test, player, ui } = deps;
   const S = { ok: true, notes: [], update() {}, stop() {} };
   const route = () => test.route;

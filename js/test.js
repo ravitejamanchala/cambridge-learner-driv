@@ -14,7 +14,7 @@ export function createTest(net, traffic, player) {
   t.fault = (kind, cat, text, key, cd = 8) => {
     if (!t.running) return; const now = traffic.clock;
     if (key) { if (t.cool[key] && now < t.cool[key]) return; t.cool[key] = now + cd; }
-    t.faults.unshift({ kind, cat, text, at: now, x: Math.round(player.x * 10) / 10, z: Math.round(player.z * 10) / 10 }); if (kind === 'S') t.S++; else t.D++;
+    t.faults.unshift({ kind, cat, text, key: key || null, context: t.context || null, elapsed: Math.max(0, now - (t.startedAt ?? now)), at: now, x: Math.round(player.x * 10) / 10, z: Math.round(player.z * 10) / 10 }); if (kind === 'S') t.S++; else t.D++;
     t.onFault && t.onFault();
   };
   t.reset = () => {
@@ -73,7 +73,7 @@ export function createTest(net, traffic, player) {
     if (t.parked && v > 0.8) {
       t.parked = false;
       const looked = player.lookAt !== undefined && traffic.clock - player.lookAt < 10;
-      if (!looked) t.fault('D', 'Move off – safety', 'Moved off without checking your mirrors and blind spot first');
+      if (!looked) t.fault('D', 'Move off – safety', 'Moved off without a recent look-round input (B or observation button)');
       let close = null;
       for (const c of traffic.cars) {
         if (!c.alive || c.v < 2 || Math.cos(c.th - player.th) < 0.7) continue;
@@ -255,6 +255,7 @@ export function createTest(net, traffic, player) {
       if (offL > (way.oneway ? -0.5 : 0.3)) finish();
     }
   };
-  function finish() { t.running = false; t.done = true; t.onFinish && t.onFinish(); }
+  function finish() { if (!t.running || t.done) return; t.running = false; t.done = true; t.onFinish && t.onFinish(); }
+  t.finish = finish;
   return t;
 }

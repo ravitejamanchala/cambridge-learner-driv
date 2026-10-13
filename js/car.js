@@ -1,5 +1,7 @@
 // Player car: physics, glTF model loading (with steering/rolling wheels), L-plates, indicators, and simple box cars for traffic.
 import { CAR, HANDLING } from './config.js';
+import { createVehicleState, canDrive } from './vehicle-state.js';
+import { automaticVelocity } from './automatic.js';
 
 const T = THREE;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -101,6 +103,7 @@ export function loadCarModel(url) {
 
 export function createPlayer(scene) {
   const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, mesh: makeBoxCar(0x1a7c52, true) };
+  p.operation = createVehicleState(); p.observations = [];
   scene.add(p.mesh);
   p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); };
   p.place = (x, z, th) => Object.assign(p, { x, z, th, v: 0, steer: 0, delta: 0 });
@@ -108,10 +111,16 @@ export function createPlayer(scene) {
   p.lookAt = -1e9; // last time the driver checked mirrors and blind spot (B)
   // input: {throttle 0..1, brake 0..1, steer -1..1 (left +)}
   p.update = (dt, inp, surface) => {
+    p.rawInput = inp;
+    const blocked = !canDrive(p.operation);
+    if (blocked) inp = { ...inp, throttle: 0, brake: Math.abs(p.v) > 0.3 ? 1 : 0 };
     p.inp = inp;
     const H = HANDLING, st = clamp(inp.steer, -1, 1) * H.steerSensitivity;
     const rate = Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
     const delta = p.steer * H.maxSteer / (1 + Math.max(0, Math.abs(p.v) - 4) * 0.08); p.delta = delta; // full lock at walking pace; less lock as speed builds
+    if (p.operation.transmission === 'automatic') {
+      p.v = automaticVelocity(p.v, p.rawInput, p.operation, dt, H, surface); p.hold = 0;
+    } else {
     let acc = 0; const thr = inp.throttle > 0.05, brk = inp.brake > 0.05;
     // power fades towards top speed; light drag so a car can reach 70 mph on a dual carriageway (about 0–60 in 10 s)
     if (thr) acc = p.v < -0.1 ? 8 : H.accel * inp.throttle * (1 - (Math.max(0, p.v) / H.topSpeed) ** 2);
@@ -119,11 +128,13 @@ export function createPlayer(scene) {
     // off the accelerator while rolling forward: the car settles at a slow creep (like the clutch biting point) instead of
     // rolling to a stop, so corners can be taken slowly; brake to stop. A stopped car stays where it is.
     if (!thr && !brk) acc = p.v > 0.3 && p.v < H.creep ? Math.min(1.2, (H.creep - p.v) * 2) : -Math.sign(p.v) * 0.55;
+    if (blocked) { acc = -Math.sign(p.v) * H.brake; if (Math.abs(p.v) < H.brake * dt) { p.v = 0; acc = 0; } }
     acc -= H.drag * p.v * Math.abs(p.v);
     if (surface === 'off') acc -= Math.sign(p.v) * 2.4;
     const nv = p.v + acc * dt;
     if (!thr && !brk && Math.abs(nv) < 0.12 && p.v <= 0.3) p.v = 0; else if (brk && p.v > 0 && nv < 0) p.v = 0; else p.v = nv;
     p.v = clamp(p.v, -H.reverseSpeed, H.topSpeed);
+    }
     // bicycle model about the rear axle: the back wheels follow, the front swings out, like a real car
     const half = H.wheelbase / 2;
     let rx = p.x + Math.sin(p.th) * half, rz = p.z + Math.cos(p.th) * half;

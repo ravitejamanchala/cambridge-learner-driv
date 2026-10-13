@@ -11,10 +11,43 @@ const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI
 // ---------- the driver ----------
 // Follows the route guide's lane line, keeps to limits, stops for lights, crossings and traffic,
 // gives way at side roads, minis, roundabouts and cycle rings, signals, looks round before moving off.
-function makeDriver(api) {
+export function makeDriver(api) {
   const st = { lookedAt: -1e9, waitT: 0 };
   return function input() {
     const A = api.A, t = A.test, pl = api.player, R = t.route, tr = A.traffic, net = A.net; if (!t.running) return null;
+    const lesson = api.lesson?.(), status = api.scenarioStatus?.();
+    if (pl.operation?.enabled && pl.operation.transmission !== 'automatic') {
+      const missing = ['doorClosed', 'seatSet', 'mirrorsSet', 'belt'].find(k => !pl.operation[k]);
+      if (missing) api.operate(missing);
+      else if (lesson.scenario === 'engine') {
+        if (!pl.operation.events.some(e => e.action === 'engine' && e.value) || pl.operation.engine) api.operate('engine');
+      }
+      return { throttle: 0, brake: 0, steer: 0 };
+    }
+    if (pl.operation?.transmission === 'automatic') {
+      const desired = lesson.scenario === 'automatic-reverse' ? 'R' : 'D';
+      if (status?.phase === 'prepare') {
+        if (pl.rawInput?.brake >= 0.5 && Math.abs(pl.v) < 0.1) {
+          if (pl.operation.gear !== desired) api.gear(desired);
+          if (pl.operation.parkingBrake) api.operate('parkingBrake');
+          api.look();
+        }
+        return { throttle: 0, brake: 1, steer: 0 };
+      }
+      if (['stop', 'secure'].includes(status?.phase)) {
+        if (status.phase === 'secure' && pl.rawInput?.brake >= 0.5 && Math.abs(pl.v) < 0.1) {
+          if (pl.operation.gear !== 'P') api.gear('P');
+          if (!pl.operation.parkingBrake) api.operate('parkingBrake');
+        }
+        return { throttle: 0, brake: 1, steer: 0 };
+      }
+      // Idle creep is enough for this straight reversing exercise.
+      if (desired === 'R') return { throttle: 0, brake: 0, steer: 0 };
+      return { throttle: pl.v < 2.5 ? 0.3 : 0, brake: pl.v > 2.8 ? 0.3 : 0, steer: 0 };
+    }
+    if (lesson?.scenario === 'mirrors' && (t.parked || t.sRoute > 180)) {
+      for (const view of ['interior', 'right', 'blindspot']) if (!pl.observations.some(e => e.view === view && (t.parked || tr.clock - e.at < 5))) api.look(view);
+    }
     const fx = -Math.sin(pl.th), fz = -Math.cos(pl.th), dt = 0.05;
     if (api.estopBanner()) return { throttle: 0, brake: 1, steer: 0 };
     // moving off: look round, wait for traffic coming from behind (up to 8 s), signal right, go
@@ -26,6 +59,7 @@ function makeDriver(api) {
     } else st.waitT = 0;
     const p = api.lanePoint(t.sRoute + 10), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 24);
+    if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
     const ins = R.instructions[t.step], ahead = ins.s - t.sRoute;
     if (!t.parked && pl.indicator === 'R' && !(ins.signal === 'R' && ahead < 90)) pl.signal('R'); // cancel the moving-off signal
     if (ins.kind === 'rb' && ahead < 45) target = Math.min(target, ahead < 15 ? 5.5 : 8);
@@ -34,6 +68,11 @@ function makeDriver(api) {
     const prev = R.instructions[t.step - 1]; if (prev && /left|right/.test(prev.kind) && t.sRoute - prev.s < 14) target = Math.min(target, 5);
     const p2 = api.lanePoint(t.sRoute + 45), bend = Math.abs(wrapA(Math.atan2(-(p2.x - pl.x), -(p2.z - pl.z)) - pl.th));
     if (bend > 0.25) target = Math.min(target, Math.max(9, 22 - bend * 30));
+    if (['controlled-stop', 'accel-decel', 'mirrors'].includes(lesson?.scenario)) {
+      target = Math.min(target, 5.5);
+      if (lesson.scenario === 'controlled-stop' && status?.message?.startsWith('Brake to stop')) target = 0;
+      if (lesson.scenario === 'accel-decel' && status?.message?.startsWith('Release accelerator')) target = 3;
+    }
     if (ins.final && t.sRoute > ins.s - 60) target = Math.min(target, 4);
     if (ins.final && t.sRoute > ins.s - 28) target = 0;
     const stopAt = (fw, m) => { target = Math.min(target, Math.max(0, (fw - m) * 0.45)); };

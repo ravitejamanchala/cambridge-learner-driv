@@ -329,6 +329,8 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 @media (max-width:600px){ .card .body.split,.credits{grid-template-columns:1fr} .card .body.split{grid-template-rows:none;overflow:auto} .card .body.split>*{max-height:none;overflow:visible} .stats .pill:nth-child(2){display:none} }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:0ms!important}}
 :root{--map-bg:#e9e6dc;--map-pave:#d8d2c4;--map-road:#ffffff;--map-label:#6d5e52;--accent:#ef4f97;--bad:#e5484d}
+
+#trainingControls{position:absolute;left:12px;top:90px;z-index:8;max-width:min(430px,90vw);padding:10px;border-radius:12px;background:rgba(255,255,255,.95);color:#241825;font-size:12px;max-height:45vh;overflow:auto} #trainingControls button{padding:8px;margin:3px;border-radius:8px;border:1px solid #777;background:white;color:#241825} #trainingControls button[aria-pressed=true]{background:#d0f2de} #trainingControls[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -403,7 +405,12 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       </section>
     </div>
     <div class="glass hud-road" id="hudRoad">–</div>
-    <div class="banner" id="banner" hidden role="alert"></div>
+    <div class="banner" id="banner" role="status" hidden role="alert"></div>
+    <section id="trainingControls" hidden aria-label="Training controls">
+      <div id="cockpitControls"><p id="cockpitState" role="status"></p>
+        <button data-operation="doorClosed" aria-pressed="false">Door closed</button><button data-operation="seatSet" aria-pressed="false">Seat confirmed</button><button data-operation="mirrorsSet" aria-pressed="false">Mirrors confirmed</button><button data-operation="belt" aria-pressed="false">Belt fastened</button><button data-operation="engine" aria-pressed="false">Engine (I)</button><button data-operation="parkingBrake" aria-pressed="true">Parking brake (P)</button>
+      </div><div id="gearControls" hidden aria-label="Automatic selector"><p>Hold the footbrake and stop before selecting a gear.</p><button data-gear="P" aria-pressed="true">P · Park</button><button data-gear="R" aria-pressed="false">R · Reverse</button><button data-gear="N" aria-pressed="false">N · Neutral</button><button data-gear="D" aria-pressed="false">D · Drive</button></div><div id="observationControls"><p>Record an observation input (physical head movement is not measured).</p><button data-observe="interior">Interior mirror</button><button data-observe="right">Right mirror</button><button data-observe="blindspot">Right blind spot</button></div>
+    </section>
     <div class="touch" aria-label="Touch controls">
       <div class="grp">
         <div class="c"><button class="tb sm" data-sig="L" aria-label="Signal left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 6 4 12l6 6M4 12h16"/></svg></button><button class="tb" data-k="left" aria-label="Steer left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5 8 12l7 7"/></svg></button></div>
@@ -422,7 +429,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
   <div class="sheet" id="profileSheet" hidden><div class="card sm" role="dialog" aria-labelledby="profH">
     <header><h2 id="profH">Who's learning?</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body">
-      <div class="list" id="profList"></div>
+      <p id="practiceSummary" class="muted"></p><ul id="recentHistory"></ul><div class="list" id="profList"></div>
       <form class="field" id="profForm" autocomplete="off"><label for="profName">New learner</label><div class="row2"><input type="text" id="profName" maxlength="40" placeholder="First name"><button class="cbtn go" type="submit">Add learner</button></div></form>
       <p class="muted">Progress is saved in this browser only, so each learner on this device keeps their own lessons and test results.</p>
     </div></div></div>
@@ -450,11 +457,13 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
   <div class="sheet" id="controlsSheet" hidden><div class="card sm" role="dialog" aria-labelledby="ctlH">
     <header><h2 id="ctlH">Controls</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body"><dl class="keys">
+      <dt><kbd>I</kbd><kbd>P</kbd></dt><dd>Engine / parking brake in cockpit lessons</dd>
       <dt><kbd>W</kbd><kbd>↑</kbd></dt><dd>Accelerate</dd>
       <dt><kbd>S</kbd><kbd>↓</kbd></dt><dd>Brake, hold to reverse</dd>
       <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Steer</dd>
       <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>Signal left / right</dd>
       <dt><kbd>C</kbd></dt><dd>Chase, driver or overhead view</dd>
+      <dt><kbd>B</kbd></dt><dd>Record look-round input; physical head movement is not measured</dd>
       <dt><kbd>Esc</kbd></dt><dd>Pause</dd>
       <dt><kbd>Drag</kbd></dt><dd>Pan the route map or overhead view; scroll or pinch to zoom</dd>
     </dl><p class="muted">On a phone or tablet, turn to landscape: steering and indicators are on the left, brake and accelerator on the right.</p></div></div></div>
@@ -492,7 +501,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       <div class="score"><div><b id="rD">0</b><span>Driving faults</span></div><div><b id="rS">0</b><span>Serious faults</span></div></div>
       <p id="rNote" style="margin:0"></p>
       <ul class="reasons" id="rReasons"></ul>
-      <div class="btns"><button class="cbtn go" id="nextBtn" hidden>Next lesson</button><button class="cbtn alt" id="againBtn">Try again</button><button class="cbtn lav" id="hubBtn">Back to lobby</button></div>
+      <p id="coachingReport" class="muted"></p><div class="btns"><button class="cbtn go" id="nextBtn" hidden>Next lesson</button><button class="cbtn alt" id="againBtn">Try again</button><button class="cbtn lav" id="hubBtn">Back to lobby</button></div>
     </div></div></div>
 
   <!-- ================= LOADING & ROTATE ================= -->

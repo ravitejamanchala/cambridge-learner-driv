@@ -4,6 +4,8 @@ import { UNITS, LESSONS } from './course.js';
 import { TIERS, PUZZLES, starsFor } from './puzzles.js';
 import { ROUTES } from './config.js';
 import { Profiles } from './profile.js';
+import { availability, recommendedLesson } from './curriculum.js';
+import { scenariosFor } from './scenarios.js';
 import { ICONS, LESSON_ICON, STAR } from './icons.js';
 
 const $ = id => document.getElementById(id);
@@ -24,12 +26,12 @@ function progress(p) {
 // meta(key) -> { len, n, first } for 'route:<id>', 'lesson:<id>', 'puzzle:<id>' (from data/areas/index.json)
 export function createHub({ meta, onPick, onStart }) {
   Profiles.init();
-  const st = { kind: 'lesson', lesson: LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0 };
+  const st = { kind: 'lesson', lesson: LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, scenarioId: null };
   const status = (id) => { const L = Profiles.lesson(id); return !L ? ['New', 'new'] : L.passed ? ['Passed', 'ok'] : ['Tried ' + L.attempts + '×', 'try']; };
-  const firstOpen = () => (LESSONS.find(l => !(Profiles.lesson(l.id) || {}).passed) || LESSONS[LESSONS.length - 1]).id;
+  const firstOpen = () => (recommendedLesson(LESSONS, Profiles.current()) || LESSONS[0]).id;
   const tierOpen = (ti) => ti === 0 || PUZZLES.some(z => z.tier === TIERS[ti - 1].id && (Profiles.lesson(z.id) || {}).passed);
   const puzzleOpen = (z) => tierOpen(TIERS.findIndex(t => t.id === z.tier));
-  const plan = () => st.kind === 'lesson' ? { kind: 'lesson', key: 'lesson:' + st.lesson, lesson: LESSONS.find(x => x.id === st.lesson) }
+  const plan = () => st.kind === 'lesson' ? { kind: 'lesson', key: 'lesson:' + st.lesson, lesson: LESSONS.find(x => x.id === st.lesson), scenarioId: st.scenarioId }
     : st.kind === 'puzzle' ? { kind: 'puzzle', key: 'puzzle:' + st.puzzle, lesson: PUZZLES.find(x => x.id === st.puzzle) }
     : { kind: 'mock', key: 'route:' + ROUTES[st.route].id, index: st.route };
   const isQuiz = (pl) => !!(pl.lesson && pl.lesson.questions);
@@ -59,7 +61,7 @@ export function createHub({ meta, onPick, onStart }) {
       return `<button class="item" role="radio" aria-checked="${me}" data-id="${p.id}"><span class="no">${esc(p.name[0].toUpperCase())}</span><span><span class="nm">${esc(p.name)}</span><span class="sub">Level ${g.lv} · ${g.done}/${LESSONS.length} lessons · ${g.stars} stars</span></span><span class="tag ${me ? 'ok' : 'new'}">${me ? 'Playing' : 'Switch'}</span></button>`;
     }).join('') : '<p class="muted" style="margin:0">No learners yet. Add your name to start.</p>';
   }
-  const chosen = () => { st.kind = 'lesson'; st.lesson = firstOpen(); pick(); $('profileSheet').hidden = true; if (afterProfile) { const f = afterProfile; afterProfile = null; f(); } };
+  const chosen = () => { st.scenarioId = null; st.kind = 'lesson'; st.lesson = firstOpen(); pick(); $('profileSheet').hidden = true; if (afterProfile) { const f = afterProfile; afterProfile = null; f(); } };
   $('profList').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (!b) return; Profiles.select(b.dataset.id); chosen(); });
   $('profForm').addEventListener('submit', e => { e.preventDefault(); const p = Profiles.create($('profName').value); if (!p) { $('profName').focus(); return; } $('profName').value = ''; chosen(); });
 
@@ -67,18 +69,21 @@ export function createHub({ meta, onPick, onStart }) {
   function renderCourse() {
     let n = 0;
     $('lessonList').innerHTML = UNITS.map((u, ui) => `<div class="unit-h">Unit ${ui + 1} · ${esc(u.title)}</div><div class="tiles">` + LESSONS.filter(l => l.unit === u.id).map(l => {
-      const [txt, cls] = status(l.id); n++;
+      const access = availability(l, Profiles.current());
+      const [txt, cls] = access.available ? status(l.id) : ['Locked', 'locked']; n++;
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
         <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? '<span class="tick">✓</span>' : ''}<span class="tt">${esc(l.title)}</span></button>`;
     }).join('') + '</div>').join('');
     const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id), qz = !!l.questions;
-    $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+    $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><p class="muted">${esc(l.difficulty)}${l.prerequisites.length ? ' · Prerequisites: ' + l.prerequisites.map(id => esc(LESSONS.find(x => x.id === id).title)).join(', ') : ''}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
       <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
-      <div class="btns"><button class="cbtn go" data-start>${qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
+      <div class="btns">${qz ? '' : `<label>Scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
-  $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; pick(); });
+  $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
+
+  $('lessonDetail').addEventListener('change', e => { if (e.target.id === 'scenarioChoice') { st.scenarioId = e.target.value; pick(); } });
 
   // ---------- puzzles: tiers, stars, unlocking ----------
   function renderPuzzles() {
@@ -128,6 +133,9 @@ export function createHub({ meta, onPick, onStart }) {
     $('statLessons').textContent = `${g.done}/${LESSONS.length}`; $('statStars').textContent = `${g.stars}/${PUZZLES.length * 3}`; $('statMocks').textContent = g.mockPass;
     const nl = LESSONS.find(l => l.id === firstOpen()), ui = UNITS.findIndex(u => u.id === nl.unit);
     $('passTitle').textContent = g.done === LESSONS.length ? 'Course complete' : UNITS[ui].title;
+    const summary = Profiles.summary();
+    $('practiceSummary').textContent = `${Math.round(summary.practiceSeconds / 60)} min practice · ${summary.attempts} recorded attempts`;
+    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${r.D} driving / ${r.S} serious</li>`).join('') || '<li>No recent reports yet.</li>';
     $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / LESSONS.length * 100) + '%';
     const pl = plan();
     if (pl.kind === 'lesson') {
@@ -146,7 +154,7 @@ export function createHub({ meta, onPick, onStart }) {
 
   function play() {
     if (!Profiles.current()) { afterProfile = play; openSheet('profileSheet'); return; }
-    const pl = plan(); if (pl.kind === 'puzzle' && !puzzleOpen(pl.lesson)) { openSheet('puzzleSheet'); return; }
+    const pl = plan(); if (pl.kind === 'lesson' && !availability(pl.lesson, Profiles.current()).available) { openSheet('courseSheet'); return; } if (pl.kind === 'puzzle' && !puzzleOpen(pl.lesson)) { openSheet('puzzleSheet'); return; }
     if (isQuiz(pl)) { startQuiz(pl.lesson); return; }
     closeSheets(); onStart(pl);
   }
@@ -190,11 +198,11 @@ export function createHub({ meta, onPick, onStart }) {
   function open() { closeSheets(); render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); if (!Profiles.current()) openSheet('profileSheet'); }
   // what comes after this lesson or puzzle (null if none, or the next puzzle is still locked)
   function next(pl) {
-    if (pl.kind === 'lesson') { const i = LESSONS.findIndex(l => l.id === pl.lesson.id); return LESSONS[i + 1] ? { kind: 'lesson', id: LESSONS[i + 1].id, title: LESSONS[i + 1].title } : null; }
+    if (pl.kind === 'lesson') { const l = recommendedLesson(LESSONS, Profiles.current(), pl.lesson.id); return l ? { kind: 'lesson', id: l.id, title: l.title } : null; }
     if (pl.kind === 'puzzle') { const i = PUZZLES.findIndex(z => z.id === pl.lesson.id), z = PUZZLES[i + 1]; return z && puzzleOpen(z) ? { kind: 'puzzle', id: z.id, title: z.title } : null; }
     return null;
   }
-  function select(kind, id) { st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; return plan(); }
+  function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; return plan(); }
   if (Profiles.current()) st.lesson = firstOpen();
   return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz };
 }

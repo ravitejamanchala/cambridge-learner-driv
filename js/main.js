@@ -16,6 +16,10 @@ import { STAR } from './icons.js';
 import { createBotLab } from './bots.js';
 import { LESSONS } from './course.js';
 import { PUZZLES } from './puzzles.js';
+import { availability } from './curriculum.js';
+import { resolveScenario } from './scenarios.js';
+import { createVehicleState, createAutomaticState, selectGear, operate } from './vehicle-state.js';
+import { buildReport } from './reports.js';
 
 const T = THREE, $ = id => document.getElementById(id);
 const shadowed = (o) => { o.traverse(c => { if (c.isMesh) c.castShadow = true; }); return o; };
@@ -46,7 +50,7 @@ async function boot() {
   const makeBk = (i) => { let m = bikePool[bikeI]; if (!m) bikePool.push(m = shadowed(makeBike(i))); bikeI++; scene.add(m); return m; };
   const A = { id: null, net: null, traffic: null, world: null, test: null, trafficInit: false };
   let areaChain = Promise.resolve(), shadowsOn = true;
-  const areaOf = (pl) => meta(pl.key).area;
+  const areaOf = (pl) => pl.scenarioDefinition?.location.areaId || meta(pl.key).area;
   function disposeScene(old) {
     const keep = new Set(kitResources());
     const mark = (o) => o.traverse(c => { if (c.geometry) keep.add(c.geometry); for (const m of [].concat(c.material || [])) { keep.add(m); if (m.map) keep.add(m.map); } });
@@ -57,8 +61,9 @@ async function boot() {
     });
   }
   function useArea(id) {
-    areaChain = areaChain.then(async () => {
-      if (A.id === id) return;
+    areaChain = areaChain.catch(() => {}).then(async () => {
+      if (A.id === id) { $('areaLoad').hidden = true; return; }
+      $('areaLoad').textContent = 'Loading map…';
       const info = index.areas.find(a => a.id === id); if (!info) throw new Error('Unknown map area ' + id);
       $('areaLoad').hidden = false;
       const r = await fetch(AREAS_URL + info.file); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
@@ -75,7 +80,7 @@ async function boot() {
       Object.assign(A, { id, net, traffic, world, test, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
-    }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; });
+    }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; throw err; });
     return areaChain;
   }
 
@@ -83,7 +88,7 @@ async function boot() {
   let route = null, nodes = null, plan = null, scenario = null;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
-  const startS = (pl) => { if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startS = (pl) => { if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
   const startPos = (s0 = 0) => {
     let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
     const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
@@ -102,12 +107,14 @@ async function boot() {
   // load a plan (lesson, puzzle or mock route) in the current area without starting it: the car moves to the start
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
-    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.lesson.waypoints;
+    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
     nodes = wps.map(w => snapWaypoint(A.net, w));
     route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
+    player.operation = pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
+    A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl)); camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
@@ -119,12 +126,15 @@ async function boot() {
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
+    if (pl.kind === 'lesson' && !pl.lesson.questions) pl = { ...pl, scenarioDefinition: resolveScenario(pl.lesson, pl.scenarioId) };
     if (pl.lesson && pl.lesson.questions) { // theory quiz: no driving, no map
       if (start) { if (A.test) A.test.running = false; paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; banner(null); setMode('lobby'); hub.startQuiz(pl.lesson); }
       return;
     }
-    const tok = ++pickTok; await useArea(areaOf(pl));
-    if (tok !== pickTok || !A.net) return;
+    const tok = ++pickTok;
+    try { await useArea(areaOf(pl)); } catch (_) { if (A.test) A.test.running = false; setMode('lobby'); return false; }
+    if (tok !== pickTok || !A.net || A.id !== areaOf(pl)) return false;
     loadPlan(pl); if (start) begin();
   }
   const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
@@ -155,6 +165,8 @@ async function boot() {
     else if (e.code === 'KeyQ') { player.signal('L'); sigBtns(); } else if (e.code === 'KeyE') { player.signal('R'); sigBtns(); }
     else if (e.code === 'KeyC') setCam((cam + 1) % 3, true);
     else if (e.code === 'KeyB') look();
+    else if (e.code === 'KeyI') cockpitAction('engine');
+    else if (e.code === 'KeyP') cockpitAction('parkingBrake');
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => { const k = KM[e.code]; if (k) key[k] = 0; });
@@ -168,12 +180,34 @@ async function boot() {
   document.querySelectorAll('[data-sig]').forEach(b => b.addEventListener('click', () => { player.signal(b.dataset.sig); sigBtns(); }));
   // look round: mirrors and over the shoulder (the driver view turns to look); the examiner notes when you did it
   let lookAnim = 0;
-  function look() { if (!A.traffic) return; player.lookAt = A.traffic.clock; lookAnim = 1; }
-  $('lookBtn').addEventListener('click', look);
+  function look(view = 'all-round') { if (!A.traffic || !A.test?.running) return; player.lookAt = A.traffic.clock; player.observations.push({ view, at: A.traffic.clock, x: player.x, z: player.z }); lookAnim = 1; }
+  $('lookBtn').addEventListener('click', () => look());
+  function cockpitAction(action) {
+    if (!A.test?.running || !player.operation.enabled) return;
+    if (!operate(player.operation, action, player.v, A.traffic.clock)) A.test.fault('D', 'Control – cockpit', 'Control input rejected: stop and prepare the cockpit before operating this control', 'cockpit-' + action, 2);
+    renderTrainingControls();
+  }
+  function gearAction(gear) {
+    if (!A.test?.running || player.operation.transmission !== 'automatic') return;
+    if (!selectGear(player.operation, gear, player.v, player.rawInput?.brake || 0, A.traffic.clock)) A.test.fault('D', 'Control – selector', 'Stop and hold the footbrake before selecting a gear', 'gear-change', 2);
+    renderTrainingControls();
+  }
+  document.querySelectorAll('[data-gear]').forEach(b => b.addEventListener('click', () => gearAction(b.dataset.gear)));
+  document.querySelectorAll('[data-operation]').forEach(b => b.addEventListener('click', () => cockpitAction(b.dataset.operation)));
+  document.querySelectorAll('[data-observe]').forEach(b => b.addEventListener('click', () => look(b.dataset.observe)));
+  function renderTrainingControls() {
+    $('trainingControls').hidden = document.body.dataset.mode !== 'drive' || (!player.operation.enabled && plan?.lesson?.scenario !== 'mirrors');
+    $('cockpitControls').hidden = !player.operation.enabled;
+    $('gearControls').hidden = player.operation.transmission !== 'automatic';
+    document.querySelectorAll('[data-gear]').forEach(b => b.setAttribute('aria-pressed', String(player.operation.gear === b.dataset.gear)));
+    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors';
+    document.querySelectorAll('[data-operation]').forEach(b => b.setAttribute('aria-pressed', String(!!player.operation[b.dataset.operation])));
+    $('cockpitState').textContent = `Engine ${player.operation.engine ? 'on' : 'off'} · Parking brake ${player.operation.parkingBrake ? 'on' : 'off'}${player.operation.gear ? ' · Selector ' + player.operation.gear : ''}`;
+  }
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => extraInputs.push(fn), look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
   let botInput = null, botMode = false, pinMesh = null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
@@ -189,7 +223,9 @@ async function boot() {
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
       const res = evaluate(plan.lesson, test, scenario), pz = plan.kind === 'puzzle';
-      if (!botMode) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S }); // bot runs never touch a learner's progress
+      const report = buildReport({ lessonId: plan.lesson.id, scenarioId: plan.scenarioDefinition?.id, pass: res.pass, faults: test.faults, duration: test.elapsed, objectives: plan.lesson.objectives || plan.lesson.steps, evidence: { observations: player.observations.map(e => ({ ...e })), controls: player.operation.events.map(e => ({ ...e })), scenarioEvents: scenario?.events || [], objectiveResult: scenario?.result ? scenario.result() : null } });
+      $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
+      if (!botMode) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
@@ -200,11 +236,12 @@ async function boot() {
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
       const pass = test.passed();
-      if (!botMode) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S });
+      if (!botMode) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
       $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
         : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
+      $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       reasons.innerHTML = ''; next.hidden = true;
       $('testState').textContent = pass ? 'Passed' : 'Failed';
     }
@@ -221,7 +258,8 @@ async function boot() {
     loadPlan(plan);
     if (plan.kind !== 'mock') scenario = createScenario(plan.lesson, { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner } });
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
-    sigBtns(); A.test.running = true; banner(null);
+    sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
+    A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     lastStep = -1;
   }
@@ -321,6 +359,7 @@ async function boot() {
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
+    if (test.running) test.elapsed = (test.elapsed || 0) + dt;
     if (test.running && scenario) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
@@ -354,7 +393,7 @@ async function boot() {
     guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive;
     if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
     renderer.render(scene, camera);
-    uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
+    uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
   }
   requestAnimationFrame(frame);
@@ -362,6 +401,7 @@ async function boot() {
   setMode('lobby'); hub.open();
   // bot lab: open the sim with ?bots to run and watch the test driver on any lesson, puzzle or mock test
   if (/[?&]bots\b/.test(location.search)) createBotLab({
+    lesson: () => plan.lesson, scenarioStatus: () => scenario?.progress, operate: cockpitAction, gear: gearAction,
     get A() { return A; }, player, look, frame: (dt) => tick(dt), step: (n, dt) => window.cambridgeDrive.step(n, dt),
     // screenshot of the 3D view (rendered now, so the drawing buffer is still there to read)
     snapshot: () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); },
