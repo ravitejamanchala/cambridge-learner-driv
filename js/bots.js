@@ -8,13 +8,25 @@ const KEY = 'cld.bot.';           // one localStorage entry per run, so windows 
 const TAB = Math.random().toString(36).slice(2, 7);
 const MPH = 2.23694;
 const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+export function plannedStopPosition(route,index,light,lanePoint) {
+  const step=route.steps[index],base=route.stepS[index]+(step.dir>0?light.s:step.e.len-light.s);
+  let before=lanePoint(Math.max(0,base-25)),best=base,bestDelta=Infinity;
+  let previous=(before.x-light.x)*light.tx+(before.z-light.z)*light.tz;
+  for(let s=Math.max(0,base-25)+1;s<=Math.min(route.len,base+25);s++) {
+    const point=lanePoint(s),signed=(point.x-light.x)*light.tx+(point.z-light.z)*light.tz;
+    const lateral=(point.x-light.x)*light.tz-(point.z-light.z)*light.tx;
+    if(previous<0&&signed>=0&&Math.abs(lateral)<light.w/2+2){const crossing=s-signed/(signed-previous),delta=Math.abs(crossing-base);if(delta<bestDelta){best=crossing;bestDelta=delta;}}
+    before=point;previous=signed;
+  }
+  return best;
+}
 
 // ---------- the driver ----------
 // Follows the route guide's lane line, keeps to limits, stops for lights, crossings and traffic,
 // gives way at side roads, minis, roundabouts and cycle rings, signals, looks round before moving off.
 export function makeDriver(api) {
   const parkingInput = createParkingDriver(api);
-  const st = { lookedAt: -1e9, waitT: 0 };
+  const st = { lookedAt: -1e9, waitT: 0 },stopPositions=new WeakMap(),cyclePositions=new WeakMap();
   return function input() {
     const A = api.A, t = A.test, pl = api.player, R = t.route, tr = A.traffic, net = A.net; if (!t.running) return null;
     const lesson = api.lesson?.(), status = api.scenarioStatus?.();
@@ -57,11 +69,14 @@ export function makeDriver(api) {
     if (t.parked) {
       st.waitT += dt; if (tr.clock - pl.lookAt > 6) { api.look(); st.lookedAt = tr.clock; }
       const behind = tr.cars.some(o => { if (!o.alive || o.v < 1.5 || Math.cos(o.th - pl.th) < 0.7) return false; const dx = o.x - pl.x, dz = o.z - pl.z, fw = dx * fx + dz * fz; return fw < 3 && fw > -90 && Math.abs(dx * fz - dz * fx) < 5.5; });
-      if ((behind && st.waitT < 8) || tr.clock - st.lookedAt < 1.2) return { throttle: 0, brake: pl.v > 0.05 ? 1 : 0, steer: 0 };
+      if (behind || tr.clock - st.lookedAt < 1.2) return { throttle: 0, brake: pl.v > 0.05 ? 1 : 0, steer: 0 };
       if (pl.indicator !== 'R') pl.signal('R');
     } else st.waitT = 0;
-    const p = api.lanePoint(t.sRoute + 10), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
-    const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 24);
+    const nearMini=net.minis.some(m=>Math.hypot(m.x-pl.x,m.z-pl.z)<18);
+    const follow = nearMini ? 6 : 10;
+    const p = api.lanePoint(t.sRoute + follow), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
+    const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
+    if(nearMini)target=Math.min(target,3.5);
     if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
     const ins = R.instructions[t.step], ahead = ins.s - t.sRoute;
     if (!t.parked && pl.indicator === 'R' && !(ins.signal === 'R' && ahead < 90)) pl.signal('R'); // cancel the moving-off signal
@@ -78,33 +93,88 @@ export function makeDriver(api) {
     }
     if (ins.final && t.sRoute > ins.s - 60) target = Math.min(target, 4);
     if (ins.final && t.sRoute > ins.s - 28) target = 0;
-    const stopAt = (fw, m) => { target = Math.min(target, Math.max(0, (fw - m) * 0.45)); };
-    for (const s of net.stops) { const rx = s.x - pl.x, rz = s.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 50 || Math.abs(rx * fz - rz * fx) > s.w / 2 + 2 || s.tx * fx + s.tz * fz < 0.5) continue; const L = tr.lightState(s); if (L === 'R' || L === 'RA' || (L === 'A' && fw > 6)) stopAt(fw, 2.5); }
+    const stopAt = (fw, m) => { target=Math.min(target,Math.max(0,(fw-m)*.45)); };
+    // See stop lines along the planned route before steering towards them.
+    // A tight turn can otherwise hide a red ring signal from a heading-only scan.
+    for(let i=0;i<R.steps.length;i++) {
+      const step=R.steps[i];if(R.stepS[i]>t.sRoute+50)break;
+      if(R.stepS[i]+step.e.len<t.sRoute-1)continue;
+      for(const light of net.stopsByEdge.get(step.e.id)||[]) {
+        if(light.dir!==step.dir)continue;
+        if(!stopPositions.has(R))stopPositions.set(R,new Map());const positions=stopPositions.get(R),key=i+':'+light.id;
+        if(!positions.has(key))positions.set(key,plannedStopPosition(R,i,light,api.lanePoint));
+        const distance=positions.get(key)-t.sRoute;
+        if(distance<.2||distance>50)continue;
+        const passed=(pl.x-light.x)*light.tx+(pl.z-light.z)*light.tz;
+        if(passed>.5 && fx*light.tx+fz*light.tz>.3)continue;
+        const state=tr.lightState(light);
+        if(state==='R'||state==='RA'||(state==='A'&&distance>1.5))stopAt(distance,6);
+      }
+    }
+    for (const s of net.stops) { if(t.ctx && s.e!==t.ctx.e)continue;const rx = s.x - pl.x, rz = s.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 50 || Math.abs(rx * fz - rz * fx) > s.w / 2 + 2 || s.tx * fx + s.tz * fz < 0.5) continue; const L = tr.lightState(s); if (L === 'R' || L === 'RA' || (L === 'A' && fw > 6)) stopAt(fw, 4.5); }
     for (const z of net.zebras) { if (z.ped.state === 'idle') continue; const rx = z.x - pl.x, rz = z.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 40 || Math.abs(rx * fz - rz * fx) > z.w) continue; stopAt(fw, 5); }
     for (const c of tr.puffins) { if (c.ped.state === 'idle') continue; const rx = c.x - pl.x, rz = c.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 40 || Math.abs(rx * fz - rz * fx) > c.w) continue; stopAt(fw, 4.5); }
     const look = Math.max(24, pl.v * pl.v / 9 + pl.v * 1.2 + 8), others = tr.cars.concat(tr.bikes);
-    for (const o of others) { if (!o.alive) continue; const rx = o.x - pl.x, rz = o.z - pl.z, fw = rx * fx + rz * fz; if (fw < 0 || fw > look || Math.abs(rx * fz - rz * fx) > 2.3 || Math.cos(o.th - pl.th) < -0.5) continue; target = Math.min(target, o.v + Math.max(0, (fw - 8) * 0.35)); stopAt(fw, 7); }
-    for (const o of others) { if (!o.alive || o.v < 0.8 || Math.cos(o.th - pl.th) < -0.75) continue; const px = o.x - Math.sin(o.th) * o.v * 1.5 - pl.x, pz = o.z - Math.cos(o.th) * o.v * 1.5 - pl.z, fw = px * fx + pz * fz; if (fw < 0 || fw > 14 || Math.abs(px * fz - pz * fx) > 2.6) continue; stopAt(Math.max(fw, Math.hypot(o.x - pl.x, o.z - pl.z)), 6); }
+    const path=[{x:pl.x,z:pl.z,s:0}];
+    for(let distance=3;distance<=look+3;distance+=3)path.push({...api.lanePoint(t.sRoute+distance),s:distance});
+    const routeGap=o=>{
+      let gap=Infinity,along=0;
+      for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dz=b.z-a.z,u=Math.max(0,Math.min(1,((o.x-a.x)*dx+(o.z-a.z)*dz)/(dx*dx+dz*dz||1))),distance=Math.hypot(o.x-a.x-dx*u,o.z-a.z-dz*u);if(distance<gap){gap=distance;along=a.s+(b.s-a.s)*u;}}
+      return {gap,along};
+    };
+    for(const o of others){
+      if(!o.alive||Math.hypot(o.x-pl.x,o.z-pl.z)>look+6)continue;
+      const {gap,along}=routeGap(o),width=o.kind==='bike'?3.05:2.3;
+      if(gap>width||along<.5)continue;
+      if(Math.cos(o.th-pl.th)<-.5){if(o.kind==='bike')stopAt(along,10);continue;}
+      const following=o.v+Math.max(0,(along-8)*.35);target=Math.min(target,following);stopAt(along,8);
+    }
+    for(const o of others){
+      if(!o.alive||Math.hypot(o.x-pl.x,o.z-pl.z)>35)continue;
+      const dx=o.x-pl.x,dz=o.z-pl.z,vx=-Math.sin(o.th)*o.v-fx*pl.v,vz=-Math.cos(o.th)*o.v-fz*pl.v;
+      if(dx*vx+dz*vz>=0)continue;
+      for(const time of [.5,1,1.5,2,2.5]){
+        const q=api.lanePoint(t.sRoute+Math.max(0,pl.v)*time),u=Math.min(1,time/1.5);
+        const x=pl.x+(q.x-pl.x)*u,z=pl.z+(q.z-pl.z)*u;
+        const ox=o.x-Math.sin(o.th)*o.v*time,oz=o.z-Math.cos(o.th)*o.v*time;
+        if(Math.hypot(ox-x,oz-z)<3.2){stopAt(Math.max(0,routeGap(o).along),8);break;}
+      }
+    }
     if (ins.kind === 'right' && ahead < 14 && ahead > -4 && tr.cars.some(o => { if (!o.alive || o.v < 1) return false; const dx = o.x - pl.x, dz = o.z - pl.z, fw = dx * fx + dz * fz; return fw > 0 && fw < 60 && Math.cos(o.th - pl.th) < -0.6 && Math.abs(dx * fz - dz * fx) < 8; })) stopAt(ahead + 2, 0);
     if (ins.approach && ahead > 1.5 && ahead < 26 && net.giveways.some(g => g.e === ins.approach.e && g.dir === ins.approach.dir)) {
       const vx = net.nx[ins.node], vz = net.nz[ins.node];
       if (others.some(o => { if (!o.alive || o.v < 0.8) return false; const dx = vx - o.x, dz = vz - o.z, dd = Math.hypot(dx, dz); if (dd > 55 || dd < 3 || Math.hypot(o.x - pl.x, o.z - pl.z) < 4) return false; return (dx * -Math.sin(o.th) + dz * -Math.cos(o.th)) / dd > 0.6; })) stopAt(ahead, 5);
     }
     if (ins.kind === 'rb' && ahead > 2 && ahead < 22) {
-      const vx = net.nx[ins.node], vz = net.nz[ins.node], lit = net.stops.some(s => Math.hypot(s.x - pl.x, s.z - pl.z) < 40 && s.tx * fx + s.tz * fz > 0.5);
-      if (!lit && tr.cars.some(o => o.alive && o.e.way.rb && o.v > 1 && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 4);
+      const vx = net.nx[ins.node], vz = net.nz[ins.node], lit = net.stops.some(s => s.e===ins.approach.e && s.dir===ins.approach.dir && Math.hypot(s.x-vx,s.z-vz)<40);
+      if (!lit && others.some(o => o.alive && o.e.way.rb && o.v > .5 && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 8);
     }
     for (const m of net.minis) {
       const dx = m.x - pl.x, dz = m.z - pl.z, fw = dx * fx + dz * fz; if (fw < 5 || fw > 26 || Math.abs(dx * fz - dz * fx) > 8) continue;
       const rx = -fz, rz = fx; if (others.some(o => { if (!o.alive || o.v < 1) return false; const ox = o.x - m.x, oz = o.z - m.z, od = Math.hypot(ox, oz); if (od > 26 || od < 2.5) return false; return -(ox * -Math.sin(o.th) + oz * -Math.cos(o.th)) / od > 0.5 && (ox * rx + oz * rz) / od > 0.3; })) stopAt(fw, 8);
     }
     for (const ring of net.cycleRings) for (const cr of ring.crossings) {
-      const rx = cr.x - pl.x, rz = cr.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1.5 || fw > 28 || Math.abs(rx * fz - rz * fx) > 4) continue;
-      if (tr.ringBikes.some(b => b.ring === ring && wrapA(b.ang - cr.ang) * ring.r > -18 && wrapA(b.ang - cr.ang) * ring.r < 3)) stopAt(fw, 3.5);
+      for(let i=0;i<R.steps.length;i++){
+        const step=R.steps[i];if(step.e!==cr.e)continue;
+        const base=R.stepS[i]+(step.dir>0?cr.s:step.e.len-cr.s);
+        if(base-t.sRoute< -15||base-t.sRoute>40)continue;
+        if(!cyclePositions.has(R))cyclePositions.set(R,new Map());const positions=cyclePositions.get(R),key=ring.x+':'+ring.z+':'+i+':'+cr.s;
+        if(!positions.has(key)){
+          let crossing=base,best=Infinity,previous=null;
+          for(let s=Math.max(0,base-15);s<=Math.min(R.len,base+15);s++){
+            const point=api.lanePoint(s),d=Math.hypot(point.x-ring.x,point.z-ring.z)-ring.r;
+            if(previous&&previous.d*d<=0){const candidate=s-d/(d-previous.d||1);if(Math.abs(candidate-base)<best){crossing=candidate;best=Math.abs(candidate-base);}}
+            previous={d};
+          }
+          const point=api.lanePoint(crossing);positions.set(key,{s:crossing,angle:Math.atan2(point.x-ring.x,-(point.z-ring.z))});
+        }
+        const crossing=positions.get(key),distance=crossing.s-t.sRoute;if(distance<.4||distance>35)continue;
+        if(tr.ringBikes.some(b=>b.alive!==false&&b.ring===ring&&wrapA(b.ang-crossing.angle)*ring.r> -25&&wrapA(b.ang-crossing.angle)*ring.r<5))stopAt(distance,8);
+      }
     }
     if (ins.signal && ahead < 80 && ahead > 3 && pl.indicator !== ins.signal && !(ins.kind === 'rb' && t.sRoute > ins.prevExitS - 0.3)) pl.signal(ins.signal);
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
-    return { throttle: pl.v < target - 0.3 ? 1 : 0, brake: pl.v > target + 0.6 && pl.v > 0.05 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
+    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
   };
 }
 
@@ -118,10 +188,11 @@ function saveRun(r) { try { localStorage.setItem(KEY + r.at + '.' + TAB + '.' + 
 function clearRuns() { try { const ks = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith(KEY) || k.startsWith('cld.note.'))) ks.push(k); } ks.forEach(k => localStorage.removeItem(k)); } catch (_) {} }
 function allNotes() { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cld.note.')) { try { out.push(JSON.parse(localStorage.getItem(k))); } catch (_) {} } } } catch (_) {} return out.sort((a, b) => a.at - b.at); }
 function download(name, text, type, url) { const a = document.createElement('a'); a.href = url || URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); if (!url) setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
-const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const f = q.shift(); f && f(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
+
 
 // ---------- runner + panel ----------
 export function createBotLab(api) {
+  const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const f = q.shift(); f && f(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
   const drive = makeDriver(api);
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const el = document.createElement('div'); el.id = 'botlab';
@@ -137,7 +208,7 @@ export function createBotLab(api) {
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
-<div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
+<div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
 <div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
 <div class="live" id="blPos" style="color:#9fd3ff;padding-top:0"></div>
@@ -200,8 +271,9 @@ export function createBotLab(api) {
   window.addEventListener('storage', (e) => { if (!e.key || e.key.startsWith(KEY)) render(); });
   setInterval(() => { if (!running) render(); }, 4000);
 
-  async function runOne(p, label) {
-    await api.start(p.kind, p.id);
+  async function runOne(p, label, iteration) {
+    const base=$("blSeed").value,seed=base===""?crypto.getRandomValues(new Uint32Array(1))[0]:(Number(base)+iteration)>>>0;
+    await api.start(p.kind, p.id,seed);
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
@@ -225,9 +297,10 @@ export function createBotLab(api) {
       if (!watch) await yieldNow();
     }
     api.setInput(null);
+    if(!t.done)t.running=false;
     const res = t.done ? api.result() : { pass: false, why: end };
     const pl = api.player;
-    saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind, at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
+    saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
       simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)] });
     render();
@@ -241,7 +314,7 @@ export function createBotLab(api) {
     try {
       do {
         const N = Math.max(1, +$('blN').value || 1), total = list.length * N; let k = 0;
-        for (const p of list) for (let i = 0; i < N && !stopReq; i++) await runOne(p, `[${++k}/${total}]`);
+        for (const p of list) for (let i = 0; i < N && !stopReq; i++) await runOne(p, `[${++k}/${total}]`,i);
       } while ($('blLoop').checked && !stopReq);
     } catch (err) { $('blLive').textContent = 'Stopped by an error: ' + err.message; console.error(err); }
     running = false; api.botMode(false); $('blGo').disabled = false; $('blStop').disabled = true; $('blPause').disabled = true; render();
@@ -250,7 +323,7 @@ export function createBotLab(api) {
   $('blStop').onclick = () => { stopReq = true; $('blLive').textContent = 'Stopping after this step…'; };
   $('blJson').onclick = () => download('bot-runs.json', JSON.stringify({ runs: allRuns(), notes: allNotes() }, null, 1), 'application/json');
   $('blCsv').onclick = () => {
-    const cols = ['key', 'title', 'at', 'tab', 'end', 'pass', 'D', 'S', 'len', 'reached', 'simT', 'wallT', 'rerouted', 'faults', 'where', 'hitBy'];
+    const cols = ['key', 'title', 'at', 'tab', 'end', 'pass', 'D', 'S', 'len', 'reached', 'simT', 'wallT', 'rerouted', 'faults', 'where', 'hitBy','seed','release'];
     const q = (v) => '"' + String(Array.isArray(v) ? v.map(x => Array.isArray(x) ? x.join(' ') : x).join(' | ') : v ?? '').replace(/"/g, '""') + '"';
     const notes = allNotes().map(n => ['note', n.drive, new Date(n.at).toISOString(), n.area, `x ${n.x} z ${n.z}`, n.picked ? `point x ${n.picked.x} z ${n.picked.z}` : '', n.road, n.s, n.text].map(q).join(','));
     download('bot-notes.csv', ['type,drive,at,area,car,point,road,route_m,text'].concat(notes).join('\n'), 'text/csv');

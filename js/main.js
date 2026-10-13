@@ -8,6 +8,8 @@ import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
 import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike } from './car.js';
+import { createGarage } from './garage.js';
+import { createPedestrianFactory } from './pedestrian-models.js';
 import { createTest } from './test.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
@@ -49,7 +51,9 @@ async function boot() {
 
   // ---------- map areas: each drive loads only its part of the city ----------
   // vehicle meshes are pooled and reused across areas
-  const carPool = [], bikePool = []; let carI = 0, bikeI = 0;
+  const carPool = [], bikePool = [],pedPool=[]; let carI = 0, bikeI = 0,pedI=0;
+  const buildPedestrian=createPedestrianFactory(assetURL);
+  const makePedestrian=()=>{let m=pedPool[pedI];if(!m)pedPool.push(m=buildPedestrian(pedI));pedI++;scene.add(m);return m;};
   const makeCar = (c) => { let m = carPool[carI]; if (!m) carPool.push(m = shadowed(makeBoxCar(c, false))); carI++; scene.add(m); return m; };
   const makeBk = (i) => { let m = bikePool[bikeI]; if (!m) bikePool.push(m = shadowed(makeBike(i))); bikeI++; scene.add(m); return m; };
   const A = { id: null, net: null, traffic: null, world: null, test: null, trafficInit: false };
@@ -58,7 +62,7 @@ async function boot() {
   function disposeScene(old) {
     const keep = new Set(kitResources());
     const mark = (o) => o.traverse(c => { if (c.geometry) keep.add(c.geometry); for (const m of [].concat(c.material || [])) { keep.add(m); if (m.map) keep.add(m.map); } });
-    [player.mesh, camera, guide.group, ...carPool, ...bikePool].forEach(mark);
+    [player.mesh, camera, guide.group, ...carPool, ...bikePool,...pedPool].forEach(mark);
     old.traverse(c => {
       if (c.geometry && !keep.has(c.geometry)) c.geometry.dispose();
       for (const m of [].concat(c.material || [])) { if (keep.has(m)) continue; if (m.map && !keep.has(m.map)) m.map.dispose(); m.dispose(); }
@@ -74,9 +78,9 @@ async function boot() {
       const d = await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = 0;
+      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
       const net = buildNet(d);
-      const traffic = createTraffic(net, scene, makeCar, makeBk);
+      const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
       const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
@@ -127,6 +131,7 @@ async function boot() {
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
+    if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
     ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
     $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
     A.world.updateChunks(player.x, player.z, 4);
@@ -149,7 +154,7 @@ async function boot() {
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
 
-  loadCarModel(assetURL(CAR.url)).then(m => { player.setModel(shadowed(m)); }).catch(err => console.warn('Car model did not load; using the placeholder car.', err));
+  const garage=createGarage({player,prefs,save:savePrefs,load:car=>loadCarModel(assetURL(car.url),car.supplied?{yaw:0,hide:null,maxWidth:1.8,wheel:mesh=>/Wheel/i.test(mesh.name)||/Wheel/i.test(mesh.parent?.name||'')}:{}).then(shadowed)});
 
   // ---------- input ----------
   const key = { up: 0, down: 0, left: 0, right: 0 }, tch = { up: 0, down: 0, left: 0, right: 0 };
@@ -238,8 +243,8 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
-  let botInput = null, botMode = false, pinMesh = null;
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
+  let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
@@ -451,11 +456,12 @@ async function boot() {
       const nr = nearest(A.net, p.x, p.z); return { x: p.x, z: p.z, road: nr && nr.d < nr.way.w / 2 + 1 ? nr.way.name || (nr.way.rb ? 'roundabout' : 'unnamed') : '' };
     },
     pin: (x, z) => { if (!pinMesh) { pinMesh = new T.Mesh(new T.ConeGeometry(0.3, 1.2, 12), new T.MeshBasicMaterial({ color: 0xff3b30 })); pinMesh.rotation.x = Math.PI; } scene.add(pinMesh); pinMesh.position.set(x, 0.75, z); },
-    lanePoint: (s) => guide.lanePoint(A.test.route, s),
+    lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net),
     estopBanner: () => { const b = $('banner'); return !b.hidden && /STOP/.test(b.textContent); },
     setInput: (fn) => { botInput = fn; },
     botMode: (on) => { botMode = on; manual = on; },
-    async start(kind, id) {
+    async start(kind, id, seed) {
+      botSeed=seed;
       const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
       await pickPlan(pl, true); await areaChain;
     },

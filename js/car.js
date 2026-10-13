@@ -70,21 +70,22 @@ function addLearnerKit(root, b, indL, indR) {
 }
 
 // Load a glTF car, scale it to CAR.length, split out wheels so they can steer and roll.
-export function loadCarModel(url) {
+export function loadCarModel(url, options = {}) {
+  const spec={...CAR,...options};
   return new Promise((res, rej) => {
     if (!T.GLTFLoader) return rej(new Error('GLTFLoader missing'));
     new T.GLTFLoader().load(url, gltf => {
       try {
         const root = new T.Group(), model = gltf.scene;
-        const drop = []; model.traverse(o => { if (CAR.hide && CAR.hide.test(o.name)) drop.push(o); }); drop.forEach(o => o.parent && o.parent.remove(o));
+        const drop = []; model.traverse(o => { if (spec.hide && spec.hide.test(o.name)) drop.push(o); }); drop.forEach(o => o.parent && o.parent.remove(o));
         model.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) { o.material.roughness = CAR.material.roughness; o.material.metalness = CAR.material.metalness; } });
-        model.rotation.y = CAR.yaw; root.add(model); root.updateMatrixWorld(true);
+        model.rotation.y = spec.yaw; root.add(model); root.updateMatrixWorld(true);
         let box = new T.Box3().setFromObject(model); const size = box.getSize(new T.Vector3());
-        model.scale.multiplyScalar(CAR.length / size.z); root.updateMatrixWorld(true);
+        model.scale.multiplyScalar(Math.min(CAR.length / size.z,spec.maxWidth ? spec.maxWidth/size.x : Infinity)); root.updateMatrixWorld(true);
         box = new T.Box3().setFromObject(model); const c = box.getCenter(new T.Vector3());
         model.position.set(-c.x, -box.min.y + CAR.lift, -c.z); root.updateMatrixWorld(true);
         box = new T.Box3().setFromObject(model);
-        const wheelMeshes = []; model.traverse(o => { if (o.isMesh && CAR.wheel(o)) wheelMeshes.push(o); });
+        const wheelMeshes = []; model.traverse(o => { if (o.isMesh && spec.wheel(o)) wheelMeshes.push(o); });
         const wheels = [], front = []; let radius = 0.33;
         for (const m of wheelMeshes) {
           const wb = new T.Box3().setFromObject(m), wc = wb.getCenter(new T.Vector3());

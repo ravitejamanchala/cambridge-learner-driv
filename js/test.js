@@ -3,6 +3,11 @@ import { MARKING, RULES } from './config.js';
 import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet } from './net.js';
 
 const MPH = 2.23694;
+export function approachLane(nr,approach,heading) {
+  if(nr.e!==approach.e)return null;
+  const alignment=(-Math.sin(heading)*nr.tx-Math.cos(heading)*nr.tz)*approach.dir;
+  return alignment>Math.cos(Math.PI/9) ? laneIndex(nr.e,approach.dir,nr.lat) : null;
+}
 
 export function createTest(net, traffic, player) {
   const t = {
@@ -40,7 +45,7 @@ export function createTest(net, traffic, player) {
     }
     const dist = Math.sqrt(bd);
     t.offRoute = dist > 22;
-    if (!t.offRoute) { t.idx = best; t.sRoute = Math.max(t.sRoute, s - 4); t.offT = 0; }
+    if (!t.offRoute) { t.idx = best; t.sRoute = Math.max(t.sRoute, s); t.offT = 0; }
     else { t.offT += dt; if (t.offT > 2.5) reroute(); }
     // current instruction (a roundabout stays current until you leave it at your exit)
     const ins = R.instructions; while (t.step < ins.length - 1 && t.sRoute > (ins[t.step].exitS ?? ins[t.step].s) + 6) t.step++;
@@ -126,6 +131,9 @@ export function createTest(net, traffic, player) {
     }
     // traffic lights: crossing a stop line
     for (const st of stopsNear(net, player.x, player.z)) {
+      // Nearby entry and circulating lanes have different signals. Crossing
+      // the infinite plane of another road's stop line is not crossing its line.
+      if(nr.e!==st.e){t.stopPrev.delete(st.id);t.amberAt.delete(st.id);continue;}
       const rx = player.x - st.x, rz = player.z - st.z, a = rx * st.tx + rz * st.tz, lat = rx * st.tz - rz * st.tx;
       const prev = t.stopPrev.get(st.id); t.stopPrev.set(st.id, a);
       // remember where the car was when the light first showed amber (to judge whether it could have stopped)
@@ -205,7 +213,10 @@ export function createTest(net, traffic, player) {
     for (const ins of t.route.instructions) {
       if (!ins.laneOK || ins.laneChecked) continue;
       const ahead = ins.s - t.sRoute;
-      if (ahead < 35 && ahead > 4 && nr.e === ins.approach.e) ins.laneSeen = laneIndex(nr.e, ins.approach.dir, nr.lat);
+      if (ahead < 35 && ahead > 4) {
+        const lane=approachLane(nr,ins.approach,player.th);
+        if(lane!==null)ins.laneSeen=lane;
+      }
       if (ahead <= 3) {
         ins.laneChecked = true;
         if (ins.laneSeen !== undefined && !ins.laneOK.includes(ins.laneSeen)) {

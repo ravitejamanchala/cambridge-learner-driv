@@ -20,7 +20,7 @@ for (const f of fs.readdirSync(path.join(SRC, 'data/areas'))) {
   if (f === 'index.json') delete d.source; else d.source = d.source === 'Practice layout' ? 'Practice layout' : '© OpenStreetMap contributors (ODbL)';
   fs.writeFileSync(path.join(OUT, 'data/areas', f), JSON.stringify(d));
 }
-for (const f of fs.readdirSync(path.join(SRC, 'models'))) fs.copyFileSync(path.join(SRC, 'models', f), path.join(OUT, 'models', f));
+for (const f of fs.readdirSync(path.join(SRC, 'models'))) if(fs.statSync(path.join(SRC,'models',f)).isFile()) fs.copyFileSync(path.join(SRC, 'models', f), path.join(OUT, 'models', f));
 console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
