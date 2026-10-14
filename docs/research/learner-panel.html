@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Learner Panel of 100</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}[hidden]{display:none!important}
+/* Layout: a DL25-style marking sheet — one narrow reading column, a summary strip, then ranked rows and a filterable roster. */
+:root{
+  --bg:#f6f7f5; --paper:#ffffff; --ink:#1d2327; --muted:#5d666c; --rule:#d9ddd8;
+  --tarmac:#2e353b; --lplate:#c8102e; --sign:#0b6b3a; --amber:#b86e00; --tint:#eef1ee;
+  --keep:#0b6b3a; --maybe:#b86e00; --drop:#c8102e;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15191c; --paper:#1d2226; --ink:#e7eae6; --muted:#9aa39f; --rule:#323a3f;
+  --tarmac:#0f1214; --lplate:#ff5a6a; --sign:#4fc287; --amber:#e6a23c; --tint:#232a2e;
+  --keep:#4fc287; --maybe:#e6a23c; --drop:#ff5a6a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15191c; --paper:#1d2226; --ink:#e7eae6; --muted:#9aa39f; --rule:#323a3f;
+  --tarmac:#0f1214; --lplate:#ff5a6a; --sign:#4fc287; --amber:#e6a23c; --tint:#232a2e;
+  --keep:#4fc287; --maybe:#e6a23c; --drop:#ff5a6a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body)}
+.wrap{max-width:960px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;line-height:1.05;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.4rem,6vw,3.6rem)}
+h2{font-size:1.9rem}
+h3{font-size:1.25rem}
+p{margin:0;max-width:66ch}
+.eyebrow{font:500 .75rem/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{display:grid;gap:14px}
+.lp{display:inline-grid;place-items:center;width:44px;height:44px;border:3px solid var(--lplate);background:var(--paper);color:var(--lplate);font:700 1.9rem/1 var(--display);border-radius:4px}
+.head-row{display:flex;gap:16px;align-items:center}
+.note{border-left:3px solid var(--amber);padding:10px 14px;background:var(--tint);font-size:.95rem}
+section{display:grid;gap:18px}
+/* summary strip */
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--rule);background:var(--paper)}
+.strip>div{padding:14px 16px;border-right:1px solid var(--rule);display:grid;gap:4px;min-width:0}
+.strip>div:last-child{border-right:0}
+.strip b{font:700 2rem/1 var(--display)}
+@media (max-width:640px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.strip>div:nth-child(2){border-right:0}.strip>div:nth-child(-n+2){border-bottom:1px solid var(--rule)}}
+.split{display:flex;height:10px;border-radius:2px;overflow:hidden;background:var(--rule)}
+.split i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:var(--c)}
+.mix{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
+.mix>div{display:grid;gap:8px;min-width:0}
+/* ranked rows */
+.rank{display:grid;gap:0;border-top:1px solid var(--rule)}
+.row{display:grid;grid-template-columns:2.2rem minmax(0,1fr) 3rem;gap:10px 14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--rule)}
+.row .n{font:500 .85rem var(--mono);color:var(--muted)}
+.row .lab{display:grid;gap:6px;min-width:0}
+.row .bar{height:6px;background:var(--tint);border-radius:3px;overflow:hidden}
+.row .bar i{display:block;height:100%;background:var(--c,var(--sign))}
+.row .v{font:700 1.35rem/1 var(--display);text-align:right}
+.row small{color:var(--muted);font-size:.85rem}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+/* scorecard */
+.tbl{overflow-x:auto;border:1px solid var(--rule);background:var(--paper)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.92rem}
+th,td{padding:9px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:middle}
+th{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:var(--tint)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;width:5.5rem}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font:500 .72rem var(--mono);padding:2px 7px;border-radius:999px;border:1px solid currentColor}
+.pill.keep{color:var(--keep)}.pill.maybe{color:var(--maybe)}.pill.drop{color:var(--drop)}
+/* transcript */
+.round{display:grid;gap:12px;border-top:2px solid var(--ink);padding-top:14px}
+.round .topic{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.say{display:grid;grid-template-columns:9.5rem minmax(0,1fr);gap:4px 16px;padding:6px 0}
+.say .who{font-weight:700;font-size:.92rem}
+.say .who small{display:block;font-weight:400;color:var(--muted);font-family:var(--mono);font-size:.72rem;letter-spacing:.02em}
+.say p{max-width:none}
+.say.mod p{color:var(--muted);font-style:italic}
+@media (max-width:560px){.say{grid-template-columns:1fr}}
+.take{background:var(--tint);padding:10px 14px;font-size:.95rem}
+.take b{color:var(--sign)}
+/* roster */
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.filters label{display:grid;gap:4px;font-size:.8rem;color:var(--muted)}
+select,input{font:inherit;font-size:.95rem;padding:7px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);min-width:0}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--sign);outline-offset:2px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card{background:var(--paper);border:1px solid var(--rule);padding:12px 14px;display:grid;gap:8px;align-content:start;min-width:0}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .nm{font-weight:700}
+.card .meta{font:400 .74rem/1.4 var(--mono);color:var(--muted)}
+.card q{font-size:.93rem;quotes:"“" "”"}
+.card .tags{display:flex;flex-wrap:wrap;gap:4px}
+.card .tags span{font-size:.72rem;padding:1px 6px;border-radius:3px;background:var(--tint);color:var(--muted)}
+.card .tags span.p{color:var(--drop)}
+.count{font:500 .85rem var(--mono);color:var(--muted)}
+ol.next{margin:0;padding-left:1.3rem;display:grid;gap:10px;max-width:70ch}
+ol.next b{font-weight:700}
+.frank{display:grid;border-top:1px solid var(--rule)}
+.fr{display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) 4.2rem;gap:6px 14px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.fr .nm{display:grid;gap:3px;min-width:0;font-size:.93rem}
+.fr .nm small{font:500 .7rem var(--mono);color:var(--muted);letter-spacing:.03em}
+.fr .nm small b{font-weight:500;color:var(--ink)}
+.fr .split{height:14px}
+.fr .v{font:700 1.15rem/1 var(--display);text-align:right}
+.fr .v small{display:block;font:400 .66rem var(--mono);color:var(--muted)}
+@media (max-width:600px){.fr{grid-template-columns:minmax(0,1fr) 3.6rem}.fr .split{grid-column:1/-1;grid-row:2}}
+footer{font-size:.85rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px}
+@media (prefers-reduced-motion:no-preference){.row .bar i{transition:width .5s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <div class="head-row"><span class="lp" aria-hidden="true">L</span><span class="eyebrow">Cambridge Learner Drive · simulated user panel · 14 Oct 2026</span></div>
+  <h1>100 learners try the app</h1>
+  <p>A hundred learner drivers, every one of them already taking lessons with an instructor, used the build as it stands today (v1.1, commit 1c5d4f7) and talked through what they would use, what got in the way and what they would ask for next.</p>
+  <p class="note"><b>These are simulated learners, not real people.</b> I wrote each persona and their reactions from the app's actual feature list and the issues found in testing. Use it to choose what to test with real learners, not as evidence by itself.</p>
+</header>
+
+<section aria-labelledby="who">
+  <span class="eyebrow">Section 1</span>
+  <h2 id="who">Who was on the panel</h2>
+  <div class="strip" id="strip"></div>
+  <div class="mix" id="mix"></div>
+</section>
+
+<section aria-labelledby="find">
+  <span class="eyebrow">Section 2</span>
+  <h2 id="find">What they valued and what got in the way</h2>
+  <div class="two">
+    <div style="display:grid;gap:10px;min-width:0"><h3>Most valued options</h3><p class="muted" style="font-size:.9rem">Learners naming it as something they would come back for</p><div class="rank" id="likes"></div></div>
+    <div style="display:grid;gap:10px;min-width:0"><h3>Biggest frustrations</h3><p class="muted" style="font-size:.9rem">Learners who hit it during their sessions</p><div class="rank" id="pains"></div></div>
+  </div>
+  <h3>Most requested additions</h3>
+  <div class="rank" id="asks"></div>
+</section>
+
+<section aria-labelledby="table">
+  <span class="eyebrow">Section 3</span>
+  <h2 id="table">The round table</h2>
+  <p class="muted">Eight topics, moderated. A selection of what was said, with each speaker's hours of lessons and gearbox.</p>
+  <div id="rounds" style="display:grid;gap:28px"></div>
+</section>
+
+<section aria-labelledby="score">
+  <span class="eyebrow">Section 4</span>
+  <h2 id="score">Every feature, rated by all 100</h2>
+  <p class="muted">Each learner rated all 18 features in the app today and the 13 on the roadmap: <b>must have</b>, <b>nice to have</b> or <b>wouldn’t use</b>. Ratings follow from each learner’s stage, gearbox, device and age, and anything they named themselves counts as a must have. Pick a group to see how the ratings change.</p>
+  <div class="filters">
+    <label for="sSeg">Group<select id="sSeg"><option value="">All 100 learners</option><optgroup label="Stage"></optgroup><optgroup label="Gearbox"><option value="t:M">Manual</option><option value="t:A">Automatic</option></optgroup><optgroup label="Device"></optgroup></select></label>
+    <label for="sKind">Show<select id="sKind"><option value="">All features</option><option value="now">In the app now</option><option value="plan">Planned</option></select></label>
+    <span class="count" id="sCount"></span>
+  </div>
+  <div class="legend"><span style="--c:var(--sign)">Must have</span><span style="--c:var(--amber)">Nice to have</span><span style="--c:var(--rule)">Wouldn’t use</span></div>
+  <div class="frank" id="frank"></div>
+</section>
+
+<section aria-labelledby="money">
+  <span class="eyebrow">Section 5</span>
+  <h2 id="money">Release now or wait, and what they would pay</h2>
+  <p>Asked after the round table: should this go out now with more features later, and what would you pay? Before answering, the panel saw what comparable UK learner apps charge today.</p>
+  <div class="tbl"><table><thead><tr><th>What learners already pay for</th><th>Type</th><th style="text-align:right">Price</th></tr></thead><tbody>
+    <tr><td>Driving Theory Test 4 in 1 Kit</td><td class="muted">Theory, one-off</td><td class="num" style="width:auto">£5.99</td></tr>
+    <tr><td>Official DVSA Theory Test Kit</td><td class="muted">Theory, one-off</td><td class="num" style="width:auto">£5.49</td></tr>
+    <tr><td>RAC / James May theory apps</td><td class="muted">Theory, subscription</td><td class="num" style="width:auto">£4.99 / month</td></tr>
+    <tr><td>Driving Test Routes UK</td><td class="muted">Test-centre routes</td><td class="num" style="width:auto">$3.99 / week · $9.99 / month · $39.99 / year</td></tr>
+    <tr><td>Driving Practice Routes</td><td class="muted">Test-centre routes</td><td class="num" style="width:auto">$9.99 / month · $34.99 lifetime</td></tr>
+    <tr><td>City Car Driving (Steam)</td><td class="muted">PC driving simulator</td><td class="num" style="width:auto">$24.99 one-off</td></tr>
+    <tr><td>One driving lesson</td><td class="muted">Instructor, national average</td><td class="num" style="width:auto">£39 manual · £42 automatic</td></tr>
+  </tbody></table></div>
+  <p class="muted" style="font-size:.85rem">Prices checked 14 Oct 2026 from the App Store, Google Play, Steam, Howden (Jan 2026) and passrates.uk (May 2026). Dollar prices are store listings shown in USD.</p>
+  <div class="mix" id="moneyMix"></div>
+  <div class="round" id="moneyRound"></div>
+  <div class="mix" id="planMix"></div>
+  <div class="round" id="planRound"></div>
+  <h3>Suggested tiers</h3>
+  <div class="tbl"><table><thead><tr><th>Free demo</th><th>Standard · £4.99 a month</th><th>Pro Plus · £9 a month (later)</th></tr></thead><tbody><tr>
+    <td style="vertical-align:top">Unit 1 getting-started lessons<br>Two theory quizzes<br>Easy puzzles<br>One Cambridge mock route, once a day</td>
+    <td style="vertical-align:top">All 39 lessons and every puzzle<br>All five Cambridge mock routes, unlimited<br>Marking history with fault map<br>Cloud save across devices<br>All cars</td>
+    <td style="vertical-align:top">Everything in Standard<br>Spoken examiner directions<br>Sat-nav independent driving<br>Replay at each fault, progress over time<br>Share results with your instructor<br>Manual gearbox, extra test centres, wheel and gamepad as they ship</td>
+  </tr></tbody></table></div>
+  <div class="mix" id="tierMix"></div>
+  <div class="round" id="tierRound"></div>
+</section>
+
+<section aria-labelledby="next">
+  <span class="eyebrow">Section 6</span>
+  <h2 id="next">What the panel points to</h2>
+  <ol class="next" id="nextList"></ol>
+</section>
+
+<section aria-labelledby="roster">
+  <span class="eyebrow">Section 7</span>
+  <h2 id="roster">All 100 learners</h2>
+  <div class="filters">
+    <label for="fStage">Stage<select id="fStage"><option value="">All stages</option></select></label>
+    <label for="fTrans">Gearbox<select id="fTrans"><option value="">Both</option><option value="M">Manual</option><option value="A">Automatic</option></select></label>
+    <label for="fDev">Device<select id="fDev"><option value="">All devices</option></select></label>
+    <label for="fVerdict">Verdict<select id="fVerdict"><option value="">Any verdict</option><option value="keep">Would keep using</option><option value="maybe">Maybe</option><option value="drop">Would stop</option></select></label>
+    <label for="fText">Search<input id="fText" type="search" placeholder="e.g. roundabout"></label>
+    <span class="count" id="shown"></span>
+  </div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<footer>Built from the Cambridge Learner Drive source on branch v1.1. Feature names match the app's lesson, puzzle and mock-test lists. Every number on this page is counted live from the 100 personas listed above.</footer>
+</div>
+
+<script>
+const F={basics:['Getting started lessons','Course · Unit 1'],junctions:['Junctions, lights and lanes','Course · Unit 2'],roundabouts:['Roundabout lessons','Course · Unit 3'],sharing:['Zebras, cyclists, crossings','Course · Unit 4'],faster:['Country road 60 / dual carriageway 70','Course · Unit 5'],parking:['Bay parking and leaving a bay','Course · Unit 6'],theory:['Theory and show me, tell me quizzes','Course · Unit 7'],automatic:['Automatic gearbox lessons','Course · Unit 1'],puzzles:['Puzzles, tiers and stars','Puzzles'],mocks:['Mock tests on real Cambridge roads','Mock tests'],marking:['Marking sheet with fault locations','Results'],profiles:['Learner profiles, levels and XP','Learner chip'],cars:['Choice of 8 cars','Car picker'],views:['Driver, chase and overhead views','In drive · C key'],hud:['Sign-first HUD and lane pictures','In drive'],touch:['Phone controls (portrait, up to 300%)','Settings'],look:['Look-round / mirror check button','In drive · B key'],code:['Highway Code sheet','Lobby']};
+const P={noManual:'No clutch, gears or stalling',steerSens:'Low steering setting blocks tight turns',laneLate:'Right lane appears too late (East Road)',touchSteer:'Touch steering hard to keep smooth',noVoice:'No spoken directions',hudIcons:'Some icons unclear without words',noCloud:'Progress stuck on one device',notMyTown:'Not their test area',faultsUnclear:'Unsure why a fault was given',trafficOdd:'Traffic sometimes behaves oddly',notRealFeel:'Car does not feel real enough',noHazard:'No hazard perception practice'};
+const A={manual:'Manual gearbox with clutch and stalling',voice:'Spoken examiner directions',cloud:'Account with cloud save',instructor:'Share progress with my instructor',manoeuvres:'Parallel park, pull up on the right, reverse round a corner',towns:'More towns and real test-centre routes',hazard:'Hazard perception clips',weather:'Night, rain and low sun',trends:'Progress over time',wheel:'Steering wheel or gamepad support',replay:'Replay my drive',satnav:'Sat-nav independent driving',leader:'Leaderboard with friends'};
+const STAGE={early:'Early (under 10 hrs)',mid:'Mid (10–30 hrs)',ready:'Test booked',retake:'Failed a test before',convert:'Converting a foreign licence'};
+const DEV={phone:'Phone',laptop:'Laptop',tablet:'Tablet',desktop:'Desktop with keyboard'};
+// [name, age, hours of lessons, gearbox, device, stage, likes, pains, asks, verdict, quote]
+const R=[
+['Aisha Rahman',19,6,'M','phone','early',['basics','touch'],['noManual','touchSteer'],['manual'],'maybe','Moving off is the bit I panic about, and the parked checks before moving off actually made me slow down. But my instructor’s car stalls and this one never does.'],
+['Tom Whitaker',17,4,'M','laptop','early',['basics','puzzles','cars'],['noManual'],['manual','leader'],'keep','I picked the RX-7, obviously. The mini-roundabout puzzles are properly addictive.'],
+['Priya Nair',24,18,'A','laptop','mid',['roundabouts','marking'],['laneLate'],['voice'],'keep','The two-lane roundabout lesson is the first time lanes on a roundabout made sense to me.'],
+['Daniel Okafor',22,30,'M','desktop','ready',['mocks','marking'],['noManual','laneLate'],['towns','manual'],'keep','Driving East Road before I drive it for real is the whole reason I’m here. The lane fault at Elizabeth Way caught me three times though.'],
+['Grace Liu',31,12,'A','tablet','mid',['automatic','junctions'],['touchSteer'],['wheel'],'keep','The automatic lessons with P, R, N, D are spot on for my car. On a tablet the steering slider is a bit jumpy.'],
+['Hannah Price',18,9,'M','phone','early',['basics','profiles'],['noCloud','touchSteer'],['cloud'],'maybe','I do it on the bus. Then I open it on my laptop at home and my level is back to 1.'],
+['Marek Nowak',38,20,'M','laptop','convert',['roundabouts','code'],['noManual'],['manoeuvres'],'keep','In Poland we have roundabouts but not this many lanes and signals. The Highway Code sheet next to the lesson is useful.'],
+['Sofia Esposito',27,14,'A','desktop','mid',['marking','sharing'],['faultsUnclear'],['replay'],'keep','The fault map shows me where it happened. I still want to watch the moment back.'],
+['Jamal Hussain',20,25,'M','phone','ready',['mocks','hud'],['notMyTown'],['towns'],'maybe','My test is in Peterborough. Cambridge routes are nice, but they aren’t mine.'],
+['Ellie Brooks',17,3,'M','tablet','early',['basics','theory'],['hudIcons'],['voice'],'keep','The theory quizzes are short enough to do while I wait for my lift.'],
+['Ravi Patel',45,8,'A','desktop','early',['automatic','basics','look'],['notRealFeel'],['wheel'],'keep','At my age I wanted to make mistakes somewhere private first. That is exactly what this is.'],
+['Chloe Martin',21,22,'M','laptop','mid',['roundabouts','puzzles'],['noManual','laneLate'],['manual'],'keep','The Dutch roundabout puzzle was new to me and then I saw one on Fendon Road.'],
+['Oliver Grant',19,40,'M','laptop','retake',['mocks','marking'],['faultsUnclear'],['replay','voice'],'keep','I failed on a serious at a junction. Doing the Hills Road mock until the marking sheet came back clean helped me more than anything.'],
+['Fatima Al-Sayed',29,16,'A','phone','mid',['touch','hud'],['touchSteer'],['voice'],'maybe','Portrait mode is good, I can hold it one-handed on the train. Steering by touch is not how a wheel feels.'],
+['Lewis Campbell',23,11,'M','desktop','mid',['views','junctions'],['steerSens'],['wheel'],'maybe','I turned steering sensitivity down to feel calmer and then I couldn’t make the left into Hills Road at all. I thought I was the problem.'],
+['Mei Chen',34,5,'A','laptop','early',['automatic','theory'],['hudIcons'],['voice'],'keep','The sign pictures in the corner took me a minute. After that I liked that there wasn’t much writing.'],
+['Kwame Mensah',26,28,'M','laptop','ready',['mocks','marking','look'],['noVoice'],['voice','satnav'],'keep','On the real test the examiner talks to you. Here I am reading arrows, which is a different skill.'],
+['Isabel Ward',52,14,'A','desktop','mid',['code','theory','basics'],['hudIcons'],['trends'],'keep','I would like the text a little larger and a page that shows whether I am getting better week to week.'],
+['Ben Fletcher',17,7,'M','phone','early',['puzzles','cars','profiles'],['noCloud'],['leader','cloud'],'keep','Three stars on the motorway interchange took me ages. I want to see if my mates can beat it.'],
+['Nadia Kowalczyk',25,19,'M','laptop','mid',['roundabouts','faster'],['noManual'],['manual'],'keep','The dual carriageway at 70 was scary in a good way. I haven’t done it with my instructor yet.'],
+['Sam Taylor',20,12,'A','tablet','mid',['parking','automatic'],['touchSteer'],['manoeuvres'],'keep','Reverse bay parking with the overhead view finally made the reference points click.'],
+['Arjun Mehta',28,0,'A','laptop','convert',['code','junctions','roundabouts'],['notRealFeel'],['towns'],'keep','I drove for eight years in Bangalore. Keeping left and who goes first at roundabouts is all I need to unlearn.'],
+['Lucy Harrington',18,15,'M','phone','mid',['sharing','hud'],['noManual','touchSteer'],['manual','cloud'],'maybe','Passing cyclists with the gap shown is great. Driving with thumbs is hard.'],
+['Joseph Adeyemi',33,35,'M','desktop','ready',['mocks','marking','faster'],['laneLate'],['towns','voice'],'keep','Five Cambridge routes are better than any YouTube video of the test routes.'],
+['Emily Sanderson',22,9,'A','laptop','early',['basics','automatic','look'],['faultsUnclear'],['voice'],'keep','The look-round button is the first time an app has marked me down for not checking my blind spot. Annoying but correct.'],
+['Harry Doyle',19,21,'M','laptop','mid',['puzzles','roundabouts'],['trafficOdd'],['leader'],'maybe','A car stopped in the middle of the roundabout and I got the blame. It has improved since the last version though.'],
+['Zara Ahmed',24,26,'A','phone','ready',['mocks','touch'],['touchSteer','noCloud'],['cloud','instructor'],'maybe','I want my instructor to see my mock results without me screenshotting them.'],
+['Connor Reilly',21,10,'M','desktop','mid',['junctions','views'],['noManual'],['manual','wheel'],'keep','If I could plug in my wheel and pedals I’d be on this every night.'],
+['Anna Petrova',30,17,'A','laptop','convert',['roundabouts','theory','code'],['hudIcons'],['hazard'],'keep','For the theory test I still need hazard perception. Everything else for theory is in here.'],
+['Jacob Turner',18,2,'M','phone','early',['basics','cars'],['touchSteer','noManual'],['manual'],'drop','It’s fun but my first lessons are all about the clutch, and there isn’t one.'],
+['Ruth Okonkwo',47,24,'A','tablet','mid',['automatic','parking','marking'],['faultsUnclear'],['replay','trends'],'keep','The marking chip pops up and then disappears before I have read it.'],
+['Matteo Romano',26,13,'M','laptop','mid',['roundabouts','hud','views'],['laneLate'],['voice'],'keep','The lane picture before the roundabout is the clearest thing on screen.'],
+['Imogen Clarke',17,6,'M','phone','early',['theory','puzzles'],['noCloud'],['cloud'],'keep','I mostly do the quizzes. The Who goes first? one tricked me twice.'],
+['Yusuf Demir',32,20,'M','desktop','convert',['mocks','junctions'],['notMyTown','noManual'],['towns','manual'],'maybe','I took my test in Turkey, now I need a UK one in Norwich. Practice layouts help, the Cambridge routes less so.'],
+['Charlotte Hughes',23,32,'A','laptop','ready',['mocks','marking','look'],['laneLate'],['instructor'],'keep','I did all five mock routes the week before my test and I passed. I can’t say it was the app, but it helped my nerves.'],
+['Ethan Moore',20,16,'M','laptop','mid',['faster','junctions'],['steerSens'],['wheel'],'maybe','Corners felt impossible until I found the sensitivity setting was at 0.6. Back at 1.0 it was fine.'],
+['Leila Haddad',27,8,'A','phone','early',['automatic','touch','hud'],['touchSteer'],['voice'],'keep','Big controls at 300% is the only way it works on my small phone.'],
+['George Wilson',61,18,'A','desktop','mid',['basics','code','views'],['hudIcons'],['voice','trends'],'keep','I am learning after my wife stopped driving. I like the driver’s-seat view and the slow pace.'],
+['Amelia Foster',18,27,'M','laptop','ready',['mocks','roundabouts'],['noManual','faultsUnclear'],['manual','replay'],'maybe','I’m two weeks from my test. It’s useful for routes, not for my actual weak point, which is hill starts.'],
+['Noah Bennett',22,5,'A','tablet','early',['automatic','puzzles'],['touchSteer'],['wheel'],'keep','The puzzles are like a game, which is the only reason I open it every day.'],
+['Sana Iqbal',35,23,'A','laptop','mid',['sharing','parking','marking'],['trafficOdd'],['manoeuvres'],'keep','I want parallel parking. That is the manoeuvre I lose sleep over.'],
+['Finn O’Connell',19,14,'M','phone','mid',['roundabouts','touch'],['touchSteer','noCloud'],['cloud'],'maybe','Portrait was the right call. I lost all my stars when I cleared my browser.'],
+['Olivia Reed',24,38,'M','desktop','retake',['mocks','marking','look'],['faultsUnclear'],['replay','instructor'],'keep','I failed for not checking my mirrors enough. This marks that, which nothing else does.'],
+['Dev Chauhan',21,11,'M','laptop','mid',['junctions','puzzles'],['noManual'],['manual'],'keep','Choosing your lane is the lesson I needed. My instructor keeps telling me I drift.'],
+['Molly Evans',17,1,'M','phone','early',['basics','profiles','cars'],['hudIcons'],['voice'],'maybe','I’ve had one lesson. Cockpit drill was good, the rest was too much for now.'],
+['Kai Wong',29,22,'A','laptop','mid',['faster','roundabouts','views'],['trafficOdd'],['weather'],'keep','Everything is daytime and dry. My lessons are at 6pm in October.'],
+['Bethany Shaw',20,19,'M','tablet','mid',['sharing','theory'],['noManual','touchSteer'],['manual','hazard'],'maybe','The zebra crossing lesson is good. On a tablet I miss the clutch control feel completely.'],
+['Ibrahim Yusuf',40,9,'A','desktop','convert',['code','roundabouts','junctions'],['notMyTown'],['towns'],'keep','I would pay if it had Luton.'],
+['Freya Lawson',18,24,'M','laptop','ready',['mocks','hud','marking'],['laneLate'],['voice','satnav'],'keep','For independent driving they’ll say follow the signs to somewhere. I want that here.'],
+['Ahmed Karim',23,13,'M','phone','mid',['puzzles','touch'],['touchSteer'],['leader'],'keep','I play the puzzles like a mobile game on my lunch break.'],
+['Sophie Turner',26,7,'A','laptop','early',['automatic','basics','marking'],['faultsUnclear'],['trends'],'keep','I like that it never shouts at me, it just marks it.'],
+['Patrick Byrne',19,29,'M','laptop','ready',['mocks','faster'],['noManual','laneLate'],['manual','towns'],'maybe','Cambridge mocks are good. I would like the actual test-centre start.'],
+['Ayesha Siddiqui',31,15,'A','tablet','mid',['parking','automatic','views'],['touchSteer'],['manoeuvres'],'keep','Leaving a bay safely is something my instructor never got round to teaching.'],
+['Rory MacLeod',22,17,'M','desktop','mid',['roundabouts','views','cars'],['notRealFeel'],['wheel','manual'],'maybe','It is a training tool, not a driving game. The car feels floaty compared to sim racers.'],
+['Hira Malik',20,10,'A','phone','early',['theory','touch','profiles'],['noCloud'],['cloud'],'keep','I share my phone’s profile with my sister and we each have our own learner. That bit is nice.'],
+['William Parker',55,26,'M','desktop','retake',['mocks','marking','code'],['faultsUnclear'],['replay'],'keep','Second attempt for me. It confirms the faults I already suspected.'],
+['Jade Thompson',18,12,'M','laptop','mid',['sharing','junctions'],['noManual'],['manual','hazard'],'keep','The cyclist gap check is brilliant, Cambridge is full of bikes.'],
+['Luca Bianchi',24,6,'A','laptop','convert',['code','roundabouts'],['hudIcons'],['voice'],'keep','Italian licence. The roundabout direction is the thing my brain fights.'],
+['Hassan Ali',27,31,'A','laptop','ready',['mocks','roundabouts','look'],['laneLate'],['instructor'],'keep','Elizabeth Way roundabout lane was wrong every time until I moved over much earlier.'],
+['Rebecca Stone',36,11,'A','desktop','mid',['marking','automatic','code'],['faultsUnclear'],['trends','replay'],'keep','I teach, so I like a clear marking scheme. This one mirrors the DL25 sheet closely.'],
+['Callum Fraser',20,20,'M','laptop','mid',['faster','puzzles'],['steerSens','noManual'],['manual'],'maybe','I couldn’t get round the interchange slip until someone told me to reset steering to 1.0.'],
+['Niamh Kelly',23,16,'M','tablet','mid',['sharing','roundabouts'],['touchSteer'],['wheel'],'keep','Pedestrian crossings with people actually walking out make me look properly.'],
+['Tariq Javed',19,4,'M','phone','early',['cars','puzzles'],['noManual','touchSteer'],['leader','manual'],'drop','Bit slow for me. I want more of a game.'],
+['Laura Fischer',33,21,'A','laptop','convert',['code','theory','junctions'],['notRealFeel'],['hazard'],'keep','The show me, tell me quiz is the only revision I needed for those questions.'],
+['Alfie Brown',18,10,'M','laptop','mid',['puzzles','junctions','profiles'],['noCloud'],['cloud','leader'],'keep','Level 7 now. I’d like it on my phone as well.'],
+['Shreya Iyer',25,14,'A','phone','mid',['hud','touch','automatic'],['touchSteer'],['voice'],'keep','Less text is better while I am driving. I want it read to me instead.'],
+['Daniel Fisher',44,6,'M','desktop','early',['basics','views'],['noManual','notRealFeel'],['manual','wheel'],'maybe','My son is learning too. We both use it on the family computer with separate learners.'],
+['Ella Green',17,13,'M','phone','mid',['theory','sharing'],['hudIcons'],['hazard','cloud'],'keep','I like the quizzes more than the drives on my phone.'],
+['Mohammed Saleh',30,25,'A','laptop','ready',['mocks','marking'],['laneLate','trafficOdd'],['towns'],'keep','The Mill Road route is narrow and realistic. Good test of my nerves.'],
+['Katie Morgan',21,18,'M','laptop','mid',['roundabouts','faster','marking'],['noManual'],['manual'],'keep','Country lane at 60 taught me I go into bends too fast.'],
+['Samuel Osei',24,3,'A','tablet','early',['automatic','basics'],['hudIcons','touchSteer'],['voice'],'maybe','I did not know what some icons meant until I tapped around.'],
+['Poppy Hall',18,20,'M','phone','mid',['puzzles','touch','profiles'],['noCloud','touchSteer'],['cloud','leader'],'keep','Stars and levels keep me coming back. Losing them would make me quit.'],
+['Victor Lindqvist',29,12,'A','desktop','convert',['code','roundabouts','views'],['notMyTown'],['towns','weather'],'keep','Swedish licence. I would like a rainy version, that is what UK driving is.'],
+['Zoe Adams',20,23,'M','laptop','mid',['parking','marking'],['noManual'],['manoeuvres'],'keep','Bay parking is good. I need the other manoeuvres from the test as well.'],
+['Owen Davies',22,33,'M','desktop','ready',['mocks','marking','faster'],['faultsUnclear'],['replay','voice'],'keep','I want to know why it called something a serious fault, in plain words.'],
+['Ananya Rao',19,9,'A','phone','early',['theory','automatic','touch'],['touchSteer'],['cloud'],'keep','I switch between my phone and the college computers.'],
+['Jack Robinson',17,5,'M','laptop','early',['cars','puzzles'],['noManual'],['manual'],'drop','My dad says it won’t help me with gears, so I stopped.'],
+['Elif Yilmaz',26,15,'A','laptop','mid',['sharing','junctions','hud'],['trafficOdd'],['weather'],'keep','The Pedestrian light crossing lesson showed me how long people take to cross.'],
+['Martin Kerr',58,19,'A','desktop','mid',['code','basics','marking'],['hudIcons','faultsUnclear'],['voice','trends'],'keep','Clear sheet at the end. I would like it to tell me which lesson to do next.'],
+['Rosie Allen',19,28,'M','laptop','ready',['mocks','roundabouts'],['laneLate'],['satnav'],'keep','I am practising the roundabouts on the actual routes the night before lessons.'],
+['Kofi Asante',23,12,'M','phone','mid',['touch','roundabouts'],['touchSteer','noManual'],['wheel','manual'],'maybe','Fine for learning where to look. Not for learning to steer.'],
+['Abigail Young',20,17,'A','tablet','mid',['parking','views','automatic'],['touchSteer'],['manoeuvres'],'keep','Overhead view while reversing is cheating a bit, but it teaches me where the lines are.'],
+['Rahul Gupta',27,0,'A','laptop','convert',['code','roundabouts','junctions'],['noHazard'],['hazard'],'keep','Before my first UK lesson I wanted to know the rules. This was cheaper than a lesson.'],
+['Erin Walsh',18,11,'M','laptop','mid',['puzzles','sharing'],['noCloud'],['cloud'],'keep','I would make an account just so I don’t lose my stars.'],
+['Thomas Hart',21,36,'M','desktop','retake',['mocks','marking','look'],['laneLate','faultsUnclear'],['replay','instructor'],'keep','My instructor wants to see what I do on my own. Right now I have to show her the screen.'],
+['Maryam Shah',32,10,'A','phone','early',['automatic','touch','theory'],['touchSteer'],['voice'],'keep','I use the quizzes while my baby sleeps and drive when I have both hands.'],
+['Leo Mitchell',17,14,'M','laptop','mid',['puzzles','faster','cars'],['noManual'],['leader','manual'],'keep','The motorway interchange is the best puzzle. More of those please.'],
+['Ines Duarte',28,8,'A','laptop','convert',['code','theory'],['hudIcons'],['hazard'],'maybe','Portuguese licence. I mostly need theory and hazard perception right now.'],
+['Scott Henderson',24,22,'M','desktop','mid',['views','faster','roundabouts'],['notRealFeel','noManual'],['wheel','manual'],'maybe','With a wheel and a clutch pedal this would replace some lessons. Without it, it supplements them.'],
+['Tilly Barker',18,26,'M','phone','ready',['mocks','touch'],['touchSteer','noCloud'],['cloud','instructor'],'maybe','I can’t practise mocks on my phone properly, the turns are too fiddly.'],
+['Bilal Rehman',22,18,'A','laptop','mid',['junctions','marking','look'],['faultsUnclear'],['replay'],'keep','Right turn at lights is my problem. Doing it twenty times here helped.'],
+['Grace O’Neill',43,13,'A','tablet','mid',['parking','automatic','code'],['hudIcons'],['manoeuvres','voice'],'keep','Calm, no adverts, no pressure. I like it.'],
+['Max Edwards',19,7,'M','laptop','early',['cars','views'],['noManual','steerSens'],['manual'],'drop','I set steering low because it felt twitchy, then I couldn’t turn at all and gave up.'],
+['Rachel Cohen',25,20,'A','laptop','mid',['roundabouts','sharing','marking'],['trafficOdd'],['trends'],'keep','The Dutch roundabout and cyclists lessons feel very Cambridge.'],
+['Adam Novak',30,24,'M','desktop','ready',['mocks','faster','marking'],['laneLate'],['towns','satnav'],'keep','Would love the Cambridge test centre start and a sat-nav section.'],
+['Hamza Qureshi',26,16,'A','laptop','convert',['roundabouts','junctions','code'],['notRealFeel'],['towns'],'keep','Pakistan to UK. Lane discipline is the big change and the lane-choice lesson is good for that.'],
+['Ruby Simmons',20,21,'M','tablet','mid',['sharing','parking'],['noManual','touchSteer'],['manoeuvres','manual'],'maybe','Good for road rules, not for car control.'],
+['Nathan Price',23,30,'M','laptop','retake',['mocks','marking','roundabouts'],['laneLate'],['replay','instructor'],'keep','Failed on a roundabout lane. The two-lane lesson is literally my fault.'],
+['Chiara Russo',31,11,'A','desktop','mid',['automatic','views','hud'],['hudIcons'],['voice'],'keep','The driver view with the mirrors is closer to my real lessons than I expected.'],
+['Eleanor Pike',49,22,'A','laptop','ready',['mocks','marking','code'],['faultsUnclear'],['instructor','trends'],'keep','I’d like to print a summary for my instructor each week.']
+];
+const PAY='FOOMOFOOFFLOMFFOMLFOOOFMOFMOOFLOFFMFOLMOOFMOFOFFMFOFOFFLOOMLFOFOOOFFMOFOOOMFFOLMFOOOMOOFFFOLFOMOFMOL',REL='XNNWNNNNNNNWNNWNNNNXNNXNNWNXNXNWNXNWNNXNNNNNNNXNNNNWNXNNNNWNWNNNNNXNNXNNNNNNXNNNXNNNWNNNXNNNWNNNXNNN';
+const PAYL={F:'Free only',O:'One-off £5–10',M:'£5–10 a month while preparing for the test',L:'Lifetime about £25–30'},RELL={N:'Release now, add later',W:'Fix the unfair faults first',X:'Wait for a manual gearbox'};
+const LBL=k=>F[k][0];
+const count=(field,keys)=>keys.map(k=>[k,recs.filter(r=>r[field].includes(k)).length]).sort((a,b)=>b[1]-a[1]);
+const pct=n=>Math.round(n/R.length*100);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const recs=R.map(([name,age,hrs,trans,dev,stage,likes,pains,asks,verdict,quote],i)=>({name,age,hrs,trans,dev,stage,likes,pains,asks,verdict,quote,pay:PAY[i],rel:REL[i]}));
+// strip
+const v=k=>recs.filter(r=>r.verdict===k).length;
+const avgH=Math.round(recs.reduce((a,r)=>a+r.hrs,0)/recs.length);
+$('strip').innerHTML=[[recs.length,'learners on the panel'],[avgH+' hrs','average lessons so far'],[v('keep'),'would keep using it'],[v('drop'),'would stop']].map(([b,s])=>`<div><b class="mono">${b}</b><span class="muted" style="font-size:.85rem">${s}</span></div>`).join('');
+// mix bars
+const COLS=['var(--sign)','var(--amber)','var(--lplate)','var(--muted)','var(--ink)'];
+function mix(title,keys,labels,get){const cs=keys.map(k=>recs.filter(r=>get(r)===k).length);return `<div><span class="eyebrow">${title}</span><div class="split">${cs.map((c,i)=>`<i style="width:${c}%;background:${COLS[i]}"></i>`).join('')}</div><div class="legend">${keys.map((k,i)=>`<span style="--c:${COLS[i]}">${labels[k]} <b class="mono">${cs[i]}</b></span>`).join('')}</div></div>`}
+$('mix').innerHTML=mix('Stage',Object.keys(STAGE),STAGE,r=>r.stage)+mix('Gearbox',['M','A'],{M:'Manual',A:'Automatic'},r=>r.trans)+mix('Main device',Object.keys(DEV),DEV,r=>r.dev)+mix('Verdict',['keep','maybe','drop'],{keep:'Keep using',maybe:'Maybe',drop:'Stop'},r=>r.verdict);
+const who=n=>{const r=recs.find(x=>x.name===n);return `${esc(n)}<small>${r.hrs} hrs · ${r.trans==='M'?'manual':'auto'} · ${DEV[r.dev].toLowerCase()}</small>`};
+$('moneyMix').innerHTML=mix('Release',['N','W','X'],RELL,r=>r.rel)+mix('Would pay',['F','O','M','L'],PAYL,r=>r.pay);
+{const payers=recs.filter(r=>r.pay!=='F').length,rd=recs.filter(r=>r.stage==='ready'||r.stage==='retake'),rdM=rd.filter(r=>r.pay==='M'||r.pay==='L').length,mW=recs.filter(r=>r.rel==='X'&&r.trans==='M').length;
+const ML=[['mod','Moderator','Release it now, or wait? And what would you pay, knowing a theory app is about £5 and a lesson is about £40?'],
+['Charlotte Hughes','Release it now. I would have paid for a month of mocks in the fortnight before my test, like those routes apps charge.'],
+['Joseph Adeyemi','£9.99 a month is what the routes apps ask, and they only show you a map. A month of this is worth a quarter of one lesson.'],
+['Lewis Campbell','Fix the steering setting before you put it in front of anyone. I nearly quit thinking I was a bad driver.'],
+['Hassan Ali','Same for the East Road lane. A free mock that fails you unfairly makes people distrust every result after it.'],
+['Jacob Turner','For manual learners in their first lessons, wait until there is a clutch. Otherwise we try it once and leave.'],
+['Imogen Clarke','Keep the quizzes and early lessons free. I’m seventeen, I won’t pay for those when the theory kits are £5.'],
+['Isabel Ward','I’d pay once, around £25, and never think about it again. I don’t want another subscription.'],
+['Ravi Patel','At my age a lifetime price is fine if my progress is saved to an account and doesn’t vanish with my browser.'],
+['Zara Ahmed','I’d pay monthly only if my instructor can see my results. That’s what makes it worth more than a theory app.'],
+['Ben Fletcher','Free for me or I’m gone. But I’d tell my mates about it, which is worth something.']];
+$('moneyRound').innerHTML=`<div class="topic"><span class="eyebrow">Topic 9 · release and price</span><h3>Should it go out now, and what is it worth?</h3></div>`+ML.map(l=>l[0]==='mod'?`<div class="say mod"><span class="who">${l[1]}</span><p>${esc(l[2])}</p></div>`:`<div class="say"><span class="who">${who(l[0])}</span><p>${esc(l[1])}</p></div>`).join('')+`<p class="take"><b>Takeaway.</b> ${recs.filter(r=>r.rel==='N').length} of 100 say release now and add features later, ${recs.filter(r=>r.rel==='W').length} want the unfair faults fixed first, and ${mW} manual learners would wait for a clutch. ${payers} would pay something. Test-ready and retake learners pay most: ${rdM} of ${rd.length} would pay monthly or lifetime. That suggests a free core with a paid test-prep pass priced against the routes apps, not against theory kits.</p>`;}
+{const y=r=>r.pay!=='F'||(r.verdict==='keep'&&(r.asks.includes('cloud')||r.likes.includes('puzzles')||r.likes.includes('profiles')));
+const at9=r=>r.pay==='M'||r.pay==='L'||(r.pay==='O'&&(r.stage==='ready'||r.stage==='retake'));
+const c399=recs.filter(y).length,c9=recs.filter(at9).length,c9g=recs.filter(r=>y(r)&&!at9(r)).length;
+const G={a:'Pay £3.99 now',b:'Free demos only'};
+$('planMix').innerHTML=mix('Your plan: £3.99 at launch',['a','b'],G,r=>y(r)?'a':'b')+mix('Later at £9',['k','g','n'],{k:'Would pay £9',g:'Stay only if kept at £3.99',n:'Free only'},r=>at9(r)?'k':y(r)?'g':'n');
+const PL=[['mod','Moderator','The plan: launch next week with the basic lessons as free demos, everything else £3.99, and £9 later. Fine?'],
+['Erin Walsh','£3.99 is less than a coffee and a pastry. If it keeps my stars across devices, yes.'],
+['Joseph Adeyemi','Cheaper than the routes apps. I’d pay it without thinking.'],
+['Imogen Clarke','Is £3.99 a month or once? Say it on the button. I hate finding out later.'],
+['Isabel Ward','If I pay £3.99 now and you raise it to £9, keep my price. Otherwise I feel tricked.'],
+['Charlotte Hughes','£9 a month is still fine in the fortnight before a test, as long as cancelling is one tap.'],
+['Hannah Price','If I pay and my progress is only in this browser, I want a refund the first time it disappears.'],
+['Jacob Turner','I wouldn’t pay for an automatic-only car when I learn in a manual. Tell people up front.'],
+['Lewis Campbell','Don’t charge until the steering thing is fixed. Paying for a bug feels worse than hitting it free.'],
+['Ben Fletcher','Free demos are enough for me. Make them good enough that I show my mates.']];
+$('planRound').innerHTML=`<div class="topic"><span class="eyebrow">Topic 10 · your launch plan</span><h3>£3.99 next week, £9 later</h3></div>`+PL.map(l=>l[0]==='mod'?`<div class="say mod"><span class="who">${l[1]}</span><p>${esc(l[2])}</p></div>`:`<div class="say"><span class="who">${who(l[0])}</span><p>${esc(l[1])}</p></div>`).join('')+`<p class="take"><b>Takeaway.</b> ${c399} of 100 would pay £3.99. At £9, ${c9} would pay, and ${c9g} more would stay only if their £3.99 price is kept. Conditions they set: say clearly if it is monthly or one-off, keep early buyers on their price, save progress to an account before taking money, fix the steering and East Road faults first, and say it is automatic-only.</p>`;}
+{const PRO=['voice','instructor','manual','towns','replay','wheel','trends','satnav'];
+const tier=r=>r.pay==='F'?(r.verdict==='keep'&&(r.asks.includes('cloud')||r.likes.includes('puzzles'))?'s':'f'):((r.pay==='M'||r.pay==='L')&&r.asks.filter(k=>PRO.includes(k)).length>=1?'p':'s');
+const n=k=>recs.filter(r=>tier(r)===k).length;
+$('tierMix').innerHTML=mix('Which tier they would pick',['f','s','p'],{f:'Free demo',s:'Standard £4.99',p:'Pro Plus £9'},tier);
+const TL=[['mod','Moderator','Two tiers: Standard at £4.99 a month, and Pro Plus at £9 later with the extra features. Which would you take?'],
+['Imogen Clarke','Standard. £4.99 is the same as the theory subscriptions, and this does more.'],
+['Kwame Mensah','Pro Plus the day the examiner voice arrives. That is the bit I can’t get anywhere else.'],
+['Thomas Hart','Pro Plus if my instructor can see my drives. She’d probably recommend it to her other students.'],
+['Scott Henderson','Pro Plus only once the manual gearbox is real. Don’t sell it before it exists.'],
+['Charlotte Hughes','Standard for a month or two before my test, then cancel. Make cancelling easy and I’ll recommend it.'],
+['Ben Fletcher','Free demo. Make it fun enough that people share it.'],
+['Rebecca Stone','Offer instructors a way to give students a discount code. That’s how learners will find it.']];
+$('tierRound').innerHTML=`<div class="topic"><span class="eyebrow">Topic 11 · two tiers</span><h3>Standard £4.99, Pro Plus £9</h3></div>`+TL.map(l=>l[0]==='mod'?`<div class="say mod"><span class="who">${l[1]}</span><p>${esc(l[2])}</p></div>`:`<div class="say"><span class="who">${who(l[0])}</span><p>${esc(l[1])}</p></div>`).join('')+`<p class="take"><b>Takeaway.</b> ${n('s')} would take Standard, ${n('p')} would move to Pro Plus once its features exist, and ${n('f')} would stay on the free demo. Pro Plus sells on features no other app has (examiner voice, instructor sharing, manual gearbox), so launch it when those ship, not before.</p>`;}
+// ranks
+function rank(el,rows,labelFn,color,note){const max=Math.max(...rows.map(r=>r[1]));$(el).innerHTML=rows.map(([k,n],i)=>`<div class="row"><span class="n">${String(i+1).padStart(2,'0')}</span><div class="lab"><span>${esc(labelFn(k))}${note?`<small> · ${note(k)}</small>`:''}</span><div class="bar"><i style="width:${n/max*100}%;--c:${color}"></i></div></div><span class="v mono">${n}</span></div>`).join('')}
+rank('likes',count('likes',Object.keys(F)).slice(0,8),LBL,'var(--sign)');
+rank('pains',count('pains',Object.keys(P)).slice(0,8),k=>P[k],'var(--lplate)');
+const manualAskers=k=>{const rs=recs.filter(r=>r.asks.includes(k));const m=rs.filter(r=>r.trans==='M').length;return `${m} manual, ${rs.length-m} automatic`};
+rank('asks',count('asks',Object.keys(A)).slice(0,8),k=>A[k],'var(--amber)',manualAskers);
+// every feature, rated by everyone
+const TIER={basics:'Free',theory:'Free',puzzles:'Free',code:'Free',views:'Free',hud:'Free',touch:'Free',look:'Free',junctions:'Standard',roundabouts:'Standard',sharing:'Standard',faster:'Standard',parking:'Standard',automatic:'Standard',mocks:'Standard',marking:'Standard',profiles:'Free',cars:'Standard',cloud:'Standard',manoeuvres:'Standard',towns:'Standard',voice:'Pro Plus',satnav:'Pro Plus',replay:'Pro Plus',trends:'Pro Plus',instructor:'Pro Plus',manual:'Pro Plus',wheel:'Pro Plus',hazard:'Pro Plus',weather:'Pro Plus',leader:'Free'};
+const ALL=[...Object.keys(F).map(k=>({k,now:1,name:F[k][0]})),...Object.keys(A).map(k=>({k,now:0,name:A[k]}))];
+const st=(r,...x)=>x.includes(r.stage), young=r=>r.age<=22;
+function rate(r,k,now){ // 2 must, 1 nice, 0 wouldn't use
+  if(now?r.likes.includes(k):r.asks.includes(k)) return 2;
+  let v;switch(k){
+  case'basics':v=st(r,'early')?2:st(r,'mid','convert')?1:0;break;
+  case'junctions':v=st(r,'mid','convert')?2:1;break;
+  case'roundabouts':v=st(r,'early')?1:2;break;
+  case'sharing':v=st(r,'mid')?2:1;break;
+  case'faster':v=st(r,'early')?0:1;break;
+  case'parking':v=st(r,'early','convert')?0:1;break;
+  case'theory':v=st(r,'early','convert')?2:st(r,'mid')?1:0;break;
+  case'automatic':v=r.trans==='A'?(st(r,'early','mid')?2:1):0;break;
+  case'puzzles':v=young(r)?1:0;break;
+  case'mocks':v=st(r,'ready','retake')?2:st(r,'early')?0:1;break;
+  case'marking':v=st(r,'ready','retake','mid')?2:1;break;
+  case'profiles':v=young(r)?1:0;break;
+  case'cars':v=young(r)?1:0;break;
+  case'views':case'hud':v=1;break;
+  case'touch':v=r.dev==='phone'||r.dev==='tablet'?2:0;break;
+  case'look':v=st(r,'ready','retake')?2:1;break;
+  case'code':v=st(r,'convert')?2:1;break;
+  case'manual':v=r.trans==='M'?(st(r,'early','mid')?2:1):0;break;
+  case'voice':v=st(r,'ready','retake')?2:1;break;
+  case'cloud':v=r.pains.includes('noCloud')?2:r.dev==='phone'||r.dev==='tablet'?1:r.verdict==='keep'?1:0;break;
+  case'instructor':v=st(r,'ready','retake')?1:0;break;
+  case'manoeuvres':v=st(r,'mid','ready','retake')?1:0;break;
+  case'towns':v=r.pains.includes('notMyTown')?2:st(r,'ready','retake','convert')?1:0;break;
+  case'hazard':v=st(r,'early','convert')?1:0;break;
+  case'weather':v=st(r,'mid','ready')?1:0;break;
+  case'trends':v=r.verdict==='keep'&&!st(r,'early')?1:0;break;
+  case'wheel':v=r.dev==='desktop'?1:0;break;
+  case'replay':v=st(r,'ready','retake','mid')?1:0;break;
+  case'satnav':v=st(r,'ready','retake')?1:0;break;
+  case'leader':v=r.age<=19?1:0;break;
+  default:v=0}
+  if(r.verdict==='drop'&&v===1&&!now) v=0;
+  return v;
+}
+recs.forEach(r=>{r.rate={};ALL.forEach(f=>r.rate[f.k]=rate(r,f.k,f.now))});
+$('sSeg').querySelector('optgroup[label="Stage"]').innerHTML=Object.entries(STAGE).map(([k,v])=>`<option value="s:${k}">${v}</option>`).join('');
+$('sSeg').querySelector('optgroup[label="Device"]').innerHTML=Object.entries(DEV).map(([k,v])=>`<option value="d:${k}">${v}</option>`).join('');
+function drawRank(){const seg=$('sSeg').value,kind=$('sKind').value;
+ const grp=recs.filter(r=>!seg||(seg[0]==='s'?r.stage:seg[0]==='t'?r.trans:r.dev)===seg.slice(2));const N=grp.length;
+ const rows=ALL.filter(f=>!kind||(kind==='now')===!!f.now).map(f=>{const m=grp.filter(r=>r.rate[f.k]===2).length,n=grp.filter(r=>r.rate[f.k]===1).length;return {...f,m,n,o:N-m-n}}).sort((a,b)=>b.m-a.m||b.n-a.n);
+ $('sCount').textContent=`${N} learner${N===1?'':'s'} · ${rows.length} features`;
+ $('frank').innerHTML=rows.map(f=>`<div class="fr"><div class="nm">${esc(f.name)}<small>${f.now?'In the app':'<b>Planned</b>'} · ${TIER[f.k]}</small></div><div class="split" role="img" aria-label="${f.m} must have, ${f.n} nice to have, ${f.o} wouldn't use"><i style="width:${f.m/N*100}%;background:var(--sign)"></i><i style="width:${f.n/N*100}%;background:var(--amber)"></i></div><span class="v mono">${Math.round(f.m/N*100)}%<small>must have</small></span></div>`).join('');}
+['sSeg','sKind'].forEach(id=>$(id).addEventListener('input',drawRank));drawRank();
+// transcript
+const ROUNDS=[
+ {t:'First impressions',lines:[
+  ['mod','Moderator','You have all had real lessons. What did you do first in the app, and did it make sense?'],
+  ['Molly Evans','Cockpit drill first because it was lesson one. Then the lobby showed me forty-odd things and I froze a bit.'],
+  ['Ravi Patel','I liked that it picks a recommended lesson for you. I just pressed start each time.'],
+  ['Samuel Osei','The signs instead of text looked clean, but I had to tap around to learn what the badges meant.'],
+  ['Isabel Ward','Same. A one-line hint the first time you see each icon would fix it for me.'],
+  ['Tom Whitaker','I went straight to cars and puzzles. Nobody reads the menu at seventeen.']],
+  take:'The recommended-next-lesson path works. First-time icon meaning is the most common early stumble.'},
+ {t:'Lessons versus what my instructor teaches',lines:[
+  ['mod','Moderator','Does the course line up with what you do in the car?'],
+  ['Dev Chauhan','Choosing your lane is exactly what my instructor nags me about. It’s the most useful lesson for me.'],
+  ['Jacob Turner','My lessons are all clutch control right now. There is no clutch here, so it skipped my actual problem.'],
+  ['Grace Liu','For automatic learners it matches nicely. P, R, N, D and creeping in reverse are the same as my car.'],
+  ['Amelia Foster','Hill starts and stalling are where I lose marks. Those are missing.'],
+  ['Sana Iqbal','Bay parking is covered. Parallel parking and pulling up on the right are on the test and not here yet.'],
+  ['Rebecca Stone','The theory unit with show me, tell me is a nice touch. It’s on the real test and nobody else drills it.']],
+  take:'The panel splits by gearbox. Automatic learners say the course matches their car. Manual learners in their first 10 hours find their main weakness missing.'},
+ {t:'Roundabouts and lanes',lines:[
+  ['mod','Moderator','Roundabouts came up a lot. What helped, and what didn’t?'],
+  ['Priya Nair','The two-lane roundabout lesson and the lane picture in the corner. That’s when it clicked.'],
+  ['Nathan Price','I failed my test on a roundabout lane. This lesson is literally my fault from that day.'],
+  ['Daniel Okafor','East Road into Elizabeth Way kept failing me for the wrong lane. The right lane only appears right at the end.'],
+  ['Hassan Ali','Same spot. I only passed it by moving over far earlier than the arrows told me to.'],
+  ['Chloe Martin','The Dutch roundabout puzzle is very Cambridge. I saw the real one on Fendon Road a week later.'],
+  ['Harry Doyle','One time a car stopped dead on the roundabout and it was my fault. It’s better than the last version though.']],
+  take:'Roundabouts are the strongest teaching content. The late-appearing East Road lane is the one place the app itself causes a fault.'},
+ {t:'Mock tests on real Cambridge roads',lines:[
+  ['mod','Moderator','Five mock routes on real Cambridge streets. Useful?'],
+  ['Joseph Adeyemi','More useful than any test-route video. You make the decisions yourself.'],
+  ['Charlotte Hughes','I did all five the week before my test and passed. My nerves were much better.'],
+  ['Jamal Hussain','My test is in Peterborough. For me the Cambridge routes are just extra practice.'],
+  ['Adam Novak','I want the start to be the real test centre, and a sat-nav section like the actual test.'],
+  ['Kwame Mensah','On the real test someone talks to you. Reading arrows on screen is a different skill.'],
+  ['Mohammed Saleh','Mill Road is narrow and full of parked cars, so it really tests my nerves. Good.']],
+  take:'Mock tests are the main reason test-ready learners return. Spoken directions, sat-nav driving and other towns are what they ask for next.'},
+ {t:'Marking sheet and fairness',lines:[
+  ['mod','Moderator','How did the marking feel?'],
+  ['Olivia Reed','It marks not checking mirrors. That’s exactly what I failed for, and no other app catches it.'],
+  ['Emily Sanderson','The look-round button feels annoying until you realise it’s right.'],
+  ['Ruth Okonkwo','The fault chip disappears before I’ve read it. I want to tap and keep it open.'],
+  ['Owen Davies','Tell me in plain words why something was serious rather than driving.'],
+  ['Sofia Esposito','The map pin shows where it happened. A short replay of that moment would be perfect.'],
+  ['Rebecca Stone','It follows the DL25 layout well. Driving, serious, dangerous. Learners will recognise it from their instructor.']],
+  take:'The marking is trusted. Learners want more explanation of each fault and a way to see the moment again.'},
+ {t:'Phones, tablets and controls',lines:[
+  ['mod','Moderator','About one in five of you drove mostly on a phone. How was it?'],
+  ['Leila Haddad','300% controls make it usable on my small phone. Without that I’d have quit.'],
+  ['Fatima Al-Sayed','Portrait one-handed on the train is great for puzzles and quizzes.'],
+  ['Kofi Asante','Fine for learning where to look. Not for learning to steer.'],
+  ['Lewis Campbell','I turned steering sensitivity down to feel calmer and then couldn’t make the left into Hills Road at all.'],
+  ['Ethan Moore','Same thing. I only fixed it when someone said to put it back to 1.0.'],
+  ['Connor Reilly','On desktop, give me wheel and pedal support and I’m on it every night.']],
+  take:'Phones work for quizzes, puzzles and route learning. The low steering setting stopping tight turns caused some learners to give up.'},
+ {t:'Progress, profiles and accounts',lines:[
+  ['mod','Moderator','Your progress is saved in the browser right now. Does that matter?'],
+  ['Hannah Price','I do it on the bus, then at home my level is back to 1. That’s the biggest annoyance.'],
+  ['Finn O’Connell','I cleared my browser and lost all my stars.'],
+  ['Hira Malik','I like that my sister and I each have a learner on the same phone, though.'],
+  ['Erin Walsh','I’d make an account just to keep my stars.'],
+  ['Zara Ahmed','And let my instructor see my mock results without screenshots.'],
+  ['Isabel Ward','A page that shows if I’m getting better week to week. That’s what I’d sign up for.']],
+  take:'Accounts are wanted for keeping progress and sharing it with an instructor, not as a login wall. This matches the paused cloud-save work.'},
+ {t:'If you could add one thing',lines:[
+  ['mod','Moderator','One addition each. Quickly.'],
+  ['Scott Henderson','Manual gearbox with a clutch pedal.'],
+  ['Kwame Mensah','The examiner’s voice.'],
+  ['Anna Petrova','Hazard perception clips.'],
+  ['Kai Wong','Night and rain. My lessons are in the dark.'],
+  ['Sana Iqbal','Parallel parking.'],
+  ['Ben Fletcher','A leaderboard so I can beat my mates.'],
+  ['Thomas Hart','Send my results to my instructor.']],
+  take:'Requests fall into four groups: car control (manual gearbox, controllers), realism (voice, weather), test coverage (manoeuvres, towns, hazard perception) and staying connected (cloud save, instructor sharing).'}
+];
+$('rounds').innerHTML=ROUNDS.map((r,i)=>`<div class="round"><div class="topic"><span class="eyebrow">Topic ${i+1} of ${ROUNDS.length}</span><h3>${esc(r.t)}</h3></div>${r.lines.map(l=>l[0]==='mod'?`<div class="say mod"><span class="who">${l[1]}</span><p>${esc(l[2])}</p></div>`:`<div class="say"><span class="who">${who(l[0])}</span><p>${esc(l[1])}</p></div>`).join('')}<p class="take"><b>Takeaway.</b> ${esc(r.take)}</p></div>`).join('');
+// next steps, numbers live
+const cP=k=>recs.filter(r=>r.pains.includes(k)).length, cA=k=>recs.filter(r=>r.asks.includes(k)).length;
+const manDrop=recs.filter(r=>r.trans==='M'&&r.verdict!=='keep').length, man=recs.filter(r=>r.trans==='M').length;
+const steerDrop=recs.filter(r=>r.pains.includes('steerSens')&&r.verdict!=='keep').length;
+const NEXT=[
+ [`Fix the steering setting first.`,`Only ${cP('steerSens')} learners hit it, but ${steerDrop} of them would not keep using the app, and they blamed themselves. Make the setting change how quickly the wheel responds, not how far it can turn. This is a small code change.`],
+ [`Fix the East Road lane guidance.`,`${cP('laneLate')} learners were marked for the wrong lane at Elizabeth Way. Start the lane drift and arrows on the earlier stretch so the right-hand lane is reachable.`],
+ [`Ship accounts with cloud save and instructor sharing.`,`${cA('cloud')} asked for cloud save and ${cA('instructor')} want to share progress with an instructor. Keep guest play. Frame sign-up as "keep your stars and share with your instructor".`],
+ [`Decide on manual.`,`${man} of the 100 are manual learners and ${manDrop} of them are unsure or would stop. ${cA('manual')} asked for a clutch. A simplified clutch with a biting point and stalling would cover the first ten hours, which is where the drop-off is.`],
+ [`Add spoken directions, then a sat-nav section to mock tests.`,`${cA('voice')} asked for the examiner's voice. It suits the sign-first HUD and helps phone learners, who can't read much while steering.`],
+ [`Explain each fault and keep it open.`,`${cP('faultsUnclear')} were unsure why a fault was given. Let the marking chip stay open on tap, add one plain-English line on why, and offer a short replay later.`],
+ [`Release the free core now, after fixes 1 and 2.`,`Charge for a test-prep pass rather than the basics. Learners compare it with route apps at $9.99 a month or $35–40 a year, not £5 theory kits. A starting point to test: about £6.99 a month or £24.99 lifetime, with cloud save and instructor sharing included, and payments taken on the server.`],
+ [`Extend test coverage.`,`Parallel park, pull up on the right and the reversing manoeuvres (${cA('manoeuvres')} asks), hazard perception (${cA('hazard')}), and test-centre starts and other towns (${cA('towns')}).`]
+];
+$('nextList').innerHTML=NEXT.map(([h,t])=>`<li><b>${h}</b> ${esc(t)}</li>`).join('');
+// roster
+$('fStage').insertAdjacentHTML('beforeend',Object.entries(STAGE).map(([k,v])=>`<option value="${k}">${v}</option>`).join(''));
+$('fDev').insertAdjacentHTML('beforeend',Object.entries(DEV).map(([k,v])=>`<option value="${k}">${v}</option>`).join(''));
+const VL={keep:'Keep using',maybe:'Maybe',drop:'Would stop'};
+function draw(){const s=$('fStage').value,t=$('fTrans').value,d=$('fDev').value,vd=$('fVerdict').value,q=$('fText').value.trim().toLowerCase();
+ const list=recs.filter(r=>(!s||r.stage===s)&&(!t||r.trans===t)&&(!d||r.dev===d)&&(!vd||r.verdict===vd)&&(!q||(r.name+' '+r.quote+' '+r.likes.map(LBL).join(' ')+' '+r.pains.map(k=>P[k]).join(' ')+' '+r.asks.map(k=>A[k]).join(' ')).toLowerCase().includes(q)));
+ $('shown').textContent=`${list.length} of ${recs.length}`;
+ $('cards').innerHTML=list.length?list.map(r=>`<article class="card"><div class="top"><span class="nm">${esc(r.name)}</span><span class="pill ${r.verdict}">${VL[r.verdict]}</span></div><span class="meta">${r.age} · ${r.hrs} hrs lessons · ${r.trans==='M'?'manual':'automatic'} · ${DEV[r.dev].toLowerCase()} · ${STAGE[r.stage].toLowerCase()}</span><q>${esc(r.quote)}</q><span class="meta">Must haves: ${ALL.filter(f=>r.rate[f.k]===2).map(f=>f.name.split(/[,(]/)[0].trim().toLowerCase()).slice(0,6).join(' · ')}</span><span class="meta">Release: ${RELL[r.rel].toLowerCase()} · Pay: ${PAYL[r.pay].toLowerCase()}</span><div class="tags">${r.likes.map(k=>`<span>${esc(LBL(k))}</span>`).join('')}${r.pains.map(k=>`<span class="p">${esc(P[k])}</span>`).join('')}</div></article>`).join(''):'<p class="muted">No learners match these filters. Clear a filter to see more.</p>'}
+['fStage','fTrans','fDev','fVerdict','fText'].forEach(id=>$(id).addEventListener('input',draw));
+draw();
+</script>
+
+</body>
+</html>
