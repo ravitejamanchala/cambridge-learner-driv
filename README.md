@@ -1,4 +1,4 @@
-# Cambridge Learner Drive
+# Learner Drive
 
 A 3D mock UK driving test that runs in the browser on Cambridge's real road network.
 
@@ -38,7 +38,7 @@ The first development batch adds cockpit preparation, engine start/stop, explici
 
 ## Demo build
 
-For demos the Info screen is removed (its markup is kept in `info-sheet.release.html` for the release version) and the code is shipped as one minified file:
+The static build ships the application as one minified file. Map attribution is accessible from Settings → Credits:
 
 ```sh
 npm ci
@@ -58,3 +58,5 @@ python3 tools/publish_pages.py
 This runs checks/build, pushes the built assets to `gh-pages`, and uses the existing `gh` authentication to enable branch-based Pages hosting. It does not switch your source checkout or overwrite `main`. Publishing requires Git push and GitHub Pages settings permissions; if the latter are unavailable, enable Pages in repository Settings → Pages using `gh-pages` and `/ (root)`. `release.json` identifies the published source commit and lesson count.
 
 The garage offers eight cars, including seven supplied models, and saves the selected car locally. Street pedestrians use four supplied civilian models with idle/walk animations and a primitive fallback. Traffic spawning checks the actual spawn position and keeps respawns away from the forward view. Bot runs accept and export replay seeds. See [traffic and model validation](docs/development/traffic-and-models.md) for conversion and remaining simulation defects.
+
+The blue, teal and pink interface is shared by the home screen, course, mock tests, puzzles, quizzes, settings, pause and results. Choose a car directly from the home carousel; the showroom turns gently and stops animating when a menu is open, during driving, in a hidden tab, or when reduced motion is enabled. See [theme and showroom notes](docs/development/theme-and-showroom.md).

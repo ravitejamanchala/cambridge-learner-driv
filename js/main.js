@@ -154,7 +154,7 @@ async function boot() {
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
 
-  const garage=createGarage({player,prefs,save:savePrefs,load:car=>loadCarModel(assetURL(car.url),car.supplied?{yaw:0,hide:null,maxWidth:1.8,wheel:mesh=>/Wheel/i.test(mesh.name)||/Wheel/i.test(mesh.parent?.name||'')}:{}).then(shadowed)});
+  const garage=createGarage({player,prefs,save:savePrefs,assetURL,load:car=>loadCarModel(assetURL(car.url),car.supplied?{yaw:0,hide:null,maxWidth:1.8,wheel:mesh=>/Wheel/i.test(mesh.name)||/Wheel/i.test(mesh.parent?.name||'')}:{}).then(shadowed)});
 
   // ---------- input ----------
   const key = { up: 0, down: 0, left: 0, right: 0 }, tch = { up: 0, down: 0, left: 0, right: 0 };
@@ -435,7 +435,7 @@ async function boot() {
     guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive && !plan?.lesson?.manoeuvre;
     if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }
     if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
-    renderer.render(scene, camera);
+    if(drive||botMode)renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
   }

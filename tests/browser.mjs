@@ -10,7 +10,7 @@ const server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.
 const url=`http://127.0.0.1:${port}`;
 let browser;
 try {
- for(let i=0;i<100;i++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ for(let i=0;i<100;i++){try{const response=await fetch(url);await response.arrayBuffer();if(response.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
  // Match the app's exact version. This functional test does not test public CDN availability.

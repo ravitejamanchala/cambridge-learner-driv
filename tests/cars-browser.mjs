@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url), three=path.dirname(require.resolve
 const root=path.resolve(process.env.TEST_SITE||'.'),port=8773,url=`http://127.0.0.1:${port}`;
 const server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1','--directory',root],{stdio:'ignore'});let browser;
 try{
- for(let i=0;i<100;i++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ for(let i=0;i<100;i++){try{const response=await fetch(url);await response.arrayBuffer();if(response.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));
@@ -16,24 +16,34 @@ try{
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
  await page.goto(url);await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
  await page.locator('#profName').fill('Car checks');await page.locator('#profForm').evaluate(f=>f.requestSubmit());
- await page.locator('[data-open="carSheet"]').first().click();
  for(const id of ['compact','hatchback','suv','sports','sports-2','taxi','police','rx7']){
-  await page.locator(`[data-car="${id}"]`).click();
+  await page.locator(`[data-home-car="${id}"]`).click();
   await page.waitForFunction(id=>window.cambridgeDrive.player.carId===id,id);
   const geometry=await page.evaluate(()=>{const p=window.cambridgeDrive.player,rotation=p.mesh.rotation.clone();p.mesh.rotation.set(0,0,0);p.mesh.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(p.mesh),size=box.getSize(new THREE.Vector3());p.mesh.rotation.copy(rotation);return {w:size.x,h:size.y,l:size.z,wheels:p.mesh.userData.wheels.length,front:p.mesh.userData.front.length};});
   assert.ok(geometry.w>1&&geometry.l>3&&geometry.h>.7,JSON.stringify({id,geometry}));assert.ok(geometry.wheels>0&&geometry.front>0,JSON.stringify({id,geometry}));
   console.log(id,JSON.stringify(geometry));
  }
- await page.locator('[data-car="suv"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='suv');
+ await page.locator('[data-home-car="suv"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='suv');
  await page.screenshot({path:'/tmp/car-picker-desktop.png'});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/car-picker-mobile.png'});
  await page.reload();await page.waitForFunction(()=>window.cambridgeDrive?.player.carId==='suv');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs')).car),'suv');
  // Failed model selection preserves the current car and offers retry.
- await page.route('**/models/Cop.glb*',r=>r.abort());await page.locator('[data-open="carSheet"]').first().click();await page.locator('[data-car="police"]').click();
- await page.waitForFunction(()=>document.querySelector('#carStatus').textContent.includes('Could not load'));
+ await page.route('**/models/Cop.glb*',r=>r.abort());await page.locator('[data-home-car="police"]').click();
+ await page.waitForFunction(()=>document.querySelector('#homeCarStatus').textContent.includes('Could not load'));
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.carId),'suv');
- await page.unroute('**/models/Cop.glb*');await page.locator('[data-car="police"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='police');
+ assert.equal(await page.locator('#carTitle').textContent(),'SUV');
+ assert.equal(await page.locator('[data-home-car="suv"]').getAttribute('aria-checked'),'true');
+ await page.unroute('**/models/Cop.glb*');await page.locator('[data-home-car="police"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='police');
+ // Keyboard choices and Settings garage stay synchronized with the home selector.
+ await page.locator('[data-home-car="police"]').focus();await page.keyboard.press('Home');
+ await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='rx7');
+ assert.equal(await page.locator('#carTitle').textContent(),'RX-7');
+ assert.equal(await page.locator('#homeCars [aria-checked="true"]').count(),1);
+ await page.locator('#setBtn').click();await page.locator('[data-open="carSheet"]').click();
+ await page.locator('#carList [data-car="suv"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='suv');
+ assert.equal(await page.locator('#carTitle').textContent(),'SUV');
+ await page.locator('#carSheet [data-close]').click();
  await page.waitForFunction(()=>window.cambridgeDrive.traffic.pedestrians.every(m=>m.userData.pedestrian.ready));
  const pedestrians=await page.evaluate(()=>{
   const pool=window.cambridgeDrive.traffic.pedestrians,skeletons=[];

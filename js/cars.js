@@ -8,4 +8,6 @@ export const CARS = [
   {id:'taxi',title:'Taxi',url:'models/Taxi.glb',supplied:true},
   {id:'police',title:'Police car',url:'models/Cop.glb',supplied:true},
 ];
+export const carPreview = car => 'models/car-' + car.id + '.png';
+export const carHeadline = car => ({rx7:'RX-7',compact:'COMPACT',hatchback:'HATCH',suv:'SUV',sports:'COUPE','sports-2':'COUPE II',taxi:'TAXI',police:'POLICE'})[car.id];
 export const carById = id => CARS.find(car=>car.id===id) || CARS[0];

@@ -8,7 +8,7 @@ const root=path.resolve(process.env.TEST_SITE||'.'),port=8767,url=`http://127.0.
 const server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1','--directory',root],{stdio:'ignore'});
 let browser;
 try {
- for(let i=0;i<100;i++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ for(let i=0;i<100;i++){try{const response=await fetch(url);await response.arrayBuffer();if(response.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  for(const device of [{name:'phone',width:320,height:568,touch:true},{name:'phone-large',width:390,height:844,touch:true},{name:'landscape',width:844,height:390,touch:true},{name:'tablet',width:768,height:1024,touch:true},{name:'desktop',width:1440,height:900,touch:false}]){
   if(process.env.TEST_DEVICE && process.env.TEST_DEVICE !== device.name)continue;
