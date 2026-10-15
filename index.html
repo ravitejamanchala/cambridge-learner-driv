@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta name="app-release" content="700f89bddc55b6e215c259a7a813ce02c995aeda">
+<head><meta name="app-release" content="e3f65c56bf534758022416e4244bdc92e1f0df92">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#79a9d2">
@@ -428,6 +428,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 @media(orientation:landscape) and (max-height:600px){.showcase{top:56px;bottom:108px;left:20%;right:20%}.showcase h1{font-size:19vw;top:12%}.showcase h1.long-name{font-size:12vw}.selection{bottom:76px;max-width:calc(100% - 330px)}.home-car-choice{width:44px;height:44px}.cars{gap:10px}.col.l{top:92px}.col.r{top:76px}.gbtn .disc{width:44px;height:44px}.gbtn .lb{font-size:9px}#lobby .playzone{width:185px;bottom:14px}#lobby .passcard{width:180px;bottom:14px}#lobby .play{height:44px;font-size:24px}#lobby .event .th{display:none}#lobby .event .s{display:none}.avatar{width:44px;height:44px}.col{gap:10px}.col.r{display:flex}}
 
 .account-panel{padding:12px 0;border-bottom:1px solid #ddd;margin-bottom:12px}.account-panel .cbtn{margin:4px 4px 4px 0}.account-panel [hidden]{display:none!important}
+.access-locked{opacity:.6}
 </style>
 </head>
 <body>
@@ -528,6 +529,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
   <div class="sheet" id="profileSheet" hidden><div class="card sm" role="dialog" aria-labelledby="profH">
     <header><h2 id="profH">Who's learning?</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body">
+      <p id="accessNotice" class="muted" role="status">Course lessons, mock tests and puzzles require full access. Sign in, then ask the administrator to enable your account.</p>
       <p id="practiceSummary" class="muted"></p><ul id="recentHistory"></ul><div class="list" id="profList"></div>
       <form class="field" id="profForm" autocomplete="off"><label for="profName">New learner</label><div class="row2"><input type="text" id="profName" maxlength="40" placeholder="First name"><button class="cbtn go" type="submit">Add learner</button></div></form>
       <p class="muted">Guest progress is saved in this browser. Sign in to sync your account across devices.</p>
@@ -617,7 +619,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="auth-config.js"></script>
-<script type="module" src="app.js?v=700f89bddc55b6e215c259a7a813ce02c995aeda"></script>
+<script type="module" src="app.js?v=e3f65c56bf534758022416e4244bdc92e1f0df92"></script>
 
 </body>
 </html>
