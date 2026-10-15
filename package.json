@@ -9,7 +9,9 @@
     "dev": "python3 -m http.server 8000 --bind 127.0.0.1",
     "test:parking": "node tests/parking-browser.mjs",
     "test:devices": "node tests/devices-browser.mjs",
-    "test:cars": "node tests/cars-browser.mjs"
+    "test:cars": "node tests/cars-browser.mjs",
+    "test:mobile": "node tests/mobile-browser.mjs",
+    "test:mobile:live": "node tests/mobile-live.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
