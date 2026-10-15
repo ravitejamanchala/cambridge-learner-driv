@@ -1,4 +1,4 @@
-import { hasFullAccess } from './access.js';
+import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
 import { parkingPlan } from './parking-layout.js';
 import { gradeParking } from './parking-geometry.js';
@@ -143,7 +143,7 @@ async function boot() {
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
-    if(start&&!hasFullAccess()){hub.requestAccess();return false;}
+    if(start&&!canAccessPlan(pl)){hub.requestAccess();return false;}
     if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
     if (pl.kind === 'lesson' && !pl.lesson.questions) pl = { ...pl, scenarioDefinition: resolveScenario(pl.lesson, pl.scenarioId) };
     if (pl.lesson && pl.lesson.questions) { // theory quiz: no driving, no map
@@ -158,7 +158,7 @@ async function boot() {
   const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
-    if(!hasFullAccess()){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
+    if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
   });
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
@@ -300,7 +300,7 @@ async function boot() {
   }
   let parkingCamera = null;
   function begin() {
-    if(!hasFullAccess()){hub.requestAccess();return;}
+    if(!canAccessPlan(plan)){hub.requestAccess();return;}
     driveScope = learnerScope();
     paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);

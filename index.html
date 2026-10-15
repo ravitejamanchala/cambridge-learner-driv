@@ -430,6 +430,9 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 
 .account-panel{padding:12px 0;border-bottom:1px solid #ddd;margin-bottom:12px}.account-panel .cbtn{margin:4px 4px 4px 0}.account-panel [hidden]{display:none!important}
 .access-locked{opacity:.6}
+.subscription-offer{margin:12px 0;padding:12px;border:1px solid #c9b8de;border-radius:12px;background:#fffaf3}
+.subscription-offer p{margin:8px 0;font-size:13px;line-height:1.5}
+.subscription-offer button{margin:4px 4px 4px 0}
 </style>
 </head>
 <body>
@@ -530,7 +533,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
   <div class="sheet" id="profileSheet" hidden><div class="card sm" role="dialog" aria-labelledby="profH">
     <header><h2 id="profH">Who's learning?</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body">
-      <p id="accessNotice" class="muted" role="status">Course lessons, mock tests and puzzles require full access. Sign in, then ask the administrator to enable your account.</p>
+      <p id="accessNotice" class="muted" role="status">Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course, mock tests and puzzles. Renews monthly until cancelled.</p>
       <p id="practiceSummary" class="muted"></p><ul id="recentHistory"></ul><div class="list" id="profList"></div>
       <form class="field" id="profForm" autocomplete="off"><label for="profName">New learner</label><div class="row2"><input type="text" id="profName" maxlength="40" placeholder="First name"><button class="cbtn go" type="submit">Add learner</button></div></form>
       <p class="muted">Guest progress is saved in this browser. Sign in to sync your account across devices.</p>

@@ -1,6 +1,6 @@
 # Course access
 
-Course lessons, mock tests and puzzles require a signed-in Clerk account with this **private metadata**:
+The first three practical lessons and Highway Code are free. Remaining course lessons, mock tests and puzzles require a paid subscription, or complimentary access using this Clerk **private metadata**:
 
 ```json
 {"learnerAccess":"full"}
@@ -16,3 +16,5 @@ Web: https://manchala.co.uk/cambridge-learner-driv/
 API: https://learner-drive-api.manchala0024.workers.dev
 
 This gate controls the app UI and authenticated API. The static simulator bundle remains publicly downloadable; it is not DRM for lesson assets.
+
+See [subscriptions.md](subscriptions.md) for billing setup and the free tier.

@@ -12,10 +12,10 @@ test('PostgreSQL migrations are repeatable, checksum protected and atomic',async
  await assert.rejects(()=>broken.exec(source.replace('CREATE INDEX sessions_user_time','CREATE BAD_INDEX sessions_user_time')));
  assert.equal((await broken.query("select to_regclass('users') as t")).rows[0].t,null);await broken.close();
  await pg.exec(source);await pg.exec(source);
- assert.equal((await pg.query('select * from app_migrations')).rows.length,1);
+ assert.equal((await pg.query('select * from app_migrations')).rows.length,3);
  await pg.exec("update app_migrations set checksum='tampered'");
  await assert.rejects(()=>pg.exec(source),/checksum mismatch/);
- await pg.exec('drop table app_migrations');await pg.exec('drop table ai_feedback,driving_faults,driving_sessions,lesson_progress,learner_profiles,users cascade');await pg.exec(source);
+ await pg.exec('drop table app_migrations');await pg.exec('drop table billing_events,billing_accounts,ai_feedback,driving_faults,driving_sessions,lesson_progress,learner_profiles,users cascade');await pg.exec(source);
 });
 test('real embedded PostgreSQL persists progress; stale revisions and user leaks are prevented',async()=>{
  const a=await store.user('alice'),b=await store.user('bob');assert.notEqual(a,b);
@@ -35,5 +35,16 @@ test('sessions, faults and feedback commit together; duplicates and ownership co
  assert.equal(await store.session(b,s.id),null);assert.equal((await store.list(a,20,0)).length,1);
  assert.equal((await pg.query('select * from driving_faults')).rows.length,1);assert.equal((await pg.query('select * from ai_feedback')).rows.length,1);
  await assert.rejects(()=>store.saveSession(a,{...s,id:crypto.randomUUID(),duration:-1}));assert.equal((await store.list(a,20,0)).length,1);
+});
+test('billing storage isolates customers and ignores older observations',async()=>{
+ const a=await store.user('billing-a'),b=await store.user('billing-b');
+ assert.equal(await store.billingCustomer(a,'cus_a'),'cus_a');assert.equal(await store.billingCustomer(a,'cus_other'),'cus_a');
+ await store.billingCustomer(b,'cus_b');assert.equal(await store.billingOwner('cus_a'),a);
+ const state={subscriptionId:'sub_a',status:'active',paidUntil:new Date(Date.now()+86400000).toISOString(),cancelAtPeriodEnd:false};
+ await store.saveBilling(a,state,'2099-01-02T00:00:00Z','evt_a');
+ await store.saveBilling(a,{...state,status:'canceled'},'2099-01-01T00:00:00Z','evt_old');
+ assert.equal((await store.billing(a)).status,'active');assert.equal((await store.billing(b)).status,'none');assert.equal(await store.billingEvent('evt_a'),true);
+ await store.saveBilling(a,{...state,status:'canceled'},'2099-01-03T00:00:00Z','evt_cancel');assert.equal((await store.billing(a)).status,'canceled');
+ const live=createStore('unused',drizzle(pg),'live');assert.equal(await live.billing(a),null);await live.billingCustomer(a,'cus_live');assert.equal((await live.billing(a)).customerId,'cus_live');assert.equal((await store.billing(a)).customerId,'cus_a');
  await pg.close();
 });

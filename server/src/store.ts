@@ -1,12 +1,22 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { sql } from 'drizzle-orm';
-export function createStore(url: string, override?: any) {
+export function createStore(url: string, override?: any, billingMode: 'test' | 'live' = 'test') {
  const db = override || drizzle(neon(url));
  const run = async (q: any): Promise<any[]> => (await db.execute(q)).rows;
  return {
-  async ready() { await run(sql`select users.id from users, learner_profiles, lesson_progress, driving_sessions, driving_faults, ai_feedback limit 0`); },
+  async ready() { await run(sql`select users.id from users, learner_profiles, lesson_progress, driving_sessions, driving_faults, ai_feedback, billing_accounts, billing_events limit 0`); },
   async user(clerkId: string) { return (await run(sql`insert into users (clerk_id) values (${clerkId}) on conflict(clerk_id) do update set clerk_id=excluded.clerk_id returning id`))[0].id; },
+  async billing(user: string) { return (await run(sql`select customer_id as "customerId", subscription_id as "subscriptionId", status, paid_until as "paidUntil", cancel_at_period_end as "cancelAtPeriodEnd" from billing_accounts where user_id=${user}::uuid and mode=${billingMode}`))[0] || null; },
+  async billingCustomer(user: string, customerId: string) { await run(sql`insert into billing_accounts(user_id,mode,customer_id) values (${user}::uuid,${billingMode},${customerId}) on conflict(user_id,mode) do nothing`); return (await run(sql`select customer_id as "customerId" from billing_accounts where user_id=${user}::uuid and mode=${billingMode}`))[0].customerId; },
+  async billingOwner(customerId: string) { return (await run(sql`select user_id as id from billing_accounts where customer_id=${customerId} and mode=${billingMode}`))[0]?.id || null; },
+  async billingEvent(id: string) { return (await run(sql`select id from billing_events where id=${id}`)).length>0; },
+  async saveBilling(user: string, state: any, observedAt: string, eventId?: string) {
+   await run(sql`with updated as (
+    update billing_accounts set subscription_id=${state.subscriptionId},status=${state.status},paid_until=${state.paidUntil}::timestamptz,cancel_at_period_end=${state.cancelAtPeriodEnd},observed_at=${observedAt}::timestamptz
+    where user_id=${user}::uuid and mode=${billingMode} and observed_at<=${observedAt}::timestamptz returning user_id
+   ) insert into billing_events(id) select ${eventId || ''} where ${!!eventId} on conflict(id) do nothing`);
+  },
   async progress(user: string) { return (await run(sql`select data as profile, revision from learner_profiles where user_id=${user}::uuid`))[0] || { profile: null, revision: 0 }; },
   async saveProgress(user: string, input: any) {
    const rows = await run(sql`with saved as (
