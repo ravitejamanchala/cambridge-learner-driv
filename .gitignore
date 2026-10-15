@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.log
 __pycache__/
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+.test-build/
+audit-server.json

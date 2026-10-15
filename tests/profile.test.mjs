@@ -18,3 +18,13 @@ test('history is bounded while total time survives and bot data is separate',()=
 test('failed storage writes still leave usable progress in memory',()=>{
  const original=localStorage.setItem;localStorage.setItem=()=>{throw new Error('quota')};Profiles.create('Memory');Profiles.recordLesson('speed',{pass:true,D:0,S:0});assert.equal(Profiles.lesson('speed').passed,true);localStorage.setItem=original;
 });
+test('sign-in uses separate account data and sign-out restores untouched guest progress',()=>{
+ Profiles.useAccount(null);Profiles.create('Guest');Profiles.recordLesson('guest-lesson',{pass:true,D:0,S:0});
+ const guest=localStorage.getItem('cambridge-learner-drive.v1');
+ Profiles.useAccount('alice',{name:'Alice',lessons:{},history:[],mocks:[],practiceSeconds:0});
+ Profiles.recordLesson('private-lesson',{pass:true,D:0,S:0});
+ assert.equal(Profiles.isAccount(),true);assert.equal(Profiles.guest().name,'Guest');
+ assert.equal(localStorage.getItem('cambridge-learner-drive.v1'),guest);
+ Profiles.useAccount('bob',{name:'Bob',lessons:{},history:[],mocks:[],practiceSeconds:0});assert.equal(Profiles.lesson('private-lesson'),null);
+ Profiles.useAccount(null);assert.equal(Profiles.current().name,'Guest');assert.equal(Profiles.lesson('guest-lesson').passed,true);assert.equal(Profiles.lesson('private-lesson'),null);
+});

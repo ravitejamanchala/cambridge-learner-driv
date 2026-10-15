@@ -1,0 +1,11 @@
+name = "learner-drive-api"
+account_id = "eab4a0a8ec80610eb37fc56768e971dc"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+compatibility_flags = ["nodejs_compat"]
+[vars]
+FRONTEND_URL = "https://manchala.co.uk"
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

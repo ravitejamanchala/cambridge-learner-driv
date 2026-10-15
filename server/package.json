@@ -1,0 +1,28 @@
+{
+  "name": "learner-drive-api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node tools/test.mjs",
+    "check": "tsc --noEmit",
+    "dry-run": "wrangler deploy --dry-run",
+    "migrate": "node --use-env-proxy tools/migrate.mjs"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.23.2",
+    "@neondatabase/serverless": "^1.0.0",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.9.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.0.0"
+  }
+}

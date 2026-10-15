@@ -26,6 +26,7 @@ function progress(p) {
 // meta(key) -> { len, n, first } for 'route:<id>', 'lesson:<id>', 'puzzle:<id>' (from data/areas/index.json)
 export function createHub({ meta, onPick, onStart }) {
   Profiles.init();
+  window.addEventListener('learner-account-change', () => render());
   const st = { kind: 'lesson', lesson: LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, scenarioId: null };
   const status = (id) => { const L = Profiles.lesson(id); return !L ? ['New', 'new'] : L.passed ? ['Passed', 'ok'] : ['Tried ' + L.attempts + '×', 'try']; };
   const firstOpen = () => (recommendedLesson(LESSONS, Profiles.current()) || LESSONS[0]).id;
@@ -55,6 +56,7 @@ export function createHub({ meta, onPick, onStart }) {
 
   // ---------- learners ----------
   function renderProfiles() {
+    $('profForm').hidden = Profiles.isAccount();
     const list = Profiles.list(), cur = Profiles.current();
     $('profList').innerHTML = list.length ? list.map(p => {
       const g = progress(p), me = !!cur && cur.id === p.id;
@@ -135,7 +137,7 @@ export function createHub({ meta, onPick, onStart }) {
     $('passTitle').textContent = g.done === LESSONS.length ? 'Course complete' : UNITS[ui].title;
     const summary = Profiles.summary();
     $('practiceSummary').textContent = `${Math.round(summary.practiceSeconds / 60)} min practice · ${summary.attempts} recorded attempts`;
-    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${r.D} driving / ${r.S} serious</li>`).join('') || '<li>No recent reports yet.</li>';
+    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious</li>`).join('') || '<li>No recent reports yet.</li>';
     $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / LESSONS.length * 100) + '%';
     const pl = plan();
     if (pl.kind === 'lesson') {
@@ -163,12 +165,12 @@ export function createHub({ meta, onPick, onStart }) {
   // ---------- quiz runner (theory modules) ----------
   const qz = { quiz: null, i: 0, right: 0, answered: false };
   const shuffled = (n) => { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }; // new order every attempt
-  function startQuiz(q) { closeSheets(); Object.assign(qz, { quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
+  function startQuiz(q) { closeSheets(); Object.assign(qz, { owner: Profiles.scope() + ":" + Profiles.current()?.id, quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
   function drawQuiz() {
     const q = qz.quiz, n = q.questions.length;
     if (qz.i >= n) {
       const pass = qz.right / n >= q.pass;
-      Profiles.recordLesson(q.id, { pass, D: n - qz.right, S: 0 });
+      if (qz.owner === Profiles.scope() + ":" + Profiles.current()?.id) Profiles.recordLesson(q.id, { pass, D: n - qz.right, S: 0 });
       const nx = pass ? next({ kind: 'lesson', lesson: q }) : null;
       $('quizBody').innerHTML = `<h3 class="verdict ${pass ? 'pass' : 'fail'}">${pass ? 'Passed' : 'Not yet'}</h3>
         <div class="score"><div><b>${qz.right}/${n}</b><span>Correct</span></div><div><b>${Math.ceil(q.pass * n)}</b><span>Needed to pass</span></div></div>

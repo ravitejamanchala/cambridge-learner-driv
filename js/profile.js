@@ -1,6 +1,9 @@
 // Learner profiles and progress, stored in this browser (localStorage).
-// Swap `load`/`save` for a backend (Supabase, Firebase) later to sync accounts across devices.
-const KEY = 'cambridge-learner-drive.v1';
+// Guest storage remains separate from account storage and the cloud sync outbox.
+const GUEST_KEY = 'cambridge-learner-drive.v1';
+let KEY = GUEST_KEY;
+const listeners = new Set();
+const notify = (kind, value) => { for (const fn of listeners) fn(kind, value); };
 let mem = { profiles: [], current: null };
 
 function load() {
@@ -9,10 +12,22 @@ function load() {
   for (const p of mem.profiles) { p.lessons ||= {}; p.mocks ||= []; p.history ||= []; p.practiceSeconds ||= 0; }
   return mem;
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (_) {} }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (_) {} notify('progress', Profiles.current()); }
 
 export const Profiles = {
   init() { load(); return this; },
+  subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  guest() { try { const g = JSON.parse(localStorage.getItem(GUEST_KEY)); return g?.profiles?.find(p => p.id === g.current) || null; } catch { return null; } },
+  useAccount(userId, profile) {
+    KEY = userId ? GUEST_KEY + '.account.' + userId : GUEST_KEY;
+    mem = { profiles: [], current: null };
+    if (userId) { if (profile) { mem = { profiles:[{...structuredClone(profile), id:'account'}], current:'account' }; } }
+    else load();
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch {}
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('learner-account-change'));
+  },
+  isAccount() { return KEY !== GUEST_KEY; },
+  scope() { return KEY; },
   list() { return mem.profiles; },
   current() { return mem.profiles.find(p => p.id === mem.current) || null; },
   create(name) {
@@ -37,7 +52,7 @@ export const Profiles = {
   },
   recordHistory(r) { const p = this.current(); if (!p) return; p.history ||= []; p.practiceSeconds ||= 0;
     const duration = Number.isFinite(r.duration) ? Math.max(0, r.duration) : 0;
-    p.practiceSeconds += duration; p.history.unshift({ ...r, duration, at: Date.now() }); p.history = p.history.slice(0, 50);
+    p.practiceSeconds += duration; const entry = { ...r, duration, at: Date.now(), sessionId: crypto.randomUUID() }; p.history.unshift(entry); p.history = p.history.slice(0, 50); notify('session', entry);
   },
   summary() { const p = this.current(); return { history: p?.history || [], practiceSeconds: p?.practiceSeconds || 0, attempts: Object.values(p?.lessons || {}).reduce((n, l) => n + (l.attempts || 0), 0) + (p?.mocks?.length || 0) }; },
   mockStats(routeId) {
