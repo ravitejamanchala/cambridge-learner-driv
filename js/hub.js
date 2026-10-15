@@ -1,6 +1,8 @@
 // Game-style lobby: learner chip with level/XP, course (icon tiles), puzzles (tiers and stars), mock tests,
 // Highway Code and learner sheets, the course "pass" card, the selected-drive card and START.
-import { UNITS, LESSONS } from './course.js';
+import { LESSONS } from './course.js';
+import { VISIBLE_LESSONS, VISIBLE_UNITS as UNITS } from './course-menu.js';
+import { hasFullAccess } from './access.js';
 import { TIERS, PUZZLES, starsFor } from './puzzles.js';
 import { ROUTES } from './config.js';
 import { Profiles } from './profile.js';
@@ -16,7 +18,7 @@ const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${[1, 2, 
 // XP: 40 per lesson passed, 15 per puzzle star, 100 per mock pass, 10 per mock attempt. 100 XP per level.
 function progress(p) {
   if (!p) return { done: 0, mockPass: 0, stars: 0, xp: 0, lv: 1, frac: 0 };
-  const done = LESSONS.filter(l => (p.lessons[l.id] || {}).passed).length;
+  const done = VISIBLE_LESSONS.filter(l => (p.lessons[l.id] || {}).passed).length;
   const st = PUZZLES.reduce((a, z) => a + starsFor(p.lessons[z.id]), 0);
   const mockPass = p.mocks.filter(m => m.pass).length;
   const xp = done * 40 + st * 15 + mockPass * 100 + p.mocks.length * 10;
@@ -27,9 +29,9 @@ function progress(p) {
 export function createHub({ meta, onPick, onStart }) {
   Profiles.init();
   window.addEventListener('learner-account-change', () => render());
-  const st = { kind: 'lesson', lesson: LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, scenarioId: null };
+  const st = { kind: 'lesson', lesson: VISIBLE_LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, scenarioId: null };
   const status = (id) => { const L = Profiles.lesson(id); return !L ? ['New', 'new'] : L.passed ? ['Passed', 'ok'] : ['Tried ' + L.attempts + '×', 'try']; };
-  const firstOpen = () => (recommendedLesson(LESSONS, Profiles.current()) || LESSONS[0]).id;
+  const firstOpen = () => (recommendedLesson(VISIBLE_LESSONS, Profiles.current()) || VISIBLE_LESSONS[0]).id;
   const tierOpen = (ti) => ti === 0 || PUZZLES.some(z => z.tier === TIERS[ti - 1].id && (Profiles.lesson(z.id) || {}).passed);
   const puzzleOpen = (z) => tierOpen(TIERS.findIndex(t => t.id === z.tier));
   const plan = () => st.kind === 'lesson' ? { kind: 'lesson', key: 'lesson:' + st.lesson, lesson: LESSONS.find(x => x.id === st.lesson), scenarioId: st.scenarioId }
@@ -40,8 +42,19 @@ export function createHub({ meta, onPick, onStart }) {
 
   // ---------- sheets ----------
   let afterProfile = null;
+  const protectedSheets = new Set(['courseSheet','mockSheet','puzzleSheet']);
+  function requestAccess() {
+    const notice=$('accessNotice'); if(notice)notice.hidden=false;
+    openSheet('profileSheet');
+  }
+  window.addEventListener('learner-access-change', renderAccess);
+  function renderAccess() {
+    const allowed=hasFullAccess();
+    document.querySelectorAll('[data-open=courseSheet],[data-open=mockSheet],[data-open=puzzleSheet],#eventCard,#playBtn').forEach(b=>{b.setAttribute('aria-disabled',String(!allowed));b.classList.toggle('access-locked',!allowed);b.title=allowed?'':'Sign in with an account that has full access';});
+    const notice=$('accessNotice');if(notice)notice.hidden=allowed;
+  }
   const modal = s => s.id === 'pauseSheet' || s.id === 'resultSheet';
-  function openSheet(id) { closeSheets(); const s = $(id); if (!s) return; s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
+  function openSheet(id) { if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
   function closeSheets() { document.querySelectorAll('.sheet').forEach(s => { if (!modal(s)) s.hidden = true; }); }
   const anyOpen = () => [...document.querySelectorAll('.sheet')].some(s => !s.hidden && !modal(s));
   document.addEventListener('click', e => {
@@ -60,7 +73,7 @@ export function createHub({ meta, onPick, onStart }) {
     const list = Profiles.list(), cur = Profiles.current();
     $('profList').innerHTML = list.length ? list.map(p => {
       const g = progress(p), me = !!cur && cur.id === p.id;
-      return `<button class="item" role="radio" aria-checked="${me}" data-id="${p.id}"><span class="no">${esc(p.name[0].toUpperCase())}</span><span><span class="nm">${esc(p.name)}</span><span class="sub">Level ${g.lv} · ${g.done}/${LESSONS.length} lessons · ${g.stars} stars</span></span><span class="tag ${me ? 'ok' : 'new'}">${me ? 'Playing' : 'Switch'}</span></button>`;
+      return `<button class="item" role="radio" aria-checked="${me}" data-id="${p.id}"><span class="no">${esc(p.name[0].toUpperCase())}</span><span><span class="nm">${esc(p.name)}</span><span class="sub">Level ${g.lv} · ${g.done}/${VISIBLE_LESSONS.length} lessons · ${g.stars} stars</span></span><span class="tag ${me ? 'ok' : 'new'}">${me ? 'Playing' : 'Switch'}</span></button>`;
     }).join('') : '<p class="muted" style="margin:0">No learners yet. Add your name to start.</p>';
   }
   const chosen = () => { st.scenarioId = null; st.kind = 'lesson'; st.lesson = firstOpen(); pick(); $('profileSheet').hidden = true; if (afterProfile) { const f = afterProfile; afterProfile = null; f(); } };
@@ -70,7 +83,7 @@ export function createHub({ meta, onPick, onStart }) {
   // ---------- course: icon tiles grouped by unit ----------
   function renderCourse() {
     let n = 0;
-    $('lessonList').innerHTML = UNITS.map((u, ui) => `<div class="unit-h">Unit ${ui + 1} · ${esc(u.title)}</div><div class="tiles">` + LESSONS.filter(l => l.unit === u.id).map(l => {
+    $('lessonList').innerHTML = UNITS.map((u, ui) => `<div class="unit-h">Unit ${ui + 1} · ${esc(u.title)}</div><div class="tiles">` + VISIBLE_LESSONS.filter(l => l.unit === u.id).map(l => {
       const access = availability(l, Profiles.current());
       const [txt, cls] = access.available ? status(l.id) : ['Locked', 'locked']; n++;
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
@@ -132,13 +145,13 @@ export function createHub({ meta, onPick, onStart }) {
     $('whoName').textContent = p ? p.name : 'Tap to add learner';
     $('whoAv').textContent = p ? p.name[0].toUpperCase() : '?';
     $('whoLv').textContent = g.lv; $('whoXp').style.width = (g.frac * 100) + '%';
-    $('statLessons').textContent = `${g.done}/${LESSONS.length}`; $('statStars').textContent = `${g.stars}/${PUZZLES.length * 3}`; $('statMocks').textContent = g.mockPass;
+    $('statLessons').textContent = `${g.done}/${VISIBLE_LESSONS.length}`; $('statStars').textContent = `${g.stars}/${PUZZLES.length * 3}`; $('statMocks').textContent = g.mockPass;
     const nl = LESSONS.find(l => l.id === firstOpen()), ui = UNITS.findIndex(u => u.id === nl.unit);
-    $('passTitle').textContent = g.done === LESSONS.length ? 'Course complete' : UNITS[ui].title;
+    $('passTitle').textContent = g.done === VISIBLE_LESSONS.length ? 'Course complete' : UNITS[ui].title;
     const summary = Profiles.summary();
     $('practiceSummary').textContent = `${Math.round(summary.practiceSeconds / 60)} min practice · ${summary.attempts} recorded attempts`;
     $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious</li>`).join('') || '<li>No recent reports yet.</li>';
-    $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / LESSONS.length * 100) + '%';
+    $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / VISIBLE_LESSONS.length * 100) + '%';
     const pl = plan();
     if (pl.kind === 'lesson') {
       const l = pl.lesson, [txt] = status(l.id);
@@ -152,9 +165,10 @@ export function createHub({ meta, onPick, onStart }) {
       $('eventIco').innerHTML = '<svg viewBox="0 0 40 40"><rect x="8" y="7" width="24" height="28" rx="4" fill="#fff" stroke="#8a6ae3" stroke-width="2"/><rect x="14" y="4" width="12" height="7" rx="2.5" fill="#b49cf5" stroke="#8a6ae3" stroke-width="2"/><path d="M13 19l3 3 6-6M13 28h14" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     }
   }
-  function render() { renderLobby(); renderProfiles(); renderCourse(); renderPuzzles(); renderMock(); }
+  function render() { renderAccess(); renderLobby(); renderProfiles(); renderCourse(); renderPuzzles(); renderMock(); }
 
   function play() {
+    if(!hasFullAccess()){requestAccess();return;}
     if (!Profiles.current()) { afterProfile = play; openSheet('profileSheet'); return; }
     const pl = plan(); if (pl.kind === 'lesson' && !availability(pl.lesson, Profiles.current()).available) { openSheet('courseSheet'); return; } if (pl.kind === 'puzzle' && !puzzleOpen(pl.lesson)) { openSheet('puzzleSheet'); return; }
     if (isQuiz(pl)) { startQuiz(pl.lesson); return; }
@@ -165,7 +179,7 @@ export function createHub({ meta, onPick, onStart }) {
   // ---------- quiz runner (theory modules) ----------
   const qz = { quiz: null, i: 0, right: 0, answered: false };
   const shuffled = (n) => { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }; // new order every attempt
-  function startQuiz(q) { closeSheets(); Object.assign(qz, { owner: Profiles.scope() + ":" + Profiles.current()?.id, quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
+  function startQuiz(q) { if(!hasFullAccess()){requestAccess();return;} closeSheets(); Object.assign(qz, { owner: Profiles.scope() + ":" + Profiles.current()?.id, quiz: q, i: 0, right: 0, answered: false }); $('quizH').textContent = q.title; $('quizSheet').hidden = false; drawQuiz(); }
   function drawQuiz() {
     const q = qz.quiz, n = q.questions.length;
     if (qz.i >= n) {
@@ -200,11 +214,11 @@ export function createHub({ meta, onPick, onStart }) {
   function open() { closeSheets(); render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); if (!Profiles.current()) openSheet('profileSheet'); }
   // what comes after this lesson or puzzle (null if none, or the next puzzle is still locked)
   function next(pl) {
-    if (pl.kind === 'lesson') { const l = recommendedLesson(LESSONS, Profiles.current(), pl.lesson.id); return l ? { kind: 'lesson', id: l.id, title: l.title } : null; }
+    if (pl.kind === 'lesson') { const l = recommendedLesson(VISIBLE_LESSONS, Profiles.current(), pl.lesson.id); return l ? { kind: 'lesson', id: l.id, title: l.title } : null; }
     if (pl.kind === 'puzzle') { const i = PUZZLES.findIndex(z => z.id === pl.lesson.id), z = PUZZLES[i + 1]; return z && puzzleOpen(z) ? { kind: 'puzzle', id: z.id, title: z.title } : null; }
     return null;
   }
   function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; return plan(); }
   if (Profiles.current()) st.lesson = firstOpen();
-  return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz };
+  return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz, requestAccess };
 }

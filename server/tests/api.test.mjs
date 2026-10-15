@@ -4,7 +4,7 @@ import { createApp } from '../.test-build/app.mjs';
 const env={ DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://manchala.co.uk',RATE_LIMITER:{limit:async()=>({success:true})} };
 const profile={name:'Learner',lessons:{},mocks:[],history:[],practiceSeconds:0};
 const store={ready:async()=>{},user:async id=>id,progress:async()=>({profile:null,revision:0}),saveProgress:async()=>({revision:1}),list:async()=>[],session:async(user)=>user==='alice'?{pass:true}:null};
-const app=createApp({store,verify:async token=>{if(token==='bad')throw Error('secret');return {sub:token,sid:'session'};}});
+const app=createApp({getAccess:async()=>true,store,verify:async token=>{if(token==='bad')throw Error('secret');return {sub:token,sid:'session'};}});
 const request=(path,opts={},bindings=env)=>app.request(path,{headers:{Authorization:'Bearer alice',Origin:env.FRONTEND_URL,'Content-Type':'application/json'},...opts},bindings);
 test('liveness and readiness are distinct; missing config fails closed',async()=>{
  assert.equal((await app.request('/health',{},{})).status,200);
@@ -32,12 +32,12 @@ test('user-scoped session detail conceals another user’s records',async()=>{
 });
 test('rate limits fail closed with safe error response',async()=>{
  const r=await request('/api/me',{}, {...env,RATE_LIMITER:{limit:async()=>({success:false})}});assert.equal(r.status,429);
- const broken=createApp({store:{user:async()=>{throw Error('password=secret');}},verify:async()=>({sub:'alice',sid:'x'})});
+ const broken=createApp({getAccess:async()=>true,store:{user:async()=>{throw Error('password=secret');}},verify:async()=>({sub:'alice',sid:'x'})});
  const fail=await broken.request('/api/me',{headers:{Authorization:'Bearer alice'}},env);assert.equal(fail.status,503);assert.equal((await fail.text()).includes('secret'),false);
 });
 test('API exposes revision conflicts, idempotent session statuses and bounded pagination',async()=>{
  let duplicate=false;
- const api=createApp({verify:async()=>({sub:'alice',sid:'s'}),store:{...store,
+ const api=createApp({getAccess:async()=>true,verify:async()=>({sub:'alice',sid:'s'}),store:{...store,
   saveProgress:async()=>null,
   saveSession:async()=>{const result={id:'saved',duplicate};duplicate=true;return result;},
   list:async(_user,limit,offset)=>{assert.equal(limit,3);assert.equal(offset,10);return [{id:1},{id:2},{id:3}];}

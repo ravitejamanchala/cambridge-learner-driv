@@ -1,13 +1,15 @@
+import { setAccess } from './access.js';
 import { Profiles } from './profile.js';
 import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
+ setAccess(false);
  const config = window.LEARNER_CONFIG;
  if (!config?.CLERK_PUBLISHABLE_KEY || !config?.API_BASE_URL) return;
  const base = new URL(config.API_BASE_URL);
  if (base.protocol !== 'https:' && base.hostname !== 'localhost') return;
  const panel = document.createElement('aside'); panel.id = 'learnerAccount';
  panel.className = 'account-panel';
- panel.innerHTML = '<button data-login>Sign in / create account</button> <span data-avatar></span><button data-logout hidden>Sign out</button><p data-status>Guest progress stays on this device</p><button data-import hidden>Import guest progress</button><button data-retry hidden>Retry sync</button><button data-local hidden>Keep device progress</button><button data-cloud hidden>Use cloud progress</button>';
+ panel.innerHTML = '<button data-login>Sign in / create account</button> <span data-avatar></span><button data-logout hidden>Sign out</button><button data-access hidden>Refresh access</button><p data-status>Guest progress stays on this device</p><button data-import hidden>Import guest progress</button><button data-retry hidden>Retry sync</button><button data-local hidden>Keep device progress</button><button data-cloud hidden>Use cloud progress</button>';
  document.querySelector('#profileSheet .body').prepend(panel);
  panel.querySelector('[data-status]').setAttribute('role','status');
  panel.querySelectorAll('button').forEach(button => { button.className='cbtn'; button.type='button'; });
@@ -25,12 +27,14 @@ export async function initAuth() {
   el('login').onclick = () => clerk.openSignIn();
   el('logout').onclick = () => clerk.signOut();
   el('retry').onclick = () => sync?.flush();
-  async function activate(user) {
-   if ((user?.id || null) === activeId) return;
+  async function activate(user, force=false) {
+   if (!force && (user?.id || null) === activeId) return;
+   setAccess(false);
    activeId = user?.id || null; const epoch=++generation; unsubscribe?.(); sync?.close(); sync=null;
    clerk.unmountUserButton(el('avatar'));
-   el('avatar').replaceChildren(); el('login').hidden=!!user; el('logout').hidden=!user; el('import').hidden=true;
-   if (!user) { Profiles.useAccount(null); status('Guest progress stays on this device'); return; }
+   el('avatar').replaceChildren(); el('login').hidden=!!user; el('logout').hidden=!user; el('import').hidden=true; el('access').hidden=!user;
+   if (!user) { Profiles.useAccount(null); status('Sign in, then ask the administrator to enable full access.'); return; }
+   el('access').onclick=()=>activate(clerk.user,true).catch(()=>status('Could not verify access. Try Refresh access again.'));
    clerk.mountUserButton(el('avatar'));
    const userId=user.id;
    const request = async (path, body) => {
@@ -38,12 +42,16 @@ export async function initAuth() {
     const token=await clerk.session?.getToken();
     if (!token || epoch!==generation || clerk.user?.id!==userId) throw new Error('No active session');
     const response=await fetch(base.origin+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(15000)});
-    if (!response.ok) { const error=new Error('Cloud request failed');error.status=response.status;throw error; }
+    if (!response.ok) { if(response.status===403){setAccess(false);unsubscribe?.();sync?.close();sync=null;el('import').hidden=true;status('Full access is required. Ask the administrator, then refresh access.');} const error=new Error('Cloud request failed');error.status=response.status;throw error; }
     return response.json();
    };
    const current = new CloudSync({userId,storage:localStorage,request,status}); sync=current;
    // Switch immediately so a drive completed while cloud hydration is pending cannot enter guest storage.
    Profiles.useAccount(userId,current.state.profile || {name:user.firstName || 'Learner',lessons:{},mocks:[],history:[],practiceSeconds:0});
+   try { const me=await request('/api/me'); if(epoch!==generation)return;
+    if(me.access?.full!==true){current.close();sync=null;status('Account signed in. Full access is not enabled. Ask the administrator, then refresh access.');return;}
+    setAccess(true);
+   } catch { if(epoch===generation){current.close();sync=null;status('Could not verify access. Try Refresh access again.');}return; }
    unsubscribe=Profiles.subscribe((kind,value)=>{if(kind==='session') current.session(cloudSession(value));else if(value) current.save(cloudProfile(value));});
    try { const profile=await current.hydrate(); if(epoch!==generation)return;
     if (profile) Profiles.useAccount(userId,profile);
@@ -62,9 +70,9 @@ export async function initAuth() {
    const resolve=async keep=>{try{const p=await current.resolve(keep);if(epoch===generation)Profiles.useAccount(userId,p || {name:user.firstName || 'Learner',lessons:{},mocks:[],history:[],practiceSeconds:0});}catch{status('Could not resolve progress. Retry when online.');}};
    el('local').onclick=()=>resolve(true);el('cloud').onclick=()=>resolve(false);
   }
-  clerk.addListener(({user})=>{activate(user).catch(()=>status('Account unavailable. Guest mode remains available.'));});
+  clerk.addListener(({user})=>{activate(user).catch(()=>status('Account unavailable. Refresh to verify access.'));});
   await activate(clerk.user);
   window.addEventListener('online',()=>sync?.flush());
   setInterval(()=>sync?.flush(),30000);
- } catch { status('Sign-in unavailable. You can continue as a guest.'); }
+ } catch { status('Sign-in unavailable. Refresh to try again.'); }
 }

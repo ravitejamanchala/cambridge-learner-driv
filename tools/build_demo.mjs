@@ -1,6 +1,6 @@
 // Demo build: one minified script with no comments, cleaned data headers. Source stays readable in the project.
 import { execFileSync } from 'node:child_process';
-import { LESSONS } from '../js/course.js';
+import { VISIBLE_LESSONS as LESSONS } from '../js/course-menu.js';
 import fs from 'fs'; import path from 'path'; import { build } from 'esbuild';
 const SRC = process.argv[2], OUT = process.argv[3];
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(path.join(OUT, 'data/areas'), { recursive: true }); fs.mkdirSync(path.join(OUT, 'models'), { recursive: true });

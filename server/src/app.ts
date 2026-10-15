@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { bodyLimit } from 'hono/body-limit';
-import { verifyToken } from '@clerk/backend';
+import { hasFullAccess } from './access.mjs';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { createStore } from './store';
 import { progressInput, sessionInput, pageInput } from './validation.mjs';
 import { z } from 'zod';
 type Env = { DATABASE_URL: string; CLERK_SECRET_KEY: string; FRONTEND_URL: string; RATE_LIMITER: { limit(input: {key: string}): Promise<{success: boolean}> } };
-export function createApp(deps: { store?: any; verify?: any } = {}) {
- const app = new Hono<{ Bindings: Env; Variables: { user: string; store: ReturnType<typeof createStore> } }>();
+export function createApp(deps: { store?: any; verify?: any; getAccess?: (subject: string, env: Env) => Promise<boolean> } = {}) {
+ const app = new Hono<{ Bindings: Env; Variables: { full: boolean; user: string; store: ReturnType<typeof createStore> } }>();
  app.use('*', async (c, next) => { c.header('Cache-Control', 'no-store'); c.header('X-Content-Type-Options','nosniff'); await next(); });
  app.use('*', cors({ origin: (origin, c) => origin === c.env.FRONTEND_URL ? origin : '', allowHeaders: ['Authorization','Content-Type'], allowMethods: ['GET','POST','OPTIONS'], maxAge: 600 }));
  app.get('/health', c => c.json({ ok: true }));
@@ -27,10 +28,13 @@ export function createApp(deps: { store?: any; verify?: any } = {}) {
   try { claims = await (deps.verify || verifyToken)(match[1], {secretKey:c.env.CLERK_SECRET_KEY, authorizedParties:[c.env.FRONTEND_URL]}); } catch { return c.json({error:'unauthorized'},401); }
   if (!claims.sub || !claims.sid) return c.json({error:'unauthorized'},401);
   if (!(await c.env.RATE_LIMITER.limit({key:'user:'+claims.sub})).success) return c.json({error:'rate_limited'},429);
+  const full = deps.getAccess ? await deps.getAccess(claims.sub,c.env) : hasFullAccess(await createClerkClient({secretKey:c.env.CLERK_SECRET_KEY}).users.getUser(claims.sub));
+  c.set('full', full === true);
+  if (c.req.path !== '/api/me' && full !== true) return c.json({error:'access_required'},403);
   const store = deps.store || createStore(c.env.DATABASE_URL);
   c.set('store',store); c.set('user',await store.user(claims.sub)); await next();
  });
- app.get('/api/me', c => c.json({id:c.get('user')}));
+ app.get('/api/me', c => c.json({id:c.get('user'),access:{full:c.get('full'),course:c.get('full'),mock:c.get('full'),puzzles:c.get('full')}}));
  app.get('/api/progress', async c => c.json(await c.get('store').progress(c.get('user'))));
  app.post('/api/progress', async c => {
   const input = progressInput.safeParse(await c.req.json().catch(()=>null));
