@@ -200,6 +200,27 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .score b{font:600 30px/1 var(--font-mono)}.score span{font:600 11px/1 var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 .reasons{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 .reasons:empty{display:none}
+.practise{display:flex;flex-direction:column;gap:8px}
+.practise h4{margin:0;font:600 11px/1 var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.practise ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.practise li{display:flex;align-items:center;gap:10px;background:#fff;box-shadow:0 0 0 2px var(--cream-2);border-radius:14px;padding:8px 12px}
+.practise .cat{flex:1;font:600 14px/1.25 var(--font-display)}
+.practise .n{font:600 12px/1 var(--font-mono);color:var(--ink-soft)}
+.practise .n.s{color:var(--red)}
+.trend{display:flex;align-items:flex-end;gap:6px;height:34px;max-width:240px}
+.trend i{flex:1;max-width:34px;background:var(--teal);border-radius:4px 4px 0 0;min-height:3px}
+.trend i.f{background:var(--red)}
+/* Landscape phones are short: cap the panel and let it scroll inside itself so "Try again" stays on screen. */
+@media (max-height:520px){
+  .practise{gap:5px;max-height:112px;overflow:auto;-webkit-overflow-scrolling:touch}
+  .practise h4{font-size:10px;position:sticky;top:0;background:var(--cream);padding:2px 0}
+  .practise li{padding:5px 10px;border-radius:11px}
+  .practise .cat{font-size:12.5px}
+  .trend{height:22px}
+  .card .body{gap:9px}
+  .verdict{font-size:26px}
+  .score div{padding:8px 12px}.score b{font-size:24px}
+}
 
 /* ---------- driving HUD ---------- */
 #hud{padding:calc(12px + var(--safe-t)) calc(12px + var(--safe-r)) calc(12px + var(--safe-b)) calc(12px + var(--safe-l))}
@@ -443,6 +464,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
       <div class="score"><div><b id="rD">0</b><span>Driving faults</span></div><div><b id="rS">0</b><span>Serious faults</span></div></div>
       <p id="rNote" style="margin:0"></p>
       <ul class="reasons" id="rReasons"></ul>
+      <div class="practise" id="rPractise" hidden></div>
       <div class="btns"><button class="cbtn go" id="nextBtn" hidden>Next lesson</button><button class="cbtn alt" id="againBtn">Try again</button><button class="cbtn lav" id="hubBtn">Back to lobby</button></div>
     </div></div></div>
 

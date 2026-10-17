@@ -159,13 +159,28 @@ async function boot() {
 
   // ---------- drive flow ----------
   const banner = (text, kind) => { const el = $('banner'); el.hidden = !text; if (text) { el.textContent = text; el.className = 'banner ' + (kind || ''); } };
+  // "Practise next": the categories this learner keeps losing marks on, and how the last few
+  // mocks on this route have gone. Both read results already stored on the profile.
+  function renderPractise(routeId) {
+    const el = $('rPractise'), P = hub.Profiles;
+    const weak = P.weakAreas(routeId), trend = routeId ? P.trend(routeId) : [];
+    if (!weak.length && trend.length < 2) { el.hidden = true; el.innerHTML = ''; return; }
+    const esc = t => String(t).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const max = Math.max(1, ...trend.map(t => t.D));
+    el.innerHTML =
+      (weak.length ? `<h4>Practise next</h4><ol>${weak.map(w =>
+        `<li><span class="cat">${esc(w.cat)}</span><span class="n${w.S ? ' s' : ''}">${w.n}\u00d7</span></li>`).join('')}</ol>` : '') +
+      (trend.length > 1 ? `<h4>Last ${trend.length} mocks here</h4><div class="trend" aria-label="Driving faults per attempt, oldest first">${trend.map(t =>
+        `<i class="${t.pass ? '' : 'f'}" style="height:${Math.round(100 * t.D / max)}%" title="${t.D} driving, ${t.S} serious"></i>`).join('')}</div>` : '');
+    el.hidden = false;
+  }
   function onFinish() {
     const test = A.test; if (scenario) scenario.stop();
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
       const res = evaluate(plan.lesson, test, scenario), pz = plan.kind === 'puzzle';
-      hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S });
+      hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, faults: test.faults });
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
@@ -176,7 +191,7 @@ async function boot() {
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
       const pass = test.passed();
-      hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S });
+      hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, faults: test.faults });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
       $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
@@ -184,6 +199,7 @@ async function boot() {
       reasons.innerHTML = ''; next.hidden = true;
       $('testState').textContent = pass ? 'Passed' : 'Failed';
     }
+    renderPractise(plan.kind === 'mock' ? ROUTES[plan.index].id : null);
     $('resultSheet').hidden = false; hub.render();
   }
   function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; for (const k in key) key[k] = 0; $('pauseSheet').hidden = false; }
