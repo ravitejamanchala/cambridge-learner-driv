@@ -199,6 +199,10 @@ async function boot() {
       reasons.innerHTML = ''; next.hidden = true;
       $('testState').textContent = pass ? 'Passed' : 'Failed';
     }
+    // Colour the result header by outcome: teal for a pass, red for a fail, orange elsewhere.
+    const passed = v.classList.contains('pass');
+    const rh = $('resultSheet').querySelector('header');
+    if (rh) rh.className = passed ? 'ok' : 'no';
     renderPractise(plan.kind === 'mock' ? ROUTES[plan.index].id : null);
     $('resultSheet').hidden = false; hub.render();
   }
