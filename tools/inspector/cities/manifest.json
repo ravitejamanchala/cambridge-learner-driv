@@ -1,0 +1,11 @@
+{
+  "cities": [
+    { "id": "cambridge", "name": "Cambridge", "file": "cities/cambridge.json",
+      "status": "ready", "roads": 9926, "note": "14 areas, built from OpenStreetMap" },
+    { "id": "luton", "name": "Luton", "status": "pending" },
+    { "id": "peterborough", "name": "Peterborough", "status": "pending" },
+    { "id": "norwich", "name": "Norwich", "status": "pending" },
+    { "id": "ipswich", "name": "Ipswich", "status": "pending" },
+    { "id": "bedford", "name": "Bedford", "status": "pending" }
+  ]
+}

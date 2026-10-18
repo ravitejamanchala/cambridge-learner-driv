@@ -1,0 +1,345 @@
+<title>Cambridge Road Inspector</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed map canvas; a sticky stat/filter bar on top; inspector docks right on desktop, slides up as a sheet on phones. */
+:root{
+  --paper:#eef1f3; --paper-2:#e3e8ec; --line:#cbd4da;
+  --ink:#1b2a33; --ink-2:#56696f; --ink-3:#8295a0;
+  --known:#2f7d72; --assumed:#b4552f; --sel:#1f4ea8;
+  --panel:#f7f9fa; --shadow:0 1px 2px rgba(27,42,51,.09),0 8px 24px -12px rgba(27,42,51,.28);
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ui:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#11171c; --paper-2:#1a2228; --line:#2b3740;
+  --ink:#e4ebef; --ink-2:#9fb0ba; --ink-3:#6d808c;
+  --known:#4fc3b0; --assumed:#e4825a; --sel:#7ba6f5;
+  --panel:#161e24; --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 28px -14px rgba(0,0,0,.75);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --paper:#11171c; --paper-2:#1a2228; --line:#2b3740;
+  --ink:#e4ebef; --ink-2:#9fb0ba; --ink-3:#6d808c;
+  --known:#4fc3b0; --assumed:#e4825a; --sel:#7ba6f5;
+  --panel:#161e24; --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 28px -14px rgba(0,0,0,.75);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--panel)}
+
+.bar{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;z-index:30;background:var(--panel);
+  border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:10px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:700;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+.brand small{display:block;font-weight:500;font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.stats{display:flex;gap:16px;flex-wrap:wrap;min-width:0}
+.stat{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.sw{width:15px;height:3px;border-radius:2px;flex:none}
+.stat b{color:var(--ink);font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.tools{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=search]{font:500 13px var(--ui);padding:6px 10px;border-radius:7px;border:1px solid var(--line);
+  background:var(--paper);color:var(--ink);width:170px;min-width:0}
+input[type=search]:focus-visible,button:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+button{font:600 12.5px var(--ui);padding:6px 11px;border-radius:7px;border:1px solid var(--line);
+  background:var(--paper);color:var(--ink-2);cursor:pointer}
+button[aria-pressed=true]{background:var(--assumed);border-color:var(--assumed);color:#fff}
+
+/* canvas is a replaced element: inset alone will not stretch it past its intrinsic 300x150 */
+#map{position:fixed;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#map.drag{cursor:grabbing}
+
+.panel{position:fixed;z-index:25;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);width:310px;max-width:calc(100vw - 32px);
+  right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));
+  padding:14px 16px}
+.panel h2{margin:0 0 2px;font-size:16.5px;font-weight:650;letter-spacing:-.01em;text-wrap:balance}
+.panel .cls{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.rows{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin-top:12px;font-size:13px}
+.rows dt{color:var(--ink-3)}
+.rows dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.flag{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:999px;font:600 11px var(--ui);
+  letter-spacing:.02em}
+.flag.guess{background:color-mix(in srgb,var(--assumed) 16%,transparent);color:var(--assumed)}
+.flag.ok{background:color-mix(in srgb,var(--known) 16%,transparent);color:var(--known)}
+.hint{color:var(--ink-3);font-size:12.5px;line-height:1.5;margin:0}
+.zoom{position:fixed;z-index:25;left:max(16px,env(safe-area-inset-left,0px));
+  bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px}
+.zoom button{width:34px;height:34px;padding:0;font-size:17px;line-height:1;background:var(--panel)}
+@media (max-width:620px){
+  .panel{left:max(16px,env(safe-area-inset-left,0px));width:auto}
+  /* the bar wraps to two or three rows on a phone, so sit below its measured height */
+  .zoom{bottom:auto;top:calc(env(safe-area-inset-top,0px) + var(--barH,96px) + 12px)}
+  .stats{gap:12px}
+  input[type=search]{width:120px}
+}
+select{font:600 12.5px var(--ui);padding:6px 9px;border-radius:7px;border:1px solid var(--line);
+  background:var(--paper);color:var(--ink);cursor:pointer;max-width:150px}
+select:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+select option:disabled{color:var(--ink-3)}
+
+/* Loading state: the map is useless until the city's roads are in, so say what is happening. */
+.load{position:fixed;inset:0;z-index:28;display:grid;place-items:center;background:var(--paper);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  transition:opacity .28s ease}
+.load[hidden]{display:none!important}
+.load.out{opacity:0;pointer-events:none}
+.loadbox{width:min(320px,100%);text-align:left}
+.loadbox h2{margin:0 0 3px;font-size:17px;font-weight:650;letter-spacing:-.01em}
+.loadbox p{margin:0 0 14px;color:var(--ink-3);font-size:13px}
+.track{height:4px;border-radius:3px;background:var(--paper-2);overflow:hidden}
+.track i{display:block;height:100%;width:0;border-radius:3px;background:var(--known);transition:width .2s ease}
+.loadbox .num{margin-top:9px;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;display:flex;justify-content:space-between}
+.err{color:var(--assumed);font-size:13px;margin-top:10px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<div class="bar">
+  <div class="brand">Road Inspector<small>Driveroo map data</small></div>
+  <div class="stats">
+    <span class="stat"><i class="sw" style="background:var(--known)"></i> limit in OSM <b id="nKnown">–</b></span>
+    <span class="stat"><i class="sw" style="background:var(--assumed)"></i> assumed <b id="nAssumed">–</b></span>
+    <span class="stat">roads <b id="nEdges">–</b></span>
+  </div>
+  <div class="tools">
+    <select id="city" aria-label="Choose a city"></select>
+    <input type="search" id="q" placeholder="Find a road…" aria-label="Find a road by name">
+    <button id="only" aria-pressed="false">Assumed only</button>
+  </div>
+</div>
+
+<canvas id="map" aria-label="Map of roads, coloured by whether each speed limit is known or assumed"></canvas>
+
+<div class="load" id="load">
+  <div class="loadbox">
+    <h2 id="lTitle">Loading Cambridge</h2>
+    <p id="lSub">Reading the road network</p>
+    <div class="track"><i id="lBar"></i></div>
+    <div class="num"><span id="lGot">0 KB</span><span id="lPct"></span></div>
+    <div class="err" id="lErr" hidden></div>
+  </div>
+</div>
+
+<div class="zoom">
+  <button id="zin" aria-label="Zoom in">+</button>
+  <button id="zout" aria-label="Zoom out">−</button>
+  <button id="zfit" aria-label="Fit whole city" style="font-size:12px">fit</button>
+</div>
+
+<aside class="panel" id="panel">
+  <p class="hint" id="hint">Tap any road to see what the map knows about it — and whether the speed limit was read from OpenStreetMap or guessed from the road class.</p>
+  <div id="detail" hidden>
+    <h2 id="dName">—</h2>
+    <div class="cls" id="dCls">—</div>
+    <dl class="rows">
+      <dt>Speed limit</dt><dd id="dMph">—</dd>
+      <dt>Source</dt><dd id="dSrc">—</dd>
+      <dt>Lanes</dt><dd id="dLanes">—</dd>
+      <dt>Direction</dt><dd id="dOne">—</dd>
+      <dt>Cycle lane</dt><dd id="dCyc">—</dd>
+      <dt>Width</dt><dd id="dW">—</dd>
+    </dl>
+  </div>
+</aside>
+
+<script>
+const $ = id => document.getElementById(id);
+const CYC = ['none','advisory (dashed)','mandatory (solid)','separate track'];
+const cv = $('map'), ctx = cv.getContext('2d');
+
+let D=null, E=[], grid=new Map(), minX=0,maxX=0,minZ=0,maxZ=0;
+let scale=1, ox=0, oz=0, sel=null, hits=new Set(), onlyAssumed=false, dpr=1, fitted=false;
+const CELL=40, gk=(cx,cz)=>cx*100003+cz;
+
+// ---------- loading ----------
+async function loadCity(c){
+  $('load').hidden=false; $('load').classList.remove('out');
+  $('lTitle').textContent='Loading '+c.name;
+  $('lSub').textContent='Reading the road network';
+  $('lErr').hidden=true; $('lBar').style.width='0%'; $('lPct').textContent='';
+  sel=null; hits=new Set(); fitted=false; show(null);
+  try{
+    const r = await fetch(c.file);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const total = Number(r.headers.get('content-length')||0);
+    // Stream it so a slow connection shows real progress rather than a frozen bar.
+    let text='', got=0;
+    if(r.body && r.body.getReader){
+      const reader=r.body.getReader(), dec=new TextDecoder(), chunks=[];
+      for(;;){
+        const {done,value}=await reader.read(); if(done) break;
+        chunks.push(value); got+=value.length;
+        $('lGot').textContent=Math.round(got/1024).toLocaleString()+' KB';
+        if(total){ const p=Math.min(100,Math.round(got*100/total));
+          $('lBar').style.width=p+'%'; $('lPct').textContent=p+'%'; }
+      }
+      text=chunks.map(ch=>dec.decode(ch,{stream:true})).join('')+dec.decode();
+    } else { text=await r.text(); got=text.length; }
+    if(!total){ $('lBar').style.width='100%'; }
+    $('lSub').textContent='Building the index';
+    await new Promise(requestAnimationFrame);
+    build(JSON.parse(text));
+    $('load').classList.add('out');
+    setTimeout(()=>{ $('load').hidden=true; }, 300);
+  }catch(err){
+    $('lTitle').textContent='Could not load '+c.name;
+    $('lSub').textContent='The road data did not arrive.';
+    $('lErr').hidden=false; $('lErr').textContent=String(err.message||err);
+  }
+}
+
+function build(d){
+  D=d; minX=1e9;maxX=-1e9;minZ=1e9;maxZ=-1e9;
+  E = d.edges.map(([wi, flat]) => {
+    const n=flat.length/2, px=new Float32Array(n), pz=new Float32Array(n);
+    for(let i=0;i<n;i++){ const x=flat[2*i]/10, z=flat[2*i+1]/10; px[i]=x; pz[i]=z;
+      if(x<minX)minX=x; if(x>maxX)maxX=x; if(z<minZ)minZ=z; if(z>maxZ)maxZ=z; }
+    return { w:d.ways[wi], px, pz, n };
+  });
+  grid=new Map();
+  for(const e of E) for(let i=0;i<e.n-1;i++){
+    const x0=Math.min(e.px[i],e.px[i+1]),x1=Math.max(e.px[i],e.px[i+1]);
+    const z0=Math.min(e.pz[i],e.pz[i+1]),z1=Math.max(e.pz[i],e.pz[i+1]);
+    for(let cx=Math.floor(x0/CELL);cx<=Math.floor(x1/CELL);cx++)
+      for(let cz=Math.floor(z0/CELL);cz<=Math.floor(z1/CELL);cz++){
+        const k=gk(cx,cz); let a=grid.get(k); if(!a)grid.set(k,a=[]); a.push([e,i]);
+      }
+  }
+  const kn=E.filter(e=>!e.w[3]).length;
+  $('nEdges').textContent=E.length.toLocaleString();
+  $('nKnown').textContent=kn.toLocaleString();
+  $('nAssumed').textContent=(E.length-kn).toLocaleString()+' ('+Math.round((E.length-kn)*100/E.length)+'%)';
+  fit(); fitted=true; resize();
+}
+
+// ---------- picking ----------
+function pick(x,z,r){
+  let best=null, R=Math.ceil(r/CELL);
+  const cx0=Math.floor(x/CELL), cz0=Math.floor(z/CELL);
+  for(let cx=cx0-R;cx<=cx0+R;cx++) for(let cz=cz0-R;cz<=cz0+R;cz++){
+    const b=grid.get(gk(cx,cz)); if(!b) continue;
+    for(const [e,i] of b){
+      const ax=e.px[i],az=e.pz[i],dx=e.px[i+1]-ax,dz=e.pz[i+1]-az;
+      const L2=dx*dx+dz*dz||1e-9, t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/L2));
+      const d=Math.hypot(x-(ax+dx*t), z-(az+dz*t));
+      if(!best||d<best.d) best={d,e};
+    }
+  }
+  return best && best.d<=r ? best.e : null;
+}
+
+// ---------- view ----------
+function fit(){
+  const w=cv.clientWidth||1, h=cv.clientHeight||1, pad=40;
+  if(maxX<=minX||maxZ<=minZ) return;
+  scale=Math.min((w-pad*2)/(maxX-minX),(h-pad*2)/(maxZ-minZ));
+  ox=(w-(maxX-minX)*scale)/2-minX*scale; oz=(h-(maxZ-minZ)*scale)/2-minZ*scale;
+}
+const S=(v,o)=>v*scale+o;
+function draw(){
+  const w=cv.clientWidth,h=cv.clientHeight;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if(!E.length) return;
+  const known=new Path2D(), guess=new Path2D(), mark=new Path2D();
+  for(const e of E){
+    const tgt = hits.has(e)||e===sel ? mark : (e.w[3] ? guess : known);
+    tgt.moveTo(S(e.px[0],ox),S(e.pz[0],oz));
+    for(let i=1;i<e.n;i++) tgt.lineTo(S(e.px[i],ox),S(e.pz[i],oz));
+  }
+  const css=getComputedStyle(document.documentElement);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.lineWidth=Math.max(.6,Math.min(3,scale*1.5));
+  ctx.globalAlpha=onlyAssumed?.16:.85;
+  ctx.strokeStyle=css.getPropertyValue('--known').trim(); ctx.stroke(known);
+  ctx.globalAlpha=.95;
+  ctx.strokeStyle=css.getPropertyValue('--assumed').trim(); ctx.stroke(guess);
+  ctx.globalAlpha=1; ctx.lineWidth=Math.max(2.4,Math.min(6,scale*3));
+  ctx.strokeStyle=css.getPropertyValue('--sel').trim(); ctx.stroke(mark);
+}
+function resize(){
+  dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=Math.round(cv.clientWidth*dpr); cv.height=Math.round(cv.clientHeight*dpr);
+  if(!fitted && cv.clientWidth>0 && E.length){ fit(); fitted=true; }
+  draw();
+}
+
+// ---------- inspector ----------
+function show(e){
+  sel=e; $('hint').hidden=!!e; $('detail').hidden=!e;
+  if(e){
+    const w=e.w;
+    $('dName').textContent=w[0]||'Unnamed road';
+    $('dCls').textContent=((D&&D.classes[w[1]])||'—').replace(/_/g,' ')+(w[6]?' · roundabout':'');
+    $('dMph').textContent=w[2]+' mph';
+    $('dSrc').innerHTML=w[3]
+      ? '<span class="flag guess">guessed from road class</span>'
+      : '<span class="flag ok">tagged in OpenStreetMap</span>';
+    $('dLanes').textContent=w[7]?w[7]:'not tagged';
+    $('dOne').textContent=w[4]?'one-way':'two-way';
+    $('dCyc').textContent=CYC[Math.max(w[8]||0,w[9]||0)]||'none';
+    $('dW').textContent=w[5]+' m';
+  }
+  draw();
+}
+
+// ---------- interaction ----------
+let drag=null;
+cv.addEventListener('pointerdown',ev=>{drag={x:ev.clientX,y:ev.clientY,ox,oz,moved:0};cv.setPointerCapture(ev.pointerId);cv.classList.add('drag')});
+cv.addEventListener('pointermove',ev=>{ if(!drag)return;
+  const dx=ev.clientX-drag.x, dy=ev.clientY-drag.y;
+  drag.moved=Math.max(drag.moved,Math.hypot(dx,dy));
+  ox=drag.ox+dx; oz=drag.oz+dy; draw(); });
+cv.addEventListener('pointerup',ev=>{
+  const moved=drag?drag.moved:99; drag=null; cv.classList.remove('drag');
+  if(moved>5||!E.length) return;
+  const r=cv.getBoundingClientRect();
+  show(pick((ev.clientX-r.left-ox)/scale,(ev.clientY-r.top-oz)/scale,Math.max(6,14/scale)));
+});
+cv.addEventListener('pointercancel',()=>{drag=null;cv.classList.remove('drag')});
+function zoomAt(cx,cy,f){
+  const r=cv.getBoundingClientRect(), px=cx-r.left, py=cy-r.top;
+  const nx=(px-ox)/scale, nz=(py-oz)/scale;
+  scale=Math.max(.05,Math.min(14,scale*f));
+  ox=px-nx*scale; oz=py-nz*scale; draw();
+}
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomAt(ev.clientX,ev.clientY,ev.deltaY<0?1.14:1/1.14)},{passive:false});
+$('zin').onclick=()=>zoomAt(innerWidth/2,innerHeight/2,1.35);
+$('zout').onclick=()=>zoomAt(innerWidth/2,innerHeight/2,1/1.35);
+$('zfit').onclick=()=>{fit();draw()};
+$('only').onclick=function(){onlyAssumed=!onlyAssumed;this.setAttribute('aria-pressed',onlyAssumed);draw()};
+$('q').addEventListener('input',function(){
+  const v=this.value.trim().toLowerCase(); hits=new Set();
+  if(v.length>1) for(const e of E) if((e.w[0]||'').toLowerCase().includes(v)) hits.add(e);
+  draw();
+});
+const bar=document.querySelector('.bar');
+const setBar=()=>document.documentElement.style.setProperty('--barH',bar.offsetHeight+'px');
+setBar(); new ResizeObserver(setBar).observe(bar);
+addEventListener('resize',resize);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+
+// ---------- cities ----------
+(async function(){
+  let man;
+  try{ man=await (await fetch('cities/manifest.json')).json(); }
+  catch(e){ $('lTitle').textContent='Could not load the city list';
+    $('lSub').textContent='The manifest did not arrive.'; $('lErr').hidden=false;
+    $('lErr').textContent=String(e.message||e); return; }
+  const sel2=$('city');
+  for(const c of man.cities){
+    const o=document.createElement('option');
+    o.value=c.id; o.disabled=c.status!=='ready';
+    o.textContent=c.name+(c.status==='ready'?'':' — not built yet');
+    sel2.appendChild(o);
+  }
+  const ready=man.cities.filter(c=>c.status==='ready');
+  sel2.value=ready[0]?.id||'';
+  sel2.onchange=()=>{ const c=man.cities.find(x=>x.id===sel2.value); if(c&&c.file) loadCity(c); };
+  if(ready[0]) loadCity(ready[0]);
+  else { $('lTitle').textContent='No cities built yet'; $('lSub').textContent='Run the map engine to generate one.'; }
+})();
+</script>

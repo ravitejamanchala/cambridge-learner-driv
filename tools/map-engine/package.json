@@ -1,0 +1,12 @@
+{
+  "name": "learner-map-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds driving-sim road networks from OpenStreetMap, enriched with Mapillary sign and marking detections. Runs locally; emits the same area JSON the sim already loads.",
+  "scripts": {
+    "report": "node bin/snap-report.mjs",
+    "test": "node --test test/*.test.mjs",
+    "serve": "node bin/serve.mjs"
+  }
+}
