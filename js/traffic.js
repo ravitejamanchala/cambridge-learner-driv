@@ -254,6 +254,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       // A blue-light vehicle gets past once the learner has made room beside it, or has slowed to a
       // crawl: a real crew would squeeze by rather than sit behind a car doing walking pace.
       if (a.emergency && o.isPlayer && (lat > 1.6 || Math.abs(o.v) < 2) && Math.abs(o.v) < Math.max(2.5, a.v - 3)) continue;
+      // Ordinary traffic going the same way makes way for it (see below), so it filters through
+      // rather than queueing and never reaching the learner at all.
+      if (a.emergency && !o.isPlayer && !oncoming) continue;
       if (lat < width) {
         vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
@@ -261,6 +264,13 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     }
     // cyclists pass a stopped car with room to spare (or wait until they can)
     if (bike) a.swing = blocked ? Math.min(1.9, (a.swing || 0) + dt * 1.2) : Math.max(0, (a.swing || 0) - dt * 0.6);
+    // everyone makes way for a blue light coming up behind: slow right down and let it through
+    if (!a.emergency) for (const o of all) {
+      if (!o.emergency || o.alive === false) continue;
+      const ofx = -Math.sin(o.th), ofz = -Math.cos(o.th), dx = a.x - o.x, dz = a.z - o.z;
+      const ahead = dx * ofx + dz * ofz;
+      if (ahead > 0 && ahead < 40 && Math.abs(dx * ofz - dz * ofx) < 6) { vmax = Math.min(vmax, 2.5); break; }
+    }
     // predict where the learner will be over the next 2 s and give way to them
     if (player && !(a.ghost > 0) && !(a.emergency && Math.abs(player.v) < 2.5) && Math.abs(player.v) + a.v > 0.5) {
       const pfx = -Math.sin(player.th), pfz = -Math.cos(player.th), pv = player.v;

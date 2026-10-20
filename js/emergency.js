@@ -10,7 +10,8 @@ export const EMERGENCY = {
   lead: 150,         // metres ahead when it is coming the other way
   cruise: 1.25,      // it travels a little above the limit
   follow: 20,        // seconds it will sit behind before that counts against you
-  giveUp: 45,        // seconds before it finds another way and the drive carries on
+  giveUp: 45,        // seconds held up before it finds another way and the drive carries on
+  abandon: 90,       // seconds before the whole event is written off, however far away it got
   clearSpeed: 3.0,   // m/s (about 7 mph) or below counts as slowing down for it
   kerbRoom: 1.9      // metres from the nearside kerb that counts as having pulled in
 };
@@ -31,7 +32,7 @@ function lightBar(roof = 1.5) {
 export function createEmergencyEvent({ net, traffic, test, player, ui, scene = null, body = null, trigger = EMERGENCY.trigger, side = null }) {
   const events = [], record = (type, data = {}) => events.push({ type, at: traffic.clock, ...data });
   let phase = 'idle', car = null, shell = null, bar = null, flash = 0, cameAt = 0, passedAt = null, from = side;
-  let slowed = false, pulledIn = false, followFor = 0, bannerUntil = 0, badStop = false, faulted = false;
+  let slowed = false, pulledIn = false, followFor = 0, bannerUntil = 0, badStop = false, faulted = false, everNear = false;
 
   const route = () => test.route;
   // the learner's offset towards the nearside kerb, and the width of the road they are on
@@ -101,9 +102,12 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
       const pick = pool[0]; if (!pick) return;
       from = chooseSide();
       if (from === 'oncoming') {
-        // placed down the road, facing the learner, finding its own way towards them
+        // Placed down the road facing the learner, and given the learner's own route backwards to
+        // follow. Left to choose its own turns it could simply drive off down a side road and never
+        // arrive, which would leave the learner waiting for a vehicle that never came.
         const at = stepAt(Math.min(R.len - 20, test.sRoute + EMERGENCY.lead));
-        traffic.placeCar(pick, at.step.e, -at.step.dir, Math.max(1, at.step.e.len - at.into), 12, EMERGENCY.cruise, null);
+        const against = R.steps.slice(0, at.k + 1).reverse().map(st => ({ e: st.e, dir: -st.dir }));
+        traffic.placeCar(pick, at.step.e, -at.step.dir, Math.max(1, at.step.e.len - at.into), 12, EMERGENCY.cruise, against);
       } else {
         const at = stepAt(Math.max(0, test.sRoute - EMERGENCY.behind));
         traffic.placeCar(pick, at.step.e, at.step.dir, Math.min(at.step.e.len - 2, at.into), 12, EMERGENCY.cruise, R.steps);
@@ -127,15 +131,19 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
     const lateral = Math.abs((car.x - player.x) * fz - (car.z - player.z) * fx);
     const oncoming = from === 'oncoming';
     if (phase === 'coming') {
-      // in range: behind and closing, or ahead and closing
+      // In range at all: close enough that the learner should have seen it and reacted.
       const near = lateral < 12 && (oncoming ? forward > 4 && forward < 70 : forward < -4 && forward > -70);
+      // Actually being held up by the learner. Time spent stuck in a queue or at a red light further
+      // back is not the learner's doing and must not be counted against them.
+      const holding = near && Math.abs(forward) < 30;
       if (near) {
-        followFor += dt;
+        everNear = true;
+        if (holding) followFor += dt;
         if (Math.abs(player.v) <= EMERGENCY.clearSpeed) slowed = true;
         const k = kerbSide();
         if (k && k.offL > k.width / 2 - EMERGENCY.kerbRoom) pulledIn = true;
         if (Math.abs(player.v) < 0.4 && stoppedInTheWay()) badStop = true;
-        if (clock > bannerUntil && followFor > 2.5 && !slowed && !pulledIn) {
+        if (clock > bannerUntil && near && followFor > 2.5 && !slowed && !pulledIn) {
           ui.banner('Let it through: slow down and keep over to the left where it is safe.', 'warn'); bannerUntil = clock + 4;
         }
       }
@@ -154,9 +162,10 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
         test.fault('D', 'Emergency vehicle', `Held an emergency vehicle up for over ${EMERGENCY.follow} seconds without slowing down or making room`, 'emergency-room', Infinity);
       }
       // It cannot follow for ever: it finds another way, and the drive carries on without a siren
-      // behind it for the rest of the route.
-      if (followFor > EMERGENCY.giveUp) {
-        record('emergency-gave-up', { side: from, followFor: Math.round(followFor) });
+      // behind it for the rest of the route. The second clause covers one that never got close at
+      // all, so a drive is never left waiting on it.
+      if (followFor > EMERGENCY.giveUp || clock - cameAt > EMERGENCY.abandon) {
+        record('emergency-gave-up', { side: from, followFor: Math.round(followFor), reached: everNear });
         ui.banner(null); phase = 'done'; if (car) { car.alive = false; car.mesh.visible = false; } detach();
       }
       return;
@@ -167,6 +176,8 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
   S.result = () => {
     const where = from === 'oncoming' ? 'coming the other way' : 'behind you';
     if (phase === 'idle') return { ok: false, why: 'The emergency vehicle never reached you: drive the whole route at a normal speed.' };
+    // It never got close enough to be in the learner's way, so there was nothing for them to do.
+    if (!everNear) return { ok: false, why: 'The emergency vehicle never reached you on this drive. Try the route again.' };
     if (passedAt === null) return { ok: false, why: `You did not let the emergency vehicle ${where} through. Slow down and keep over to the left when it is safe.` };
     if (badStop) return { ok: false, why: 'You stopped on a crossing or in a junction. Pull up where you are clear of both.' };
     if (!slowed && !pulledIn) return { ok: false, why: 'The emergency vehicle had to find its own way past you.' };

@@ -8,7 +8,7 @@ function harness({ roadWidth = 7.3, zebras = [], fillets = [], side = 'behind', 
   const route = { len: 400, steps: [{ e: edge, dir: 1 }], stepS: [0], instructions: [] };
   const car = { x: 0, z: 0, th: -Math.PI / 2, v: 0, alive: true, pinned: 0, mesh: { add() {}, remove() {} } };
   const placed = [];
-  const traffic = { clock: 0, cars: [car], placeCar(c, e, dir, s, speed, cruise, path) { placed.push({ s, speed, cruise, path }); Object.assign(c, { x: s, z: 0, v: speed }); } };
+  const traffic = { clock: 0, cars: [car], placeCar(c, e, dir, s, speed, cruise, path) { placed.push({ e, dir, s, speed, cruise, path }); Object.assign(c, { x: s, z: 0, v: speed }); } };
   const faults = [];
   const player = { x: 0, z: 0, th: -Math.PI / 2, v: 0 };
   const test = { route, sRoute: 0, ctx: { lat: 0, tx: 1, tz: 0, way: edge.way }, fault(kind, cat, text, key) { faults.push({ kind, cat, text, key }); } };
@@ -119,4 +119,30 @@ test('it does not follow for ever: it gives up and the drive carries on',()=>{
  assert.ok(h.event.events.some(e=>e.type==='emergency-gave-up'));
  assert.equal(h.car.alive,false,'it is off the road, not sitting behind the learner');
  assert.equal(h.event.result().ok,false);
+});
+
+test('an oncoming vehicle is given the route back to the learner, not left to pick its own turns',()=>{
+ const h=harness({side:'oncoming'});
+ h.test.sRoute=100; h.player.v=12; h.step();
+ const placed=h.placed[0];
+ assert.ok(Array.isArray(placed.path)&&placed.path.length,'it follows a path');
+ assert.equal(placed.dir,-1,'facing back down the learner\'s route');
+ assert.equal(placed.path[0].dir,-1);
+});
+test('a vehicle that never reaches the learner is not held against them',()=>{
+ const h=harness({side:'oncoming'});
+ h.test.sRoute=100; h.player.v=12; h.step();
+ // it exists, but stays far away for the whole drive
+ for(let i=0;i<Math.ceil(EMERGENCY.abandon/0.5)+6;i++){place(h,400);h.step();}
+ assert.equal(h.event.phase,'done');
+ assert.deepEqual(h.faults,[],'nothing is marked for an event that never arrived');
+ assert.match(h.event.result().why,/never reached you/);
+});
+
+test('time it spends stuck further back is not counted as the learner holding it up',()=>{
+ const h=harness();
+ h.test.sRoute=100; h.player.v=12; h.step();
+ // it is in sight but 50 m back, queued at lights: well past the hold-up allowance in seconds
+ for(let i=0;i<Math.ceil(EMERGENCY.giveUp/0.5)+10;i++){place(h,-50);h.step();}
+ assert.deepEqual(h.faults.map(f=>f.cat),[],'the learner is not marked for a queue behind them');
 });
