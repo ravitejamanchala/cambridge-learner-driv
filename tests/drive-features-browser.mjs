@@ -81,5 +81,29 @@ try{
  assert.deepEqual(lesson.faults,[],JSON.stringify(lesson));
  assert.equal(lesson.result.ok,true,JSON.stringify(lesson));
  console.log('Blue light lesson: slowing down and letting it past is a clean pass.',JSON.stringify(lesson.result));
+ // ---------- Getting started on a phone: nothing may sit over the road ----------
+ await page.setViewportSize({width:390,height:844});
+ for(const id of ['mirror-practice','controlled-stop','accel-decel']){
+  await page.evaluate(async i=>{await window.cambridgeDrive.pick('lesson',i,true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0.2);},id);
+  await page.evaluate(()=>{for(let i=0;i<40;i++)window.cambridgeDrive.step(1);window.cambridgeDrive.frame(0.2);});
+  await page.waitForTimeout(150);
+  const over=await page.evaluate(()=>{
+   const vis=el=>el&&!el.hidden&&getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0;
+   const stage=document.querySelector('#stage').getBoundingClientRect();
+   const area=el=>{const r=el.getBoundingClientRect();return Math.round(r.width*r.height/(stage.width*stage.height)*100);};
+   const panel=document.querySelector('#trainingControls'), banner=document.querySelector('#banner');
+   const boxes=[['#hudNextBox',document.querySelector('#hudNextBox')],['.speedo',document.querySelector('.speedo')]]
+     .filter(([,el])=>vis(el)).map(([n,el])=>{const r=el.getBoundingClientRect();return {n,x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)};});
+   const overlap=(a,b)=>!(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
+   let clashes=[];
+   for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++)if(overlap(boxes[i],boxes[j]))clashes.push(boxes[i].n+' over '+boxes[j].n);
+   return {panel:vis(panel),banner:vis(banner),bannerArea:vis(banner)?area(banner):0,clashes};
+  });
+  assert.equal(over.panel,false,`${id}: a control panel is sitting over the road`);
+  assert.equal(over.banner,false,`${id}: a banner is sitting over the road`);
+  assert.deepEqual(over.clashes,[],`${id}: HUD pieces overlap each other`);
+ }
+ console.log('Getting started on a phone: no panel, no banner, no overlapping HUD.');
+ await page.setViewportSize({width:1280,height:720});
  assert.equal(errors.length,0,errors.join('\n'));
 }finally{await browser?.close();server.kill();}

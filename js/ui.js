@@ -134,6 +134,20 @@ export function createUI(net) {
     ln.hidden = !showL; if (showL) { const k = s.lanes + ':' + s.laneOK.join(','); if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: s.lanes }, (_, i) => `<i class="${s.laneOK.includes(i) ? 'on' : ''}"></i>`).join(''); } }
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
+    // Getting started: the state goes on the instruments, not into a sentence over the road.
+    const basic = t.basicStatus, ck = $('hudChecks'), tg = $('hudTarget');
+    ck.hidden = !basic?.checks;
+    if (basic?.checks) { const k = basic.checks.join(','); if (ck.dataset.k !== k) { ck.dataset.k = k; ck.innerHTML = basic.checks.map(on => `<i class="${on ? 'on' : ''}"></i>`).join(''); } }
+    const band = basic?.band, inBand = band && mph >= band[0] && mph <= band[1];
+    tg.hidden = !band;
+    if (band) { tg.textContent = band[0] ? `${band[0]}–${band[1]}` : `under ${band[1]}`; tg.classList.toggle('on', !!inBand); }
+    document.querySelector('.hud-spd').classList.toggle('inband', !!inBand);
+    if (basic) {
+      if (basic.value) $('hudNext').textContent = basic.value;
+      $('hudDist').textContent = basic.label || '';
+      $('hudNextBox').setAttribute('aria-label', basic.label || '');
+      if (basic.checks) $('hudNext').textContent = basic.checks.filter(Boolean).length + '/3';
+    }
     if (t.mode === 'manoeuvre' && t.manoeuvreStatus) {
       const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = m.short; $('hudNextBox').setAttribute('aria-label',m.message); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
     }

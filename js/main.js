@@ -214,16 +214,16 @@ async function boot() {
     if (k) { key[k] = 1; if (A.test && A.test.running) e.preventDefault(); }
     else if (e.code === 'KeyQ') { player.signal('L'); sigBtns(); } else if (e.code === 'KeyE') { player.signal('R'); sigBtns(); }
     else if (e.code === 'KeyC') setCam((cam + 1) % 3, true);
-    else if (e.code === 'KeyZ') { if (!lookHold.left) look('left'); lookHold.left = 1; }
-    else if (e.code === 'KeyX') { if (!lookHold.right) look('right'); lookHold.right = 1; }
-    else if (e.code === 'KeyB') look();
+    else if (e.code === 'KeyZ') holdLook('left', true);
+    else if (e.code === 'KeyX') holdLook('right', true);
+    else if (e.code === 'KeyB') look('interior');
     else if (e.code === 'KeyI') cockpitAction('engine');
     else if (e.code === 'KeyP') cockpitAction('parkingBrake');
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => {
     const k = KM[e.code]; if (k) key[k] = 0;
-    if (e.code === 'KeyZ') lookHold.left = 0; else if (e.code === 'KeyX') lookHold.right = 0;
+    if (e.code === 'KeyZ') holdLook('left', false); else if (e.code === 'KeyX') holdLook('right', false);
   });
   const releaseControls = () => {
     for (const k in key) { key[k] = 0; tch[k] = 0; }
@@ -242,12 +242,32 @@ async function boot() {
   // look round: mirrors and over the shoulder (the driver view turns to look); the examiner notes when you did it
   let lookAnim = 0;
   function look(view = 'all-round') { if (!A.traffic || !A.test?.running) return; player.lookAt = A.traffic.clock; player.observations.push({ view, at: A.traffic.clock, x: player.x, z: player.z }); lookAnim = 1; }
-  $('lookBtn').addEventListener('click', () => look());
+  // A glance in the mirror and a look over the shoulder are the same movement, held for longer:
+  // a tap records the mirror, keeping it held records the blind spot behind it.
+  const BLIND_SPOT_HOLD = 0.55;
+  const heldSince = { left: 0, right: 0 }, shoulder = { left: false, right: false };
+  function holdLook(side, down) {
+    if (down) {
+      if (lookHold[side]) return;
+      lookHold[side] = 1; heldSince[side] = A.traffic ? A.traffic.clock : 0; shoulder[side] = false;
+      look(side === 'left' ? 'left' : 'right');
+    } else { lookHold[side] = 0; shoulder[side] = false; }
+  }
+  // called every frame: once the look has been held long enough it becomes a blind-spot check
+  function updateHeldLooks() {
+    if (!A.traffic || !A.test?.running) return;
+    for (const side of ['left', 'right']) {
+      if (!lookHold[side] || shoulder[side]) continue;
+      if (A.traffic.clock - heldSince[side] < BLIND_SPOT_HOLD) continue;
+      shoulder[side] = true; look(side === 'left' ? 'left-blindspot' : 'blindspot');
+    }
+  }
+  $('lookBtn').addEventListener('click', () => look('interior'));
   // hold-to-look buttons for touch, matching the Z and X keys
   document.querySelectorAll('[data-look]').forEach(b => {
     const side = b.dataset.look;
-    const on = e => { e.preventDefault(); if (!lookHold[side]) look(side); lookHold[side] = 1; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
-    const off = () => { lookHold[side] = 0; b.classList.remove('on'); };
+    const on = e => { e.preventDefault(); holdLook(side, true); b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
+    const off = () => { holdLook(side, false); b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault());
   });
   function cockpitAction(action) {
@@ -262,7 +282,6 @@ async function boot() {
   }
   document.querySelectorAll('[data-gear]').forEach(b => b.addEventListener('click', () => gearAction(b.dataset.gear)));
   document.querySelectorAll('[data-operation]').forEach(b => b.addEventListener('click', () => cockpitAction(b.dataset.operation)));
-  document.querySelectorAll('[data-observe]').forEach(b => b.addEventListener('click', () => look(b.dataset.observe)));
   // Manoeuvre lessons have exactly one control: release the parking brake to set off, apply it to park.
   // Reverse is the back arrow held down, as on every other drive.
   $('assessParking').addEventListener('click', () => {
@@ -285,12 +304,11 @@ async function boot() {
     const warn = scenario?.progress?.message || '';
     $('parkingTask').hidden = !plan?.lesson?.manoeuvre || !warn;
     $('parkingTask').textContent = warn;
-    $('trainingControls').hidden = parking || document.body.dataset.mode !== 'drive' || (!player.operation.enabled && plan?.lesson?.scenario !== 'mirrors');
+    $('trainingControls').hidden = parking || document.body.dataset.mode !== 'drive' || !player.operation.enabled;
     $('cockpitControls').hidden = !player.operation.enabled;
     $('cockpitState').hidden = parking;
     $('gearControls').hidden = parking || player.operation.transmission !== 'automatic';
     document.querySelectorAll('[data-gear]').forEach(b => { b.hidden = parking && b.dataset.gear === 'N'; b.setAttribute('aria-pressed', String(op.gear === b.dataset.gear)); });
-    $('observationControls').hidden = plan?.lesson?.scenario !== 'mirrors';
     document.querySelectorAll('[data-operation]').forEach(b => {
       const action = b.dataset.operation;
       b.hidden = !preparation && !['engine','parkingBrake'].includes(action);
@@ -497,6 +515,7 @@ async function boot() {
       player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
+      updateHeldLooks();
       if (test.running && plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
       test.nearZebra = net.zebras.some(z => Math.abs(z.x - player.x) < 70 && Math.abs(z.z - player.z) < 70);
       test.nearLights = test.ctx && net.stopsByEdge.has(test.ctx.e.id);

@@ -23,14 +23,31 @@ The learner is looking at a road. Everything drawn on top of it costs them somet
   go away again.
 - **After the run:** all the detail, in the feedback. See below.
 
+## Instruments, not sentences
+
+A line of text that updates while the learner drives is an instrument we failed to build. The car
+already has a distance field, a speedometer and an eye button; use them.
+
+| Don't | Do |
+| --- | --- |
+| "Brake to stop: 18 metres left" | The distance field, which already reads in yards and metres |
+| "Hold 10–15 mph: 1.4 / 3 seconds" | A target band under the speed, and a count in the distance field |
+| "Repeat Interior, Right and Blind spot" | Three ticks that fill as each check is recorded |
+
+Scenarios report state through `test.basicStatus` — `{ label, value, band, checks }` — and `ui.hud()`
+draws it. They do not call `ui.banner()` during a drive.
+
 ## One control, and controls the learner already has
 
 - A manoeuvre gets **one** control. Parallel parking has a single button that releases the parking brake
   to set off and applies it to park. No cockpit drill, no P/R/N/D selector.
 - **Reuse the existing inputs rather than adding new ones.** Reverse is the back arrow held down, the
   same as everywhere else in the simulator.
-- A new key must not take a key that already means something. `B` records an all-round check, `Z` and
-  `X` are held to look left and right, `Q` and `E` are the indicators.
+- A new key must not take a key that already means something. `B` is the interior mirror, `Z` and `X`
+  look left and right, `Q` and `E` are the indicators.
+- **Prefer a gesture that matches the real movement over another button.** A mirror glance and a
+  blind-spot check are the same head movement held for different lengths, so a tap on `X` records the
+  right mirror and holding it records the blind spot. That deleted a three-button panel outright.
 
 ## Camera
 
@@ -73,7 +90,9 @@ node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.
 ```
 
 Touch targets are at least 44 px on a coarse pointer, nothing overlaps, and nothing runs off the screen
-at 320 px wide. `npm run test:devices` checks all three.
+at 320 px wide. `npm run test:devices` checks all three, and `npm run test:drive` checks that no panel
+or banner sits over the road during the Getting started lessons at phone size, and that the HUD pieces
+do not overlap each other.
 
 When the course or the interface changes, regenerate the screenshots and commit them: `docs/screenshots.md`
 is the quickest way to see what a change did to every case at once.
