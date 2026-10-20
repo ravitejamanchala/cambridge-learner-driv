@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import {createApp} from '../.test-build/app.mjs';
 import {paidAccess,validatePrice,reconcile,checkout} from '../src/billing.mjs';
 import {basicProgressAllowed} from '../../shared/access-policy.mjs';
-const env={DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://manchala.co.uk',RATE_LIMITER:{limit:async()=>({success:true})},STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_PRICE_ID:'price_499',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
+const env={DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://app.slaydrive.com',RATE_LIMITER:{limit:async()=>({success:true})},STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_PRICE_ID:'price_499',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
 const period=Math.floor(Date.now()/1000)+86400;
 const good={id:'sub_1',status:'active',latest_invoice:{status:'paid'},cancel_at_period_end:false,items:{data:[{price:{id:'price_499'},current_period_end:period}]}};
 const price={active:true,currency:'gbp',unit_amount:499,billing_scheme:'per_unit',recurring:{interval:'month',interval_count:1,usage_type:'licensed'}};

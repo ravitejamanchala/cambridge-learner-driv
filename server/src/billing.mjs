@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 export const MONTHLY_AMOUNT=499;
-export const WEB_URL='https://manchala.co.uk/cambridge-learner-driv/';
+export const WEB_URL='https://app.slaydrive.com/';
 export function billingConfigured(env){return !!(env.STRIPE_SECRET_KEY&&env.STRIPE_PRICE_ID&&env.STRIPE_WEBHOOK_SECRET);}
 export function paidAccess(state, now=Date.now()){
  return state?.status==='active'&&new Date(state.paidUntil).getTime()>now;

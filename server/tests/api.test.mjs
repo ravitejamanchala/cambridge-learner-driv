@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../.test-build/app.mjs';
-const env={ DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://manchala.co.uk',RATE_LIMITER:{limit:async()=>({success:true})} };
+const env={ DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://app.slaydrive.com',RATE_LIMITER:{limit:async()=>({success:true})} };
 const profile={name:'Learner',lessons:{},mocks:[],history:[],practiceSeconds:0};
 const store={ready:async()=>{},user:async id=>id,progress:async()=>({profile:null,revision:0}),saveProgress:async()=>({revision:1}),list:async()=>[],session:async(user)=>user==='alice'?{pass:true}:null};
 const app=createApp({getAccess:async()=>true,store,verify:async token=>{if(token==='bad')throw Error('secret');return {sub:token,sid:'session'};}});

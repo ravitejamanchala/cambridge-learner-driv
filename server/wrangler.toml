@@ -4,7 +4,7 @@ main = "src/index.ts"
 compatibility_date = "2026-10-15"
 compatibility_flags = ["nodejs_compat"]
 [vars]
-FRONTEND_URL = "https://manchala.co.uk"
+FRONTEND_URL = "https://app.slaydrive.com"
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"

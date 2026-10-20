@@ -16,7 +16,7 @@ try{
  assert.equal((await checkout(stripe,store,user,clerkId,env)).existing,true);
  await stripe.subscriptions.update(subscription.id,{cancel_at_period_end:true});
  const cancelling=await reconcile(stripe,store,user,account.customerId,env.STRIPE_PRICE_ID);assert.equal(cancelling.cancelAtPeriodEnd,true);assert.equal(paidAccess(cancelling),true);
- const portal=await stripe.billingPortal.sessions.create({customer:account.customerId,configuration:env.STRIPE_PORTAL_CONFIG_ID,return_url:'https://manchala.co.uk/cambridge-learner-driv/'});assert.match(portal.url,/^https:\/\/billing.stripe.com\//);
+ const portal=await stripe.billingPortal.sessions.create({customer:account.customerId,configuration:env.STRIPE_PORTAL_CONFIG_ID,return_url:'https://app.slaydrive.com/'});assert.match(portal.url,/^https:\/\/billing.stripe.com\//);
  await stripe.subscriptions.cancel(subscription.id);subscription=null;
  assert.equal(paidAccess(await reconcile(stripe,store,user,account.customerId,env.STRIPE_PRICE_ID)),false);
  console.log('PASS real Stripe sandbox: £4.99 checkout, test payment, activation, duplicate prevention, period-end cancellation, customer portal and revocation; isolated Neon branch.');

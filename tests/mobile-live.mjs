@@ -9,7 +9,7 @@ for(const spec of [{name:'iphone-live-signin',engine:'webkit',preset:'iPhone 13'
  try{
   browser=await (spec.engine==='webkit'?webkit:chromium).launch(spec.engine==='chromium'?{executablePath:process.env.CHROMIUM_PATH,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});
   context=await browser.newContext({...devices[spec.preset],locale:'en-GB'});page=await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror',e=>result.errors.push(e.message));
-  const start=Date.now();await page.goto('https://manchala.co.uk/cambridge-learner-driv/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv')?.hidden,{}, {timeout:60000});result.bootMs=Date.now()-start;result.checks.push('deployed simulator boots with real CDN/network');
+  const start=Date.now();await page.goto('https://app.slaydrive.com/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv')?.hidden,{}, {timeout:60000});result.bootMs=Date.now()-start;result.checks.push('deployed simulator boots with real CDN/network');
   await page.waitForFunction(()=>window.Clerk?.loaded,{}, {timeout:45000});result.checks.push('production Clerk initializes');
   if(!await page.locator('[data-login]').isVisible())await page.locator('#profBtn2').tap();
   await page.locator('[data-login]').tap();

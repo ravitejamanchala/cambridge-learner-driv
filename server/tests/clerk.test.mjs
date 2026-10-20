@@ -7,11 +7,11 @@ const jwtKey=publicKey.export({type:'spki',format:'pem'});
 function token(overrides={}) {
  const encode=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
  const now=Math.floor(Date.now()/1000);
- const data=encode({alg:'RS256',typ:'JWT',kid:'test'})+'.'+encode({sub:'user_a',sid:'sess_a',iss:'https://fixture.clerk.accounts.dev',azp:'https://manchala.co.uk',iat:now,nbf:now-1,exp:now+60,...overrides});
+ const data=encode({alg:'RS256',typ:'JWT',kid:'test'})+'.'+encode({sub:'user_a',sid:'sess_a',iss:'https://fixture.clerk.accounts.dev',azp:'https://app.slaydrive.com',iat:now,nbf:now-1,exp:now+60,...overrides});
  return data+'.'+createSign('RSA-SHA256').update(data).sign(privateKey,'base64url');
 }
 test('official Clerk verifier accepts valid signatures and rejects expiry, tampering and foreign azp (local keys)',async()=>{
- const opts={jwtKey,authorizedParties:['https://manchala.co.uk']};
+ const opts={jwtKey,authorizedParties:['https://app.slaydrive.com']};
  assert.equal((await verifyToken(token(),opts)).sub,'user_a');
  await assert.rejects(()=>verifyToken(token({exp:1}),opts));
  await assert.rejects(()=>verifyToken(token({azp:'https://evil.example'}),opts));
