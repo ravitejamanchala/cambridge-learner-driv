@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta name="app-release" content="04c15ef2fad376437fa9f67c3e8779bb5814ea49">
+<head><meta name="app-release" content="8d3e0dde9429a9ca107b0a27e4808c9c8e7789db">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#79a9d2">
@@ -257,13 +257,13 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .mb-list li i{font:700 11px/22px var(--font-mono);text-align:center;border-radius:6px;background:#ffb21a;color:#2a1b00;font-style:normal}.mb-list li i.s{background:#ff5a5f;color:#fff}
 .mb-list li b{display:block;font:600 11px/1.2 var(--font-display);color:rgba(255,255,255,.62);text-transform:uppercase;letter-spacing:.04em}
 .mb-list li.new{animation:mbIn .35s ease-out}@keyframes mbIn{from{opacity:0;transform:translateY(-4px)}}
-.lookpair{display:flex;gap:6px}.lookbtn.on{box-shadow:0 0 0 3px #82d9ef}.lookbtn{position:relative}.lookbtn kbd{position:absolute;right:3px;bottom:2px;font:600 9px/1 var(--font-mono);opacity:.65}.lookbtn.ask{box-shadow:0 0 0 3px #ffb21a}.lookbtn.done{box-shadow:0 0 0 3px #2fbf71}
+#runDetail{margin:0;font-size:13px}#runDetail summary{cursor:pointer;font-weight:600;color:var(--ink,#1e2a30);margin-bottom:6px}#runDetailList{margin:0;padding-left:18px;color:#5a6670}#runDetailList li{margin:2px 0}.parkctl{position:absolute;left:calc(12px + var(--safe-l));top:calc(12px + var(--safe-t));z-index:9;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:auto}.parkctl button{appearance:none;border:0;cursor:pointer;min-height:36px;padding:9px 18px;border-radius:999px;font:700 13px/1 var(--font-display);color:#fff;background:var(--pink,#ef4f97);box-shadow:0 3px 0 #b8306f,0 8px 18px -10px rgba(0,0,0,.6);white-space:nowrap}.parkctl button:active{transform:translateY(1px)}.parkctl p{margin:0;padding:5px 12px;border-radius:12px;background:rgba(24,18,26,.82);color:#fff;font:600 11px/1.3 var(--font-body);max-width:min(260px,52vw)}.lookpair{display:flex;gap:6px}.lookbtn.on{box-shadow:0 0 0 3px #82d9ef}.lookbtn{position:relative}.lookbtn kbd{position:absolute;right:3px;bottom:2px;font:600 9px/1 var(--font-mono);opacity:.65}.lookbtn.ask{box-shadow:0 0 0 3px #ffb21a}.lookbtn.done{box-shadow:0 0 0 3px #2fbf71}
 @media (prefers-reduced-motion:reduce){.mb-list li.new{animation:none}.markboard,.mb-bar i{transition:none}}
 .hud-road{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);padding:7px 14px;font:600 13px/1 var(--font-display)}
-.banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:4;padding:14px 26px;border-radius:20px;font:700 22px/1.1 var(--font-display);background:rgba(24,18,26,.86);color:#fff;pointer-events:none;text-align:center;max-width:80%}
+.banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:9;padding:14px 26px;border-radius:20px;font:700 22px/1.1 var(--font-display);background:rgba(24,18,26,.86);color:#fff;pointer-events:none;text-align:center;max-width:80%}
 .banner.stop{background:#d2232a;font-size:48px;letter-spacing:.06em;padding:16px 36px;animation:pulse .6s var(--spring) infinite}
 .touch{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(12px + var(--safe-b));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
-@media (any-pointer:coarse){.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
+@media (any-pointer:coarse){.parkctl button{min-height:44px;padding:13px 22px;font-size:14px}.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
 .touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
 .touch .c{display:flex;flex-direction:column;gap:10px;align-items:center}
 .touch{--ts:3;--bw:min(calc(70px * var(--ts)),27vh);--bh:var(--bw);--sw:min(calc(50px * var(--ts)),15vh);--sh:var(--sw)}
@@ -339,12 +339,12 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 #trainingControls button{min-height:40px;padding:8px 10px;margin:3px 2px;border-radius:12px;border:0;background:#fff;color:var(--ink);font:600 12px/1.25 var(--font-display);box-shadow:inset 0 0 0 2px var(--cream-2),0 2px 0 var(--cream-edge);cursor:pointer;transition:background .2s,box-shadow .2s}
 #trainingControls button[aria-pressed=true]{background:var(--lav);box-shadow:inset 0 0 0 2px var(--lav-deep),0 2px 0 var(--lav-deep);color:var(--plum)}
 #trainingControls button:active{transform:translateY(1px)}
-#trainingControls #assessParking{width:calc(100% - 4px);margin-top:10px;background:var(--pink);color:#fff;box-shadow:0 3px 0 #b8306f}
+
 #gearControls{display:flex;flex-wrap:wrap;gap:4px}#gearControls p{flex-basis:100%}#gearControls button{flex:1;margin:0;min-width:0}
 #parkingTask{border-left:3px solid var(--lav);padding-left:8px}
 #trainingControls[hidden]{display:none}
 
-body.parking-drive #mini{display:none}
+body.parking-drive .hud-map{display:none}
 body.parking-drive #trainingControls p{margin:4px 0}
 body.parking-drive #gearControls p{display:none}
 @media (any-pointer:coarse){#trainingControls button{min-height:44px;min-width:44px}}
@@ -410,7 +410,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 .full{background:radial-gradient(ellipse at 50% 43%,#a1cce5,#709fca);color:#fff}.full h1{text-shadow:0 2px 0 rgba(24,49,69,.2)}
 .hud-next .ico{background:#087f83}.glass{background:rgba(24,43,60,.84)}.tb{background:rgba(24,43,60,.64)}
 #trainingControls button[aria-pressed=true]{background:#b9eee3;color:#073c37}
-#trainingControls #assessParking{background:#b81f65}
+
 .tile[aria-checked=true],.item[aria-checked=true]{box-shadow:0 0 0 3px var(--lav-deep),0 4px 0 var(--lav-deep)}
 :focus-visible{outline-color:var(--lav-deep)}
 .sheet [fill="#b49cf5"]{fill:#38cbb9}.sheet [stroke="#8a6ae3"],.sheet [stroke="#6a4fc4"]{stroke:#087f83}
@@ -491,6 +491,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="lookpair"><button class="glass pausebtn lookbtn" data-look="left" aria-label="Hold to look left (Z)" title="Hold to look left (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7 5 12l5 5"/><path d="M19 12H5.5"/></svg><kbd>Z</kbd></button><button class="glass pausebtn lookbtn" data-look="right" aria-label="Hold to look right (X)" title="Hold to look right (X)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 7l5 5-5 5"/><path d="M5 12h13.5"/></svg><kbd>X</kbd></button></div>
       <button class="glass pausebtn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
     </div>
+    <div class="parkctl" id="parkControls" hidden><button id="assessParking">Park</button><p id="parkingTask" hidden role="status"></p></div>
     <button class="recentre cam" id="camRecentre" hidden>Back to car</button>
     <div class="hud-sig" aria-hidden="true">
       <svg id="sigL" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4 2 12l8 8v-5h12V9H10z"/></svg>
@@ -511,9 +512,9 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
     <div class="banner" id="banner" role="status" hidden role="alert"></div>
     <section id="trainingControls" hidden aria-label="Training controls">
       <h2>Driving controls</h2>
-      <p id="parkingTask" hidden role="status"></p><div id="cockpitControls"><p id="cockpitState" role="status"></p>
+      <div id="cockpitControls"><p id="cockpitState" role="status"></p>
         <button data-operation="doorClosed" aria-pressed="false">Door closed</button><button data-operation="seatSet" aria-pressed="false">Seat confirmed</button><button data-operation="mirrorsSet" aria-pressed="false">Mirrors confirmed</button><button data-operation="belt" aria-pressed="false">Belt fastened</button><button data-operation="engine" aria-pressed="false">Engine (I)</button><button data-operation="parkingBrake" aria-pressed="true">Parking brake (P)</button>
-      </div><div id="gearControls" hidden aria-label="Automatic selector"><p>Hold the footbrake and stop before selecting a gear.</p><button data-gear="P" aria-pressed="true">P · Park</button><button data-gear="R" aria-pressed="false">R · Reverse</button><button data-gear="N" aria-pressed="false">N · Neutral</button><button data-gear="D" aria-pressed="false">D · Drive</button></div><button id="assessParking" hidden>Assess parked position</button><div id="observationControls"><p>Use B or these buttons to record a check. Head movement is not measured.</p><button data-observe="interior">Interior mirror</button><button data-observe="right">Right mirror</button><button data-observe="blindspot">Right blind spot</button></div>
+      </div><div id="gearControls" hidden aria-label="Automatic selector"><p>Hold the footbrake and stop before selecting a gear.</p><button data-gear="P" aria-pressed="true">P · Park</button><button data-gear="R" aria-pressed="false">R · Reverse</button><button data-gear="N" aria-pressed="false">N · Neutral</button><button data-gear="D" aria-pressed="false">D · Drive</button></div><div id="observationControls"><p>Use B or these buttons to record a check. Head movement is not measured.</p><button data-observe="interior">Interior mirror</button><button data-observe="right">Right mirror</button><button data-observe="blindspot">Right blind spot</button></div>
     </section>
     <div class="touch" aria-label="Touch controls">
       <div class="grp">
@@ -614,6 +615,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="score"><div><b id="rD">0</b><span>Driving faults</span></div><div><b id="rS">0</b><span>Serious faults</span></div></div>
       <p id="rNote" style="margin:0"></p>
       <ul class="reasons" id="rReasons"></ul>
+      <details id="runDetail" open><summary>What you did on this run</summary><ul id="runDetailList"></ul></details>
       <p id="coachingReport" class="muted"></p><div class="btns"><button class="cbtn go" id="nextBtn" hidden>Next lesson</button><button class="cbtn alt" id="againBtn">Try again</button><button class="cbtn lav" id="hubBtn">Back to lobby</button></div>
     </div></div></div>
 
@@ -624,7 +626,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="auth-config.js"></script>
-<script type="module" src="app.js?v=04c15ef2fad376437fa9f67c3e8779bb5814ea49"></script>
+<script type="module" src="app.js?v=8d3e0dde9429a9ca107b0a27e4808c9c8e7789db"></script>
 
 </body>
 </html>
