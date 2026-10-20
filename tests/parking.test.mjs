@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rectangleCorners, containsVehicle, gradeParking, rectanglesOverlap, sweptContact, VEHICLE_ENVELOPE } from '../js/parking-geometry.js';
-import { PARKING_LAYOUT, parkingPlan } from '../js/parking-layout.js';
+import { ROADSIDE_PARKING, parkingPlan } from '../js/roadside-parking.js';
 import { createParkingScenario } from '../js/parking-scenario.js';
 import { createAutomaticState } from '../js/vehicle-state.js';
+import { buildNet, nearest } from '../js/net.js';
 import { buildLayout } from '../tools/layouts.mjs';
-const target=PARKING_LAYOUT.bay;
+const L=ROADSIDE_PARKING, target=L.bay, EAST=target.th;
 test('parking requires every corner, correct facing and a complete stop',()=>{
  assert.equal(rectangleCorners({...target,...VEHICLE_ENVELOPE}).length,4);
  assert.equal(gradeParking(target,{...target,v:0}).valid,true);
- assert.equal(containsVehicle(target,{...target,z:1}),false);
+ assert.equal(containsVehicle(target,{...target,z:target.z+1}),false);
  assert.equal(gradeParking(target,{...target,th:target.th+Math.PI}).aligned,false);
  assert.equal(gradeParking(target,{...target,v:.3}).valid,false);
 });
@@ -18,24 +19,32 @@ test('rotated vehicle contact uses separating axes, not centre proximity',()=>{
  assert.equal(rectanglesOverlap(car,{...car,x:.5}),true);
  assert.equal(rectanglesOverlap(car,{...car,x:8}),false);
 });
-test('swept collision catches a parked car passed between frames and the boundary',()=>{
- const obstacle=PARKING_LAYOUT.obstacles[0];
- assert.equal(sweptContact({x:5,z:obstacle.z,th:-Math.PI/2},{x:14,z:obstacle.z,th:-Math.PI/2},PARKING_LAYOUT),obstacle.id);
- assert.equal(sweptContact({x:0,z:0,th:0},{x:20,z:0,th:0},PARKING_LAYOUT),'boundary');
- assert.equal(sweptContact({x:0,z:14,th:0},{x:0,z:13,th:0},PARKING_LAYOUT),null);
+test('swept collision catches a parked car passed between frames and leaving the road',()=>{
+ const rear=L.obstacles.find(o=>o.id==='parked-rear');
+ assert.equal(sweptContact({x:104,z:rear.z,th:EAST},{x:118,z:rear.z,th:EAST},L),rear.id);
+ assert.equal(sweptContact({x:target.x,z:349,th:EAST},{x:target.x,z:343,th:EAST},L),'boundary');
+ assert.equal(sweptContact({x:95,z:347.6,th:EAST},{x:97,z:347.6,th:EAST},L),null);
 });
-test('all authored parking starts and references fit inside the real generated pad',()=>{
- const layout=buildLayout('parking');assert.deepEqual(layout.parking,PARKING_LAYOUT);
- for(const kind of ['forward-bay','reverse-bay','leave-bay']){
-  const spec=parkingPlan(kind);assert.equal(containsVehicle(layout.parking.bounds,spec.start),true);
-  for(const leg of spec.legs)assert.ok(leg.path.every(p=>Math.abs(p.x)<15&&p.z> -30&&p.z<32));
+test('the parking space sits at the kerb of a real road in the generated town area',()=>{
+ const net=buildNet(buildLayout('town'));
+ for(const spot of [target,L.ready,...L.obstacles]){
+  const nr=nearest(net,spot.x,spot.z);
+  assert.equal(nr.way.name,L.road,JSON.stringify(spot));
+  assert.ok(nr.d<=nr.way.w/2+.2,`${nr.d} off the centre of a ${nr.way.w} m road`);
  }
+ // the bay is on the nearside of the road, not out in the running lane
+ assert.ok(Math.abs(target.z-L.kerb.z)<L.bay.width,'bay is beside the kerb');
+});
+test('authored starts and guide paths stay on the marked stretch of road',()=>{
+ const spec=parkingPlan('parallel-park');
+ assert.equal(containsVehicle(L.bounds,spec.start),true);
+ for(const leg of spec.legs)for(const p of leg.path)assert.equal(containsVehicle(L.bounds,{...p,th:EAST}),true,JSON.stringify(p));
  assert.throws(()=>parkingPlan('unknown'),/Unknown/);
 });
-function harness(kind='forward-bay'){
+function harness(kind='parallel-park'){
  const plan=parkingPlan(kind);const player={...plan.start,v:0,operation:createAutomaticState(),observations:[],place(x,z,th){Object.assign(this,{x,z,th,v:0});}};
  const test={faults:[],fault(...f){this.faults.push(f);},finish(){this.done=true;}};const traffic={clock:10};
- const scenario=createParkingScenario({manoeuvre:true,parkingKind:kind},{net:{parking:PARKING_LAYOUT},player,test,traffic,ui:{banner(){}}});return {player,test,traffic,scenario,plan};
+ const scenario=createParkingScenario({manoeuvre:true,parkingKind:kind},{net:{},player,test,traffic,ui:{banner(){}}});return {player,test,traffic,scenario,plan};
 }
 test('no movement and a secured car outside the target fail assessment',()=>{
  const {player:p,test:t,scenario:s}=harness();p.operation.engine=false;
@@ -45,29 +54,29 @@ test('target reached before securing cannot pass; moving away again invalidates 
  const {player:p,scenario:s,plan}=harness();p.operation.gear='D';p.operation.parkingBrake=false;p.observations=[{at:10}];
  // Feed measured physical states to the unit-level assessor; integration tests use actual driving.
  for(const q of plan.legs[0].path.slice(1)){const th=Math.atan2(-(q.x-p.x),-(q.z-p.z));Object.assign(p,q,{th,v:.8});s.update(1);}
- Object.assign(p,plan.target,{v:0});s.update(.1);assert.equal(s.progress.phase,'secure');assert.equal(s.result().ok,false);
- for(const q of plan.legs[0].path.slice(0,-1).reverse()){const th=Math.atan2(-(q.x-p.x),-(q.z-p.z))-Math.PI;Object.assign(p,q,{th,v:-.8});s.update(.1);}
- p.v=0;p.operation.gear='P';p.operation.parkingBrake=true;p.operation.engine=false;s.update(.1);assert.equal(s.result().ok,false);
+ Object.assign(p,plan.legs[0].target,{v:0});s.update(.1);assert.equal(s.progress.leg,1);assert.equal(s.result().ok,false);
+ Object.assign(p,plan.target,{v:0});s.update(.1);assert.equal(s.result().ok,false);
 });
-test('leaving a bay must complete reverse and forward legs, not just finish near the exit',()=>{
- const {player:p,scenario:s,plan}=harness('leave-bay');Object.assign(p,plan.target);p.operation.engine=false;
+test('parking must complete both legs, not just finish in the space',()=>{
+ const {player:p,scenario:s}=harness();Object.assign(p,ROADSIDE_PARKING.bay,{v:0});p.operation.engine=false;
  s.finishAttempt();assert.equal(s.result().ok,false);
 });
-
 test('a stationary reported speed cannot substitute for measured displacement',()=>{
  const {player:p,scenario:s}=harness();p.operation.gear='D';p.operation.parkingBrake=false;p.observations=[{at:10}];p.v=.8;
  for(let i=0;i<40;i++)s.update(1);assert.equal(s.result().ok,false);assert.equal(s.progress.phase,'drive');
 });
-
 test('contact stays one episode until the car moves clear, then a new impact is logged',()=>{
  const {player:p,scenario:s,test:t}=harness();p.operation.gear='D';p.operation.parkingBrake=false;p.observations=[{at:10}];
- p.z=-27.849;p.v=.8;s.update(.1);
- for(let i=0;i<10;i++){p.z=-27.9;p.v=.8;s.update(.1);}
+ const rear=ROADSIDE_PARKING.obstacles.find(o=>o.id==='parked-rear');
+ p.z=rear.z;p.x=108.7;p.v=.8;s.update(.1);
+ assert.equal(t.faults.filter(f=>f[1]==='Control – collision').length,0);
+ for(let i=0;i<10;i++){p.x=108.95;p.v=.8;s.update(.1);}
  assert.equal(t.faults.filter(f=>f[1]==='Control – collision').length,1);
- p.z=-27.7;p.v=-.8;s.update(.1);p.z=-27.9;p.v=.8;s.update(.1);
+ p.x=107.9;p.v=-.8;s.update(.1);p.x=108.95;p.v=.8;s.update(.1);
  assert.equal(t.faults.filter(f=>f[1]==='Control – collision').length,2);
 });
-test('parking plans come from location metadata, so other locations can supply their own starts',()=>{
- const layout=structuredClone(PARKING_LAYOUT);layout.manoeuvres['forward-bay'].start.x=7;
- assert.equal(parkingPlan('forward-bay',layout).start.x,7);assert.equal(parkingPlan('forward-bay').start.x,0);
+test('parking plans come from layout metadata, so other locations can supply their own starts',()=>{
+ const layout=structuredClone(ROADSIDE_PARKING);layout.manoeuvres['parallel-park'].start.x=7;
+ assert.equal(parkingPlan('parallel-park',layout).start.x,7);
+ assert.equal(parkingPlan('parallel-park').start.x,ROADSIDE_PARKING.manoeuvres['parallel-park'].start.x);
 });

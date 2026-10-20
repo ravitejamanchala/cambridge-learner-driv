@@ -251,6 +251,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
       if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
+      // a blue-light vehicle goes past as soon as the learner has slowed and left room beside them
+      if (a.emergency && o.isPlayer && lat > 1.6 && Math.abs(o.v) < Math.max(2.5, a.v - 3)) continue;
       if (lat < width) {
         vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
@@ -259,7 +261,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     // cyclists pass a stopped car with room to spare (or wait until they can)
     if (bike) a.swing = blocked ? Math.min(1.9, (a.swing || 0) + dt * 1.2) : Math.max(0, (a.swing || 0) - dt * 0.6);
     // predict where the learner will be over the next 2 s and give way to them
-    if (player && !(a.ghost > 0) && Math.abs(player.v) + a.v > 0.5) {
+    if (player && !(a.ghost > 0) && !(a.emergency && Math.abs(player.v) < 2.5) && Math.abs(player.v) + a.v > 0.5) {
       const pfx = -Math.sin(player.th), pfz = -Math.cos(player.th), pv = player.v;
       const rx0 = player.x - a.x, rz0 = player.z - a.z, ahead = rx0 * fx + rz0 * fz, side = Math.abs(rx0 * fz - rz0 * fx), cosH = pfx * fx + pfz * fz;
       const passing = cosH < -0.7 && side > 2; // oncoming in the other lane
@@ -286,7 +288,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   function setDensity(value) { if (!['normal', 'light', 'none'].includes(value)) throw new Error('Unsupported traffic density'); density = value; all.forEach(a => a.scripted = false); }
   function reset(px,pz,seed) {
     random=seededRandom(seed);clock=0;overrides.clear();
-    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;});
+    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;a.emergency=false;});
     all.forEach(a=>spawn(a,px,pz,true));
     net.zebras.forEach(z=>Object.assign(z.ped,{state:'idle',t:2+(z.id*7.1)%9,p:0,dir:1}));
     puffins.forEach(c=>{c.last='G';Object.assign(c.ped,{state:'idle',p:0,dir:1});});
@@ -318,7 +320,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
   // path (optional): route steps the car should follow instead of choosing turns at random
   function placeCar(c, e, dir, s, speed, cruise = 1, path = null) {
-    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
+    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, emergency: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };

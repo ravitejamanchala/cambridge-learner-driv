@@ -1,4 +1,3 @@
-import { PARKING_LAYOUT } from '../js/parking-layout.js';
 // Purpose-built practice layouts for the course and the puzzles (the mock tests stay on real Cambridge roads).
 // Each layout is drawn here in metres (x east, z south, so north is -z) and written out in the same
 // format as the OpenStreetMap areas, so the sim loads it the same way. Built by tools/split_areas.mjs.
@@ -121,7 +120,9 @@ function town() {
   // High Street: lights at Bridge Street, side roads, a zebra
   B.road({ name: 'High Street', ...main }, [-700, -640, -250, -180, -80, 0, 200, 250, 600, 700].map(x => [x, 0]));
   // Elm Road: quiet 20 mph street (moving off), gives way at Bridge Street
-  B.road({ name: 'Elm Road', cls: 'residential', mph: 20, w: 6.5 }, [[-700, 350], [-640, 350], [-330, 350], [-250, 350], [700, 350]]);
+  B.road({ name: 'Elm Road', cls: 'residential', mph: 20, w: 6.5 }, [[-700, 350], [-640, 350], [-330, 350], [-250, 350]]);
+  // east of Bridge Street Elm Road is wide enough to park along: the parallel parking lesson uses this kerb
+  B.road({ name: 'Elm Road', cls: 'residential', mph: 20, w: 9.5 }, [[-250, 350], [700, 350]]);
   // Moor Road: long straight 30 (emergency stop)
   B.road({ name: 'Moor Road', ...main }, [[-700, 600], [-640, 600], [-250, 600], [560, 600], [700, 600]]);
   // frame roads
@@ -300,10 +301,5 @@ function park() {
   return B;
 }
 
-function parking() {
-  const B = new Builder('parking'); B.parking = PARKING_LAYOUT;
-  B.road({name:'Training aisle',cls:'living_street',mph:5,w:30}, PARKING_LAYOUT.aisle.map(p=>[p.x,p.z]));
-  return B;
-}
-export const LAYOUTS = { town, rbs, roads, park, parking };
+export const LAYOUTS = { town, rbs, roads, park };
 export function buildLayout(id) { return LAYOUTS[id]().toJSON(); }

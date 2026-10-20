@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { installAuthFixture, signedIn } from './auth-fixture.mjs';
 const require=createRequire(import.meta.url),three=path.dirname(require.resolve('three/package.json'));
 const root=path.resolve(process.env.TEST_SITE||'.'),port=8767,url=`http://127.0.0.1:${port}`;
 const server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1','--directory',root],{stdio:'ignore'});
@@ -17,17 +18,25 @@ try {
   await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));
   await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));
   await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
-  await page.goto(url);await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
-  await page.locator('#profName').fill('Device checks');await page.locator('#profForm').evaluate(f=>f.requestSubmit());
-  // Unlock only prerequisite lessons; the tested manoeuvre runs through real input and physics.
-  await page.evaluate(()=>{const key='cambridge-learner-drive.v1',data=JSON.parse(localStorage.getItem(key));for(const id of ['automatic-drive','automatic-reverse','steering-control'])data.profiles[0].lessons[id]={passed:true,attempts:1,bestD:0};localStorage.setItem(key,JSON.stringify(data));});
-  await page.reload();await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
-  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','forward-bay',true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0);});
+  await installAuthFixture(page);
+  await page.goto(url);await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);await signedIn(page);
+  // The auth fixture signs in, so the account learner already exists. Nothing is unlocked by hand:
+  // the tested manoeuvre runs through real input and physics.
+  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','parallel-park',true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0);});
   assert.equal(await page.locator('#observationControls').isVisible(),false);
   assert.equal(await page.locator('[data-gear="N"]').isVisible(),false);
   assert.equal(await page.locator('#assessParking').isVisible(),false);
   assert.equal(await page.locator('[data-operation="engine"]').isVisible(),false);
   await page.screenshot({path:`/tmp/driving-${device.name}-ready.png`});
+  // the HUD buttons beside the speedo (pause, all-round check, hold-to-look) must stay on screen and tappable
+  const hud=await page.locator('.hud-right button').evaluateAll(buttons=>buttons.filter(b=>b.offsetParent!==null).map(b=>{const r=b.getBoundingClientRect();return {name:b.getAttribute('aria-label'),x:r.x,y:r.y,w:r.width,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};}));
+  assert.equal(hud.length,4,JSON.stringify(hud));
+  for(const r of hud){
+   assert.ok(r.x>=0&&r.y>=0&&r.x+r.w<=device.width&&r.y+r.h<=device.height,JSON.stringify({device:device.name,r}));
+   assert.ok(r.hit,JSON.stringify({device:device.name,r}));
+   if(device.touch)assert.ok(r.w>=36&&r.h>=36,JSON.stringify({device:device.name,r}));
+  }
+  for(let i=0;i<hud.length;i++)for(let j=i+1;j<hud.length;j++){const a=hud[i],b=hud[j];assert.ok(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y,`${device.name}: ${a.name} overlaps ${b.name}`);}
   const controls=page.locator('.touch');assert.equal(await controls.isVisible(),device.touch,device.name);
   if(device.touch){
    const rects=await page.locator('.touch button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {name:b.getAttribute('aria-label'),x:r.x,y:r.y,w:r.width,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};}));

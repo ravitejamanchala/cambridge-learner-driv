@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: sign-in gate, blue light vehicles, hold-to-look and parallel parking
+- **Sign in before driving.** Where the build is configured with an account service, the lobby, lessons, puzzles and mock tests all stay locked until the learner signs in, and the sign-in sheet says so. A build with no account service configured (local development, the demo build) still runs as a guest on the device, so those builds are not left unusable.
+  - Signing out now drops verified paid access with the session, instead of leaving it behind until the next API call.
+- **New lesson: blue light vehicle** (Rule 219). An emergency vehicle comes up behind with a flashing blue light bar. Slow right down and pull in on the left to let it past.
+  - Not slowing down or making room is a driving fault, as is holding it up for more than 20 seconds, and so is stopping on a crossing or in a junction to get out of its way.
+  - **Every mock test** now brings a blue light vehicle up behind the learner part way round the route, marked the same way.
+  - The vehicle still obeys traffic lights; real crews may treat a red as a give-way, which this build deliberately does not model.
+- **Hold to look left and right.** <kbd>Z</kbd> looks left and <kbd>X</kbd> looks right, held down, in the chase view as well as the driver view. The camera swings; the car keeps going where it is pointed, so you can check a roundabout or a junction without steering into it. Each press is recorded as an observation. <kbd>B</kbd> still records an all-round check. Two held buttons beside the eye do the same on a touch screen.
+- **Parallel parking at the kerb** replaces the closed bay-parking area.
+  - Elm Road east of Bridge Street is now 9.5 m wide, with a marked space between two parked cars. The lesson route takes the learner along the road to the space.
+  - Drive past the parked cars, pull up alongside the front one in the highlighted box, then reverse in, finish parallel and close to the kerb, and secure the car.
+  - Striking a parked car or leaving the road is a serious fault; the manoeuvre is assessed on the whole car being inside the space, within 12° of parallel, stopped and secured.
+  - The closed training area and the `forward-bay`, `reverse-bay` and `leave-bay` exercises are removed. Saved records for those IDs are left alone and simply unused.
+  - The angle allowance is now a property of the target rather than a fixed 8°, so a kerbside park and a marked bay can differ.
+- Tests: new unit suites for the sign-in gate and the blue light vehicle, a rewritten roadside parking suite, and a new `npm run test:drive` browser check for the look cameras and the blue light vehicle in both a lesson and a mock test.
+  - The browser suites now share an offline sign-in and subscription fixture (`tests/auth-fixture.mjs`) that holds progress across reloads. `npm run test:parking`, `npm run test:devices` and `npm run test:mobile` were failing before this because the paid-access gate blocked the lessons they drive; they pass again.
+
 ## v1.1 (13 Oct 2026): practice layouts, lanes and new marking
 - Lessons and puzzles now run on purpose-built practice layouts instead of Cambridge streets, each designed to teach one thing:
   - Practice town: side roads, traffic lights, a two-lane road with lane arrows, a zebra, a puffin crossing, cycle lanes and a 30-to-20 change.

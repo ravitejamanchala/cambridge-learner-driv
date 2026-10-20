@@ -1,6 +1,6 @@
 import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
-import { parkingPlan } from './parking-layout.js';
+import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
@@ -16,6 +16,7 @@ import { createTest } from './test.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
 import { createScenario, evaluate } from './course.js';
+import { createEmergencyEvent } from './emergency.js';
 import { createMirrors } from './mirrors.js';
 import { createGuide } from './guide.js';
 import { STAR } from './icons.js';
@@ -129,7 +130,9 @@ async function boot() {
     player.operation = pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl));
-    if (pl.lesson?.manoeuvre) { const start = parkingPlan(pl.lesson.parkingKind, A.net.parking).start; player.place(start.x,start.z,start.th); }
+    const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
+    if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
+    A.world.setRoadsideParking?.(parkingLayout);
     test.ctx = nearest(A.net,player.x,player.z);
     test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
@@ -167,6 +170,8 @@ async function boot() {
 
   // ---------- input ----------
   const key = { up: 0, down: 0, left: 0, right: 0 }, tch = { up: 0, down: 0, left: 0, right: 0 };
+  // Hold to look left or right. This swings the camera only: the car keeps going where it is pointed.
+  const lookHold = { left: 0, right: 0 };
   let cam = 0; const CAMS = ['Chase view', 'Driver view', 'Overhead'];
   const KM = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
   const sigBtns = () => document.querySelectorAll('[data-sig]').forEach(b => b.classList.toggle('sig-on', b.dataset.sig === player.indicator));
@@ -185,14 +190,20 @@ async function boot() {
     if (k) { key[k] = 1; if (A.test && A.test.running) e.preventDefault(); }
     else if (e.code === 'KeyQ') { player.signal('L'); sigBtns(); } else if (e.code === 'KeyE') { player.signal('R'); sigBtns(); }
     else if (e.code === 'KeyC') setCam((cam + 1) % 3, true);
+    else if (e.code === 'KeyZ') { if (!lookHold.left) look('left'); lookHold.left = 1; }
+    else if (e.code === 'KeyX') { if (!lookHold.right) look('right'); lookHold.right = 1; }
     else if (e.code === 'KeyB') look();
     else if (e.code === 'KeyI') cockpitAction('engine');
     else if (e.code === 'KeyP') cockpitAction('parkingBrake');
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
-  window.addEventListener('keyup', e => { const k = KM[e.code]; if (k) key[k] = 0; });
+  window.addEventListener('keyup', e => {
+    const k = KM[e.code]; if (k) key[k] = 0;
+    if (e.code === 'KeyZ') lookHold.left = 0; else if (e.code === 'KeyX') lookHold.right = 0;
+  });
   const releaseControls = () => {
     for (const k in key) { key[k] = 0; tch[k] = 0; }
+    lookHold.left = lookHold.right = 0; document.querySelectorAll('[data-look].on').forEach(b => b.classList.remove('on'));
     document.querySelectorAll('.touch .on').forEach(b => b.classList.remove('on'));
   };
   window.addEventListener('blur', releaseControls);
@@ -208,6 +219,13 @@ async function boot() {
   let lookAnim = 0;
   function look(view = 'all-round') { if (!A.traffic || !A.test?.running) return; player.lookAt = A.traffic.clock; player.observations.push({ view, at: A.traffic.clock, x: player.x, z: player.z }); lookAnim = 1; }
   $('lookBtn').addEventListener('click', () => look());
+  // hold-to-look buttons for touch, matching the Z and X keys
+  document.querySelectorAll('[data-look]').forEach(b => {
+    const side = b.dataset.look;
+    const on = e => { e.preventDefault(); if (!lookHold[side]) look(side); lookHold[side] = 1; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
+    const off = () => { lookHold[side] = 0; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault());
+  });
   function cockpitAction(action) {
     if (!A.test?.running || !player.operation.enabled) return;
     if (!operate(player.operation, action, player.v, A.traffic.clock)) A.test.fault('D', 'Control – cockpit', 'Control input rejected: stop and prepare the cockpit before operating this control', 'cockpit-' + action, 2);
@@ -252,7 +270,7 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain };
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; } };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
@@ -306,7 +324,9 @@ async function boot() {
     loadPlan(plan);
     if (plan.lesson?.manoeuvre) { if (!parkingCamera) parkingCamera = { cam, height: ov.h, portrait: portrait() }; setCam(2); ov.h = 55; }
     else if (parkingCamera) { setCam(parkingCamera.portrait === portrait() ? parkingCamera.cam : portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); ov.h = parkingCamera.height; parkingCamera = null; }
-    if (plan.kind !== 'mock') scenario = createScenario(plan.lesson, { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner } });
+    // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
+    const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner } };
+    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
@@ -373,16 +393,24 @@ async function boot() {
   $('camRecentre').addEventListener('click', () => { ov.px = ov.pz = 0; ov.h = 95; showCamRecentre(); });
 
   // ---------- camera ----------
-  const camPos = new T.Vector3(), camLook = new T.Vector3(); let farMode = -2, orbit = 0;
+  const camPos = new T.Vector3(), camLook = new T.Vector3(); let farMode = -2, orbit = 0, lookBlend = 0;
   function updateCamera(dt) {
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th), rx = -fz, rz = fx; let px, py, pz, lx, ly, lz, k = 1 - Math.exp(-dt * 4.2);
     const lobby = document.body.dataset.mode === 'lobby';
     if (lookAnim > 0) lookAnim = Math.max(0, lookAnim - dt / 1.1);
+    const lookTarget = (lookHold.right ? 1 : 0) - (lookHold.left ? 1 : 0);
+    lookBlend += (lookTarget - lookBlend) * (1 - Math.exp(-dt * 9));
+    if (Math.abs(lookBlend - lookTarget) < 0.002) lookBlend = lookTarget;
     if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
-    else if (cam === 0) { const P = camera.aspect < 1, z = chaseZ, b = (P ? 7 : 6.2) * z, h = 1.25 + (P ? 2.4 : 1.4) * z, a = P ? 4 : 6; px = player.x - fx * b; py = h; pz = player.z - fz * b; lx = player.x + fx * a; ly = P ? -1.6 : 1.1; lz = player.z + fz * a; k = 1 - Math.exp(-dt * 7); } // close behind the car, so it fills the view
+    else if (cam === 0) { const P = camera.aspect < 1, z = chaseZ, b = (P ? 7 : 6.2) * z, h = 1.25 + (P ? 2.4 : 1.4) * z, a = P ? 4 : 6;
+      // looking round swings the camera about the car; the car itself is unaffected
+      const ya = lookBlend * 0.95, c = Math.cos(ya), sn = Math.sin(ya), gx = fx * c + rx * sn, gz = fz * c + rz * sn;
+      px = player.x - gx * b; py = h; pz = player.z - gz * b; lx = player.x + gx * a; ly = P ? -1.6 : 1.1; lz = player.z + gz * a; k = 1 - Math.exp(-dt * 7); } // close behind the car, so it fills the view
     else if (cam === 1) {
       const s = CAR.seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z;
-      const turn = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
+      // a held look wins over the B glance; both only turn the driver's head, never the car
+      const glance = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0;
+      const turn = lookBlend !== 0 ? lookBlend * 1.85 : glance, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
       lx = px + lfx * 20; ly = 0.9; lz = pz + lfz * 20; k = 1;
     }
     else { lx = player.x + ov.px; ly = 0; lz = player.z + ov.pz; px = lx; py = ov.h; pz = lz + ov.h * 0.38; k = 1 - Math.exp(-dt * 12); }

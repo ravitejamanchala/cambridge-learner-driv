@@ -11,9 +11,11 @@ export function containsVehicle(target, pose, size = VEHICLE_ENVELOPE) {
     return Math.abs(dx * rx + dz * rz) <= target.width / 2 + 1e-6 && Math.abs(dx * fx + dz * fz) <= target.length / 2 + 1e-6;
   });
 }
+export const ANGLE_TOLERANCE = 8; // degrees off the target heading, unless the target asks for its own allowance
 export function gradeParking(target, pose) {
   const inside = containsVehicle(target, pose), angleDegrees = Math.abs(wrapAngle(pose.th - target.th)) * 180 / Math.PI;
-  return { inside, angleDegrees, aligned: angleDegrees <= 8, stopped: Math.abs(pose.v || 0) < 0.1, valid: inside && angleDegrees <= 8 && Math.abs(pose.v || 0) < 0.1 };
+  const tolerance = target.angleTolerance ?? ANGLE_TOLERANCE, aligned = angleDegrees <= tolerance;
+  return { inside, angleDegrees, tolerance, aligned, stopped: Math.abs(pose.v || 0) < 0.1, valid: inside && aligned && Math.abs(pose.v || 0) < 0.1 };
 }
 export function rectanglesOverlap(a, b) {
   const ap = rectangleCorners(a), bp = rectangleCorners(b);

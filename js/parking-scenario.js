@@ -1,16 +1,16 @@
-import { parkingPlan } from './parking-layout.js';
+import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking, sweptContact, nearContact } from './parking-geometry.js';
 export function createParkingScenario(lesson, { net, player, test, traffic, ui }) {
   if (!lesson.manoeuvre) return null;
-  if (!net.parking) throw new Error('This lesson needs a parking layout');
-  const plan = parkingPlan(lesson.parkingKind, net.parking), events = [], contacts = new Set();
+  const layout = lesson.parkingLayout || ROADSIDE_PARKING;
+  const plan = parkingPlan(lesson.parkingKind, layout), events = [], contacts = new Set();
   let warning = '', warningUntil = 0;
   let legIndex = 0, phase = 'prepare', travel = 0, lastGear = null, moving = false, previous = {x:player.x,z:player.z,th:player.th}, observationStart = traffic.clock, speedTime = 0, complete = false;
   const record = (type, data = {}) => events.push({ type, at: traffic.clock, ...data });
   const secured = () => player.operation.gear === 'P' && player.operation.parkingBrake && !player.operation.engine && Math.abs(player.v) < 0.1;
   const S = { events, target: plan.legs[0].target, stop: () => ui.banner(null), result: () => {
     const grade = gradeParking(plan.target, player);
-    return { ok: complete && grade.valid && secured(), why: complete && grade.valid && secured() ? 'Whole car inside target, aligned, stopped and secured after the measured manoeuvre.' : `Parking assessment: ${grade.inside ? 'inside target' : 'car extends outside target'}, angle ${grade.angleDegrees.toFixed(1)}° (allowance 8°), ${grade.stopped ? 'stopped' : 'still moving'}. Complete the driving stages, select P, apply the parking brake and switch off the engine.` };
+    return { ok: complete && grade.valid && secured(), why: complete && grade.valid && secured() ? 'Whole car inside target, aligned, stopped and secured after the measured manoeuvre.' : `Parking assessment: ${grade.inside ? 'inside target' : 'car extends outside target'}, angle ${grade.angleDegrees.toFixed(1)}° (allowance ${grade.tolerance}°), ${grade.stopped ? 'stopped' : 'still moving'}. Complete the driving stages, select P, apply the parking brake and switch off the engine.` };
   } };
   S.finishAttempt = () => {
     if (!secured()) { warning = 'Stop, select P, apply the parking brake and switch off the engine before assessment.'; warningUntil = traffic.clock + 3; S.progress.message = warning; return false; }
@@ -18,15 +18,15 @@ export function createParkingScenario(lesson, { net, player, test, traffic, ui }
     record('parking-assessment', { grade: gradeParking(plan.target, player), stagesComplete: complete }); test.finish(); return true;
   };
   S.update = dt => {
-    const contact = sweptContact(previous, player, net.parking);
+    const contact = sweptContact(previous, player, layout);
     if (contact) {
       if (!contacts.has(contact)) {
-        test.fault('S', 'Control – collision', contact === 'boundary' ? 'Struck the practice area boundary' : 'Struck a parked car', 'parking-contact:' + contact, 0);
+        test.fault('S', 'Control – collision', contact === 'boundary' ? (layout.boundaryText || 'Left the exercise area') : (layout.obstacleText || 'Struck a parked car'), 'parking-contact:' + contact, 0);
         record('parking-contact', { object: contact, x: player.x, z: player.z }); contacts.add(contact);
       }
       player.place(previous.x, previous.z, previous.th);
     }
-    for (const id of contacts) if (id !== contact && !nearContact(player, net.parking, id)) contacts.delete(id);
+    for (const id of contacts) if (id !== contact && !nearContact(player, layout, id)) contacts.delete(id);
     const displacement = Math.hypot(player.x - previous.x, player.z - previous.z);
     previous = { x: player.x, z: player.z, th: player.th };
     const leg = plan.legs[Math.min(legIndex, plan.legs.length - 1)], speed = Math.abs(player.v), op = player.operation;
@@ -48,9 +48,9 @@ export function createParkingScenario(lesson, { net, player, test, traffic, ui }
     }
     if (phase === 'secure' && secured()) { S.finishAttempt(); return; }
     const active = plan.legs[Math.min(legIndex, plan.legs.length - 1)];
-    S.target = active.target;
+    S.target = active.target; S.layout = layout;
     const remaining = Math.hypot(active.target.x - player.x, active.target.z - player.z);
-    const short = phase === 'prepare' ? `Prepare · ${active.gear} · B` : phase === 'secure' ? 'P · parking brake · engine off' : lesson.parkingKind === 'leave-bay' ? (legIndex === 0 ? 'Reverse clear of the bay' : 'Drive to the exit box') : `${active.gear === 'R' ? 'Reverse' : 'Drive'} into the highlighted bay`;
+    const short = phase === 'prepare' ? `Prepare · ${active.gear} · B` : phase === 'secure' ? 'P · parking brake · engine off' : lesson.parkingKind === 'parallel-park' ? (legIndex === 0 ? 'Pull up alongside the front car' : 'Reverse into the space') : `${active.gear === 'R' ? 'Reverse' : 'Drive'} into the highlighted bay`;
     let message = phase === 'secure' ? 'Stop straight inside the target; select P, apply the parking brake and switch off the engine.' : phase === 'prepare' ? `Hold the footbrake, select ${active.gear}, check round (B) and release the parking brake.` : short + '. Keep at walking pace and record observation inputs (B).';
     if (traffic.clock < warningUntil) message = warning;
     S.progress = { phase, gear: active.gear, leg: legIndex, path: active.path, target: active.target, grade: gradeParking(active.target, player), remaining, short, message };
