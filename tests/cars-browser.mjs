@@ -16,13 +16,22 @@ try{
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
  await page.goto(url);await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
  await page.locator('#profName').fill('Car checks');await page.locator('#profForm').evaluate(f=>f.requestSubmit());
+ const paint={};
  for(const id of ['compact','hatchback','suv','sports','sports-2','taxi','police','rx7']){
   await page.locator(`[data-home-car="${id}"]`).click();
   await page.waitForFunction(id=>window.cambridgeDrive.player.carId===id,id);
+  // the driver's seat is painted the colour of the car that is actually selected
+  paint[id]=await page.evaluate(()=>window.cambridgeDrive.cockpitColour);
   const geometry=await page.evaluate(()=>{const p=window.cambridgeDrive.player,rotation=p.mesh.rotation.clone();p.mesh.rotation.set(0,0,0);p.mesh.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(p.mesh),size=box.getSize(new THREE.Vector3());p.mesh.rotation.copy(rotation);return {w:size.x,h:size.y,l:size.z,wheels:p.mesh.userData.wheels.length,front:p.mesh.userData.front.length};});
   assert.ok(geometry.w>1&&geometry.l>3&&geometry.h>.7,JSON.stringify({id,geometry}));assert.ok(geometry.wheels>0&&geometry.front>0,JSON.stringify({id,geometry}));
-  console.log(id,JSON.stringify(geometry));
+  console.log(id,JSON.stringify({...geometry,bonnet:'#'+paint[id].toString(16).padStart(6,'0')}));
  }
+ // every car gives the cockpit its own paint, and none falls back to the stand-in green
+ const colours=Object.values(paint);
+ assert.equal(new Set(colours).size>=6,true,'cars should not share one bonnet colour: '+JSON.stringify(paint));
+ assert.equal(colours.includes(0x1d6a46),false,'a car fell back to the stand-in bonnet colour: '+JSON.stringify(paint));
+ assert.ok(paint.taxi>0xa06000&&paint.taxi<0xffc040,'the taxi bonnet should be amber, got '+paint.taxi.toString(16));
+ assert.ok(paint.police<0x303030,'the police bonnet should be dark, got '+paint.police.toString(16));
  await page.locator('[data-home-car="suv"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='suv');
  await page.screenshot({path:'/tmp/car-picker-desktop.png'});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/car-picker-mobile.png'});

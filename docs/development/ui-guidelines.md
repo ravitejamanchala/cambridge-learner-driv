@@ -74,6 +74,11 @@ draws it. They do not call `ui.banner()` during a drive.
   traffic, the parked cars and the blue-light vehicle are all cars the learner could choose in the
   garage. Nothing on the road should be a coloured box once the models have loaded.
 - **L plates belong to the learner alone.** `loadCarModel` takes `learner: false` for everyone else.
+- **The driver's seat belongs to the car that was chosen.** The cockpit is a hand-built impression
+  rather than a model of an interior, so its proportions stay as they are, but its paint and width come
+  from the selected car via `carMetrics()`. A textured model carries its colour in the image, not the
+  material, so the colour is sampled from the texture; and the body is the part with the most
+  triangles, not the biggest box, or a black roof panel wins over the body around it.
 
 ## Before you call it done
 

@@ -103,11 +103,57 @@ export function loadCarModel(url, options = {}) {
   });
 }
 
+// What the driver's seat should look like in this car: the body colour, how wide it is, how high the
+// bonnet sits in front of you and where your eyes are. Measured from the model, so the view from
+// inside a tall SUV is not the view from inside a coupe.
+export function carMetrics(root) {
+  if (!root) return null;
+  const box = new T.Box3().setFromObject(root), size = box.getSize(new T.Vector3());
+  const wheels = new Set(root.userData?.wheels || []);
+  const inWheel = (o) => { for (let p = o; p; p = p.parent) if (wheels.has(p)) return true; return false; };
+  // The body is the part with the most triangles that is not a wheel or a window. Triangle count beats
+  // bounding volume here: a car's shell is by far the most detailed piece, while a black roof panel can
+  // have a bigger box than the body around it. Dark is not disqualifying — some cars really are black.
+  let body = null, mostTriangles = 0;
+  root.traverse(o => {
+    if (!o.isMesh || inWheel(o)) return;
+    const material = [].concat(o.material)[0];
+    if (!material || !material.color || material.transparent) return;
+    const index = o.geometry?.index, position = o.geometry?.attributes?.position;
+    const triangles = (index ? index.count : position ? position.count : 0) / 3;
+    if (triangles > mostTriangles) { mostTriangles = triangles; body = material; }
+  });
+  return { width: size.x, height: size.y, length: size.z, colour: bodyColour(body) };
+}
+// A textured model carries its colour in the image, not the material, so sample the texture.
+function bodyColour(material, fallback = 0x1d6a46) {
+  if (!material) return fallback;
+  const hex = material.color.getHex();
+  const image = material.map?.image;
+  if (!image || !image.width) return hex;
+  try {
+    const n = 16, canvas = document.createElement('canvas');
+    canvas.width = canvas.height = n;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0, n, n);
+    const data = ctx.getImageData(0, 0, n, n).data;
+    let r = 0, g = 0, b = 0, used = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 128) continue;
+      const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      if (lum > 0.93) continue; // windows, lights and bare highlights say nothing about the paint
+      r += data[i]; g += data[i + 1]; b += data[i + 2]; used++;
+    }
+    if (!used) return hex;
+    return (Math.round(r / used) << 16) | (Math.round(g / used) << 8) | Math.round(b / used);
+  } catch (_) { return hex; } // a cross-origin texture cannot be read back
+}
+
 export function createPlayer(scene) {
   const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, mesh: makeBoxCar(0x1a7c52, true) };
   p.operation = createVehicleState(); p.observations = [];
   scene.add(p.mesh);
-  p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); };
+  p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); p.model = m; p.onModel?.(m); };
   p.place = (x, z, th) => Object.assign(p, { x, z, th, v: 0, steer: 0, delta: 0 });
   p.signal = (d) => { p.indicator = p.indicator === d ? null : d; p.indTh = p.th; };
   p.lookAt = -1e9; // last time the driver checked mirrors and blind spot (B)
