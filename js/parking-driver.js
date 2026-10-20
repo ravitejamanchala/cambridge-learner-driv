@@ -7,14 +7,16 @@ export function createParkingDriver(api) {
     const p=api.player, status=api.scenarioStatus(), t=api.A.test;
     if (!status) return {throttle:0,brake:1,steer:0};
     if(context!==t.context||leg!==status.leg){context=t.context;leg=status.leg;index=0;}
-    const brake={throttle:0,brake:1,steer:0};
+    // One control: release the parking brake to set off, apply it to park. Holding the brake input
+    // while stopped is what reverses the car, so the driver never holds it when it should sit still.
+    const hold={throttle:0,brake:Math.abs(p.v)>.3?1:0,steer:0};
     if(status.phase==='prepare'){
-      if(Math.abs(p.v)<.05&&p.rawInput?.brake>=.5){if(p.operation.gear!==status.gear)api.gear(status.gear);if(p.operation.parkingBrake)api.operate('parkingBrake');api.look();}
-      return brake;
+      if(Math.abs(p.v)<.05){api.look();if(p.operation.parkingBrake)api.operate('parkingBrake');}
+      return hold;
     }
     if(status.phase==='secure'){
-      if(Math.abs(p.v)<.05&&p.rawInput?.brake>=.5){if(p.operation.gear!=='P')api.gear('P');if(!p.operation.parkingBrake)api.operate('parkingBrake');if(p.operation.engine)api.operate('engine');}
-      return brake;
+      if(Math.abs(p.v)<.05&&!p.operation.parkingBrake)api.operate('parkingBrake');
+      return hold;
     }
     if(api.A.traffic.clock-p.lookAt>4)api.look();
     const reverse=status.gear==='R', half=HANDLING.wheelbase/2;
@@ -44,8 +46,11 @@ export function createParkingDriver(api) {
     const angle=wrapAngle(status.target.th-p.th);
     const inTarget=gradeParking(status.target,p);
     const shouldStop=distance<.13 || (distance<.35&&inTarget.inside&&Math.abs(angle)<.1);
-    if(shouldStop)return brake;
+    const steer=Math.max(-1,Math.min(1,Math.atan((reverse?-1:1)*2*HANDLING.wheelbase*Math.sin(error)/Math.max(.3,Math.hypot(q.x-axle.x,q.z-axle.z)))/HANDLING.maxSteer/HANDLING.steerSensitivity));
+    if(shouldStop)return {...hold,steer:0};
     const desiredSpeed=distance<1?Math.max(.15,distance*.55):.85;
-    return {throttle:0,brake:Math.abs(p.v)>desiredSpeed?.25:0,steer:Math.max(-1,Math.min(1,Math.atan((reverse?-1:1)*2*HANDLING.wheelbase*Math.sin(error)/Math.max(.3,Math.hypot(q.x-axle.x,q.z-axle.z)))/HANDLING.maxSteer/HANDLING.steerSensitivity))};
+    // forward: feather the accelerator. reverse: hold the brake input to creep back, release it to slow.
+    if(reverse)return {throttle:0,brake:Math.abs(p.v)<desiredSpeed?1:0,steer};
+    return {throttle:Math.abs(p.v)<desiredSpeed?.35:0,brake:p.v>desiredSpeed+.25?.25:0,steer};
   };
 }

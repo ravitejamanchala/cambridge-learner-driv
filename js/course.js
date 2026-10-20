@@ -174,7 +174,7 @@ export function createScenario(lesson, deps) {
   if (basic) return basic;
   const { net, traffic, test, player, ui } = deps;
   // blue light vehicle: the same event the mock tests use, triggered earlier on a short lesson route
-  if (lesson.scenario === 'blue-light') return createEmergencyEvent({ net, traffic, test, player, ui, trigger: 60 });
+  if (lesson.scenario === 'blue-light') return createEmergencyEvent({ ...deps, trigger: 60 });
   const S = { ok: true, notes: [], update() {}, stop() {} };
   const route = () => test.route;
   // first feature on the route (stop line or zebra), with its distance along the route

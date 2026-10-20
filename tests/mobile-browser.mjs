@@ -58,7 +58,9 @@ try {
     const cdp=engine==='chromium'?await context.newCDPSession(page):null;
     const point=async(sel,id)=>{const r=await page.locator(sel).boundingBox();return {x:r.x+r.width/2,y:r.y+r.height/2,id};};
     if(cdp)await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await point('[data-k="down"]',1)]});else await pointer('[data-k="down"]','pointerdown',1);
-    await page.evaluate(()=>window.cambridgeDrive.step(2));await page.locator('[data-gear="D"]').click();await page.locator('[data-operation="parkingBrake"]').click();await page.locator('#lookBtn').click();
+    await page.evaluate(()=>window.cambridgeDrive.step(2));
+    // one control releases the parking brake; reverse is the back arrow, not a selector
+    await page.locator('#assessParking').click();await page.locator('#lookBtn').click();
     if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await point('[data-k="up"]',1),await point('[data-k="left"]',2)]});}
     else {await pointer('[data-k="down"]','pointerup',1);await pointer('[data-k="up"]','pointerdown',1);await pointer('[data-k="left"]','pointerdown',2);}
     const movement=await page.evaluate(()=>{const a=window.cambridgeDrive,x=a.player.x,z=a.player.z;a.step(45);return {throttle:a.player.rawInput.throttle,steer:a.player.rawInput.steer,moved:Math.hypot(a.player.x-x,a.player.z-z)};});

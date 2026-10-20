@@ -94,7 +94,8 @@ export function loadCarModel(url, options = {}) {
           wheels.push(p); if (wc.z < 0) front.push(p);
         }
         const indL = new T.MeshBasicMaterial({ color: 0x6b4a10 }), indR = new T.MeshBasicMaterial({ color: 0x6b4a10 });
-        addLearnerKit(root, { minZ: box.min.z, maxZ: box.max.z, W: box.max.x - box.min.x, H: box.max.y, roofZ: 0.25 }, indL, indR);
+        // Only the learner's own car carries L plates; the same models are also used for traffic.
+        if (spec.learner !== false) addLearnerKit(root, { minZ: box.min.z, maxZ: box.max.z, W: box.max.x - box.min.x, H: box.max.y, roofZ: 0.25 }, indL, indR);
         root.userData = { front, wheels, indL, indR, radius, roll: true };
         res(root);
       } catch (err) { rej(err); }

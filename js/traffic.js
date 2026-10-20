@@ -251,8 +251,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
       if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
-      // a blue-light vehicle goes past as soon as the learner has slowed and left room beside them
-      if (a.emergency && o.isPlayer && lat > 1.6 && Math.abs(o.v) < Math.max(2.5, a.v - 3)) continue;
+      // A blue-light vehicle gets past once the learner has made room beside it, or has slowed to a
+      // crawl: a real crew would squeeze by rather than sit behind a car doing walking pace.
+      if (a.emergency && o.isPlayer && (lat > 1.6 || Math.abs(o.v) < 2) && Math.abs(o.v) < Math.max(2.5, a.v - 3)) continue;
       if (lat < width) {
         vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;

@@ -25,8 +25,12 @@ try {
   await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','parallel-park',true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0);});
   assert.equal(await page.locator('#observationControls').isVisible(),false);
   assert.equal(await page.locator('[data-gear="N"]').isVisible(),false);
-  assert.equal(await page.locator('#assessParking').isVisible(),false);
+  // one control for the whole manoeuvre, and no cockpit drill or gear selector
+  assert.equal(await page.locator('#assessParking').isVisible(),true);
+  assert.equal(await page.locator('#assessParking').textContent(),'Release parking brake');
   assert.equal(await page.locator('[data-operation="engine"]').isVisible(),false);
+  assert.equal(await page.locator('#cockpitControls').isVisible(),false);
+  assert.equal(await page.locator('#gearControls').isVisible(),false);
   await page.screenshot({path:`/tmp/driving-${device.name}-ready.png`});
   // the HUD buttons beside the speedo (pause, all-round check, hold-to-look) must stay on screen and tappable
   const hud=await page.locator('.hud-right button').evaluateAll(buttons=>buttons.filter(b=>b.offsetParent!==null).map(b=>{const r=b.getBoundingClientRect();return {name:b.getAttribute('aria-label'),x:r.x,y:r.y,w:r.width,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};}));
@@ -48,8 +52,11 @@ try {
   if(device.touch)await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await point('[data-k="down"]',1)]});
   else await page.keyboard.down('ArrowDown');
   await page.evaluate(()=>window.cambridgeDrive.step(2));
-  await page.locator('[data-gear="D"]').click();assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.operation.gear),'D');
-  await page.locator('[data-operation="parkingBrake"]').click();await page.locator('#lookBtn').click();
+  // one control: tapping it releases the parking brake, and the car can then be driven
+  await page.locator('#assessParking').click();
+  assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.operation.parkingBrake),false);
+  assert.equal(await page.locator('#assessParking').textContent(),'Park');
+  await page.locator('#lookBtn').click();
   if(device.touch){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await point('[data-k="up"]',1),await point('[data-k="left"]',2)]});}
   else{await page.keyboard.up('ArrowDown');await page.keyboard.down('ArrowUp');await page.keyboard.down('ArrowLeft');}
   const input=await page.evaluate(()=>{const a=window.cambridgeDrive,before={x:a.player.x,z:a.player.z};a.step(45);return {raw:a.player.rawInput,moved:Math.hypot(a.player.x-before.x,a.player.z-before.z)};});

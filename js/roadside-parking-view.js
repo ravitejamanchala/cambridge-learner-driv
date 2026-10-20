@@ -4,18 +4,21 @@ import { makeBoxCar } from './car.js';
 // marked space between them, the target the learner is working towards, and the optional guide line.
 export function createRoadsideParkingView(scene) {
   const T = THREE;
-  const white = new T.LineBasicMaterial({ color: 0xf2f1ea });
-  const goalMaterial = new T.LineBasicMaterial({ color: 0xffb21a });
+  // Broken white lines, the way a UK parking bay is marked out on the road.
+  const white = new T.LineDashedMaterial({ color: 0xf2f1ea, dashSize: 0.55, gapSize: 0.3 });
+  const goalMaterial = new T.LineDashedMaterial({ color: 0xffb21a, dashSize: 0.5, gapSize: 0.28 });
   let props = null, line = null, arrow = null, pathLine = null, targetRef = null, lastPath = null;
 
   const outline = (rect, material) => {
     const p = rectangleCorners(rect), points = [];
     for (let i = 0; i < 4; i++) points.push(new T.Vector3(p[i].x, 0.05, p[i].z), new T.Vector3(p[(i + 1) % 4].x, 0.05, p[(i + 1) % 4].z));
-    return new T.LineSegments(new T.BufferGeometry().setFromPoints(points), material);
+    const line = new T.LineSegments(new T.BufferGeometry().setFromPoints(points), material);
+    line.computeLineDistances(); // dashes need the running length along each segment
+    return line;
   };
   const drop = (o) => { if (!o) return; scene.remove(o); o.traverse?.(c => { if (c.isMesh || c.isLine || c.isLineSegments) { c.geometry?.dispose(); } }); };
 
-  function setRoadsideParking(layout) {
+  function setRoadsideParking(layout, bodies = null) {
     if (props) { drop(props); props = null; }
     if (line) { drop(line); line = null; }
     if (arrow) { scene.remove(arrow); arrow = null; }
@@ -24,12 +27,12 @@ export function createRoadsideParkingView(scene) {
     if (!layout) return;
     props = new T.Group();
     props.add(outline(layout.bay, white));
-    for (const o of layout.obstacles) {
-      const car = makeBoxCar(o.id === 'parked-front' ? 0x55606a : 0x2f4f6f, false);
+    layout.obstacles.forEach((o, i) => {
+      const car = bodies?.(i) || makeBoxCar(o.id === 'parked-front' ? 0x55606a : 0x2f4f6f, false);
       car.position.set(o.x, 0, o.z); car.rotation.y = o.th;
       car.traverse(c => { if (c.isMesh) c.castShadow = true; });
       props.add(car);
-    }
+    });
     scene.add(props);
     arrow = new T.ArrowHelper(new T.Vector3(0, 0, -1), new T.Vector3(0, 0.15, 0), 1.8, 0xffb21a, 0.45, 0.3);
     scene.add(arrow);

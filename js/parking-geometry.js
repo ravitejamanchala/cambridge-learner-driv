@@ -35,8 +35,11 @@ export function sweptContact(previous, pose, layout) {
   return null;
 }
 
-export function nearContact(pose, layout, id) {
-  const size = { width: VEHICLE_ENVELOPE.width + .1, length: VEHICLE_ENVELOPE.length + .1 };
+// Still touching, within `margin`. A car held against an obstacle is pushed back to the pose it had a
+// frame earlier, which can be tens of centimetres clear of it, so the margin has to cover a frame of
+// travel or one sustained contact is logged over and over.
+export function nearContact(pose, layout, id, margin = 0.6) {
+  const size = { width: VEHICLE_ENVELOPE.width + margin, length: VEHICLE_ENVELOPE.length + margin };
   if (id === 'boundary') return !containsVehicle(layout.bounds, pose, size);
   const object = layout.obstacles.find(o => o.id === id);
   return !!object && rectanglesOverlap({ ...pose, ...size }, object);
