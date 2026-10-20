@@ -1,5 +1,33 @@
 # Authentication and API deployment
 
+## Hosting on Cloudflare Pages (app.slaydrive.com)
+
+The simulator deploys the same way as the SlayDrive marketing site. `.github/workflows/deploy.yml` runs on every push to `main`: install, root and Worker tests, type check, build, then `wrangler pages deploy dist` to the Cloudflare Pages project `learner-drive-app`. Failed tests stop the deploy.
+
+GitHub environment `cloudflare` (Settings > Environments):
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `CLOUD_FLAIR_API_TOKEN` | secret | Token with Cloudflare Pages: Edit and Workers Scripts: Edit on account `eab4a0a8ec80610eb37fc56768e971dc` |
+| `CLOUD_FLAIR_ID` | secret | `eab4a0a8ec80610eb37fc56768e971dc` |
+| `CLERK_PUBLISHABLE_KEY` | variable | Public production key for the slaydrive.com Clerk domain |
+| `API_BASE_URL` | variable | `https://learner-drive-api.manchala0024.workers.dev` |
+
+If the two variables are unset, the committed `auth-config.js` is deployed unchanged. The Worker is deployed only when the workflow is run manually with **Deploy API Worker** ticked; its secrets stay in Cloudflare and are not touched.
+
+Cut-over order (sign-in is unavailable between steps 3 and 5, so do them together):
+
+1. Add the secrets, merge to `main`, confirm the first Pages deploy, then add custom domain `app.slaydrive.com` to the Pages project.
+2. Check the app loads on `https://app.slaydrive.com/` as a guest.
+3. In Clerk, change the production domain to `slaydrive.com`, add the DNS records Clerk lists in Cloudflare DNS, update the Google OAuth redirect URI, and copy the new publishable key.
+4. Set `CLERK_PUBLISHABLE_KEY` as the environment variable above.
+5. Run the workflow manually with **Deploy API Worker** ticked. This redeploys the app with the new key and switches the Worker's `FRONTEND_URL` to `https://app.slaydrive.com`.
+6. Replace the `gh-pages` branch contents with `tools/gh-pages-redirect/` so the old address forwards to the new one, then test sign-in, Google sign-in, subscribe, manage subscription and cancel on the new domain.
+
+The Stripe webhook stays at the Worker URL and needs no change.
+
+## Original GitHub Pages notes
+
 The simulator remains vanilla JavaScript on GitHub Pages. The independent Hono Worker in `server/` uses Clerk session tokens and Neon PostgreSQL through Drizzle and the Neon HTTPS driver. No React/Next.js is introduced. This recovery branch does not deploy either service.
 
 ## Configuration and prerequisites
@@ -13,7 +41,7 @@ Use Node.js 24+ and `npm ci` in the repository root, then `npm ci --prefix serve
 | `CLOUDFLARE_API_TOKEN` | Deployment shell only; account-scoped Worker edit permissions |
 | `DATABASE_URL` | Worker secret, pooled Neon endpoint |
 | `DATABASE_URL_UNPOOLED` | Migration shell only, direct Neon endpoint |
-| `FRONTEND_URL` | Worker variable, exactly `https://manchala.co.uk` |
+| `FRONTEND_URL` | Worker variable, exactly `https://app.slaydrive.com` |
 | `API_BASE_URL` | Public frontend configuration, actual deployed Worker URL |
 
 The explicitly configured Cloudflare account is `eab4a0a8ec80610eb37fc56768e971dc`, Worker `learner-drive-api`. Neon project is `tiny-voice-54838966`, organization `org-bitter-river-15275983`, production branch `br-long-darkness-zacav6fi`.
