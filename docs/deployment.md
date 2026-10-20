@@ -8,8 +8,8 @@ GitHub environment `cloudflare` (Settings > Environments):
 
 | Name | Kind | Value |
 | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | secret | Token with Cloudflare Pages: Edit and Workers Scripts: Edit on account `eab4a0a8ec80610eb37fc56768e971dc` |
-| `CLOUDFLARE_ACCOUNT_ID` | secret | `eab4a0a8ec80610eb37fc56768e971dc` |
+| `CLOUD_FLAIR_API_TOKEN` | secret | Token with Cloudflare Pages: Edit and Workers Scripts: Edit on account `eab4a0a8ec80610eb37fc56768e971dc` |
+| `CLOUD_FLAIR_ID` | secret | `eab4a0a8ec80610eb37fc56768e971dc` |
 | `CLERK_PUBLISHABLE_KEY` | variable | Public production key for the slaydrive.com Clerk domain |
 | `API_BASE_URL` | variable | `https://learner-drive-api.manchala0024.workers.dev` |
 
