@@ -47,3 +47,15 @@ The production workflow deploys on pushes to **main**. This implementation stays
 Browser tests use the installed matching Three.js files in place of public CDN requests. These are local functional checks, not live routing/provider or production deployment verification.
 
 Local test evidence: the original 79 regression tests plus the new local-library test pass (80 total), and the production build succeeds. The Chromium import/edit test drove the 110.6-metre fixture for 1.5 seconds (4.17 metres), with mock assessment running, then saved and restored an edited revision. The existing learner browser regression suite also passes (prerequisites, cockpit/engine completion, measured control lessons, legacy startup, persisted reports and map-load failure handling). No live provider APIs are required for this local JSON handoff.
+
+## GitHub Pages browser preview
+
+The existing repository Pages site is https://manchala.co.uk/cambridge-learner-driv/ (GitHub inherits the account’s existing Pages domain). No DNS or custom-domain configuration is changed. It is served from the separate `gh-pages` branch. This preview enables a guest authoring sandbox and has no account-backend configuration. It does not change the Cloudflare learner production deployment.
+
+Open **Mock test**, import an editor JSON, select the route marked **local**, and start. **Edit saved JSON** creates another immutable revision; **Download JSON** makes a portable backup. Pages saves revisions in IndexedDB in this browser on this device, scoped to the site path. It cannot write local disk files or commit to GitHub. Clearing site data removes revisions, and other devices do not see them. Use downloaded exports for transfer. The localhost disk library remains available through `npm run dev:editor`.
+
+Build this sandbox explicitly with `npm run build:pages`. Serve `dist/` over HTTP/HTTPS; the output works under the repository subpath. The regular `npm run build` retains the committed Clerk/API configuration. Publish only the `dist/` output to `gh-pages`, preserving branch history; never push this output to `main`. The existing production workflow only deploys on `main`.
+
+The route starts/finishes at the first/last plan waypoints, snapped to connected road-network nodes by the native router. The precise car placement comes from `spawn.x`, `spawn.z` and `spawn.heading`. In the admin route generator, the administrator chooses A/B, or exports one selected section of the generated route.
+
+`npm run test:pages` checks the built site under `/cambridge-learner-driv/`, import/edit/reload in IndexedDB, real mock driving, immutable revisions, JSON download, rejected invalid JSON, and absence of localhost API calls.
