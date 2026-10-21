@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { installAuthFixture, signedIn } from './auth-fixture.mjs';
 const require = createRequire(import.meta.url);
 const root = path.resolve(process.env.TEST_SITE || '.');
 const port=8765;
@@ -18,8 +19,11 @@ try {
  await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));
  await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
+ const account = await installAuthFixture(page);
  await page.goto(url); await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
- await page.locator('#profName').fill('Development checks');await page.locator('#profForm').evaluate(f=>f.requestSubmit());
+ await signedIn(page);
+ // The signed-in account supplies the learner; only name one when the app asks for it.
+ if (await page.locator('#profName').isVisible()) { await page.locator('#profName').fill('Development checks'); await page.locator('#profForm').evaluate(f=>f.requestSubmit()); }
  await page.evaluate(()=>window.cambridgeDrive.manual(true));
  // Prerequisite enforcement also protects direct starts.
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','engine-control',true);});
@@ -36,7 +40,9 @@ try {
  for(const action of ['doorClosed','seatSet','mirrorsSet','belt'])await page.locator(`[data-operation="${action}"]`).click();
  await page.evaluate(()=>window.cambridgeDrive.step(2));assert.equal(await page.locator('#verdict').textContent(),'Lesson passed');
  assert.ok((await page.locator('#coachingReport').textContent()).includes('measured objectives'));
- await page.locator('#nextBtn').click();
+ // The result sheet offers the next lesson in the course, whichever that now is.
+ assert.ok(await page.evaluate(()=>!!document.getElementById('nextBtn').dataset.id));
+ await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','engine-control',true);});
  assert.equal(await page.evaluate(()=>window.cambridgeDrive.player.operation.enabled),true);
  for(const action of ['doorClosed','seatSet','mirrorsSet','belt','engine'])await page.locator(`[data-operation="${action}"]`).click();
  await page.evaluate(()=>window.cambridgeDrive.step(2));assert.equal(await page.evaluate(()=>window.cambridgeDrive.test.done),false);
@@ -45,25 +51,34 @@ try {
  for(const id of ['controlled-stop','accel-decel','mirror-practice']){
   await page.evaluate(async id=>{await window.cambridgeDrive.pick('lesson',id,true);window.cambridgeDrive.manual(true);},id);
   const result=await page.evaluate(id=>{
-   const api=window.cambridgeDrive, p=api.player;let target=5.5, stopped=false, slowing=false, mirrored=false;
+   const api=window.cambridgeDrive, p=api.player;let target=5.5, stopped=false, slowing=false, mirrored=0, hold=0;
    api.look(); p.signal('R');
-   if(id==='mirror-practice')for(const view of ['interior','right','blindspot'])document.querySelector(`[data-observe="${view}"]`).click();
+   // The mirror card is gone: the three checks are the real gestures. The interior-mirror button, then
+   // X held long enough that the glance in the right mirror becomes a look over the shoulder.
+   const keyX=down=>window.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code:'KeyX',bubbles:true}));
+   const startChecks=()=>{document.getElementById('lookBtn').click();keyX(true);hold=20;};
+   if(id==='mirror-practice')startChecks();
    const input=()=>{
-    const t=api.test, msg=document.querySelector('#banner').textContent;
+    // Nothing is drawn over the road any more: the scenario's own progress line is what to read.
+    const t=api.test, msg=api.scenario?.progress?.message||'';
     if(t.sRoute>25&&p.indicator==='R')p.signal('R');
     if(t.parked && api.traffic.cars.some(c=>{if(!c.alive||c.v<1||Math.cos(c.th-p.th)<.7)return false;const dx=c.x-p.x,dz=c.z-p.z,fx=-Math.sin(p.th),fz=-Math.cos(p.th),fw=dx*fx+dz*fz;return fw<3&&fw> -90&&Math.abs(dx*fz-dz*fx)<5.5;}))return {throttle:0,brake:p.v>.1?1:0,steer:0};
     if(id==='controlled-stop'&&!stopped&&msg.startsWith('Brake to stop'))target=0;
     if(id==='controlled-stop'&&!stopped&&msg.startsWith('Stopped in the target')){stopped=true;api.look();target=5.5;}
     if(id==='accel-decel'&&msg.startsWith('Release accelerator')){target=3;slowing=true;}
     if(id==='accel-decel'&&slowing&&msg.startsWith('Speed reduced'))target=5.5;
-    if(id==='mirror-practice'&&!mirrored&&t.sRoute>190){mirrored=true;for(const view of ['interior','right','blindspot'])document.querySelector(`[data-observe="${view}"]`).click();}
+    if(hold>0)return {throttle:0,brake:1,steer:0}; // stay put while the shoulder check is being held
     if(t.sRoute>t.route.len-35)target=0;
     const q=api.lanePoint(Math.min(t.route.len,t.sRoute+12));
     let angle=Math.atan2(-(q.x-p.x),-(q.z-p.z))-p.th;while(angle>Math.PI)angle-=2*Math.PI;while(angle< -Math.PI)angle+=2*Math.PI;
     return {throttle:p.v<target-.15?1:0,brake:p.v>target+.15?1:0,steer:Math.max(-1,Math.min(1,angle*2.4))};
    };
    const fn=()=>input();const removeInput=api.addInput(fn);
-   for(let i=0;i<3000&&!api.test.done;i++)api.step(1);
+   for(let i=0;i<3000&&!api.test.done;i++){
+    if(hold>0&&--hold===0)keyX(false);
+    if(id==='mirror-practice'&&mirrored===0&&hold===0&&api.test.sRoute>190){mirrored=1;startChecks();}
+    api.step(1);
+   }
    removeInput();
    return {id,done:api.test.done,verdict:document.querySelector('#verdict').textContent,faults:api.test.faults,reasons:document.querySelector('#rReasons').textContent,distance:api.test.sRoute};
   },id);
@@ -81,7 +96,7 @@ try {
       if(p.rawInput?.brake>=.5){document.querySelector(`[data-gear="${reverse?'R':'D'}"]`).click();document.querySelector('[data-operation="parkingBrake"]').click();selected=true;}
       return {throttle:0,brake:1,steer:0};
      }
-     const msg=document.querySelector('#banner').textContent;
+     const msg=api.scenario?.progress?.message||'';
      if(msg.startsWith('Target reached')||msg.startsWith('Keep the brake')) {
       if(Math.abs(p.v)<.05&&p.rawInput?.brake>=.5&&!secured){document.querySelector('[data-gear="P"]').click();document.querySelector('[data-operation="parkingBrake"]').click();secured=true;}
       return {throttle:0,brake:1,steer:0};
@@ -107,9 +122,10 @@ try {
  await page.evaluate(()=>window.cambridgeDrive.step(3));
  const trafficState=await page.evaluate(()=>({cars:window.cambridgeDrive.traffic.cars.filter(c=>c.alive).length,scripted:window.cambridgeDrive.traffic.bikes.some(b=>b.scripted&&b.alive)}));
  assert.ok(trafficState.cars<=9); assert.equal(trafficState.scripted,true);
- const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('cambridge-learner-drive.v1')));
- assert.equal(saved.profiles[0].lessons['cockpit-drill'].passed,true);
- assert.ok(saved.profiles[0].lessons['controlled-stop'].latestReport.evidence.scenarioEvents.some(e=>e.type==='controlled-stop' && e.distance<=30));assert.ok(saved.profiles[0].history.length>=6);
+ // Signed in, progress goes to the account service rather than localStorage.
+ const saved=account.profile;
+ assert.equal(saved.lessons['cockpit-drill'].passed,true);
+ assert.ok(saved.lessons['controlled-stop'].latestReport.evidence.scenarioEvents.some(e=>e.type==='controlled-stop' && e.distance<=30));assert.ok(saved.history.length>=6);
  // Reload preserves completion and unlocks the engine lesson.
  await page.reload();await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','move-off',true);});

@@ -65,22 +65,27 @@ try{
   await app.pick('lesson','blue-light',true);app.manual(true);
   let mode='drive';
   const remove=app.addInput(()=>mode==='drive'?{throttle:1,brake:0,steer:0}:{throttle:0,brake:1,steer:0});
+  let blueTop=0,otherTop=0;
   for(let i=0;i<4000&&!app.test.done;i++){
    const s=app.scenario;
    // once the blue lights are behind, slow right down and let it through
    mode=s&&s.phase==='coming'?'stop':'drive';
    if(s&&s.phase==='passing')mode='drive';
    app.step(1);
+   if(s?.vehicle)blueTop=Math.max(blueTop,s.vehicle.v);
+   for(const c of app.traffic.cars) if(c.alive&&c!==s?.vehicle) otherTop=Math.max(otherTop,c.v);
   }
   remove();
   return {phase:app.scenario.phase,events:app.scenario.events.map(e=>e.type),result:app.scenario.result(),
+   topSpeed:Math.round(blueTop*10)/10,fastestOther:Math.round(otherTop*10)/10,
    faults:app.test.faults.filter(f=>f.cat.startsWith('Emergency')).map(f=>f.cat)};
  });
  assert.ok(lesson.events.includes('emergency-approach'),JSON.stringify(lesson));
  assert.ok(lesson.events.includes('emergency-passed'),JSON.stringify(lesson));
+ assert.ok(lesson.topSpeed>lesson.fastestOther+2,`the blue light should outpace the traffic: ${JSON.stringify(lesson)}`);
  assert.deepEqual(lesson.faults,[],JSON.stringify(lesson));
  assert.equal(lesson.result.ok,true,JSON.stringify(lesson));
- console.log('Blue light lesson: slowing down and letting it past is a clean pass.',JSON.stringify(lesson.result));
+ console.log(`Blue light lesson: clean pass. It peaked at ${lesson.topSpeed} m/s against ${lesson.fastestOther} m/s for the fastest other car.`);
  // ---------- on a phone: nothing may sit over the road, in any lesson ----------
  await page.setViewportSize({width:390,height:844});
  assert.equal(await page.locator('.banner').count(),0,'the banner slab is gone for good');

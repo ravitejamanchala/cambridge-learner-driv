@@ -24,7 +24,7 @@ try{
  await installAuthFixture(page);
  await page.goto(url+'/?bots');await page.waitForFunction(()=>document.querySelector('#loadOv').hidden,{},{timeout:45000});await signedIn(page);
  await page.locator('#blN').fill('1');await page.locator('#blSpd').selectOption('0');await page.locator('#blLoop').uncheck();
- await page.locator('#blSeed').fill('7'); // same traffic every sweep
+ await page.locator('#blSeed').fill(process.env.BOT_SEED||'7'); // same traffic every sweep unless BOT_SEED asks for another
  await page.locator('#blPick').selectOption(pick);
  const expected=await page.evaluate(v=>{
   const list=[...document.querySelectorAll('#blPick option')].map(o=>o.value);

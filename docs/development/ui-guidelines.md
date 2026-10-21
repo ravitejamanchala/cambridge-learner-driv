@@ -63,7 +63,7 @@ already has a distance field, a speedometer and an eye button; use them.
 | "Brake to stop: 18 metres left" | The distance field, which already reads in yards and metres |
 | "Hold 10–15 mph: 1.4 / 3 seconds" | A target band under the speed, and a count in the distance field |
 | "Repeat Interior, Right and Blind spot" | Three ticks that fill as each check is recorded |
-| "Blue lights coming towards you…" | Nothing. It is on the card, and the police car is visible |
+| "Blue lights behind you…" | Nothing. It is on the card, and the mirrors are the exercise |
 | "It is past. Carry on when it is safe." | Nothing. The event is over |
 | "Release the parking brake" as a stage label | Nothing. The button already says it, right below |
 
@@ -99,6 +99,15 @@ rather than painting anything over the road, and its text must be short enough f
   fault by category.
 - **Every line must come from something the drive recorded.** `runDetail()` in `js/reports.js` reads
   scenario events and marked faults. It never flatters, never guesses, and never changes the result.
+- **A fault must be the learner's to own.** Before marking something, rule out the cases where they had
+  no choice: held in a queue, stopped behind a stationary vehicle, waiting at a give-way line, or sat at
+  a red light while the thing being judged is still a long way off. Geometry is the usual trap — a test
+  of the form "within the corner radius plus a road width" calls a car waiting 20 m short of a junction
+  "in the junction". Prefer the junction node and half the widest road meeting it, require the state to
+  hold for a second or two rather than a single frame, and check it by running `npm run test:bots` on a
+  clean drive: a fault the bot collects on a route it otherwise drives well is almost always ours, not
+  its. `BOT_SEED` runs the same sweep on another traffic seed, which separates a real regression from
+  one drive diverging.
 
 ## On the road
 
@@ -124,7 +133,9 @@ npm run test:drive       # look cameras and the blue-light vehicle
 npm run test:devices     # five viewports, touch targets, no overlap
 npm run test:mobile      # three device profiles, against dist/
 npm run test:cars
-npm run test:access
+npm run test:access      # needs a server on 127.0.0.1:8000
+npm run test:browser     # the course end to end: prerequisites, control lessons, saved progress
+npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
 ```
 

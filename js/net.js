@@ -108,7 +108,7 @@ function junctionFillets(net) {
       const ca = Math.hypot(C[0] - x, C[1] - z); if (ca > 40) continue;
       const A = [C[0] + a.ux * R, C[1] + a.uz * R], B = [C[0] + b.ux * R, C[1] + b.uz * R];
       const pts = []; for (let k = 0; k <= 10; k++) { const u = k / 10, m = 1 - u; pts.push([m * m * A[0] + 2 * u * m * C[0] + u * u * B[0], m * m * A[1] + 2 * u * m * C[1] + u * u * B[1]]); }
-      out.push({ node: v, C, A, B, pts, R, w: Math.max(a.e.way.w, b.e.way.w) });
+      out.push({ node: v, nx: x, nz: z, C, A, B, pts, R, w: Math.max(a.e.way.w, b.e.way.w) });
     }
   }
   return out;
