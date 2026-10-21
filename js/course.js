@@ -326,10 +326,10 @@ export function createScenario(lesson, deps) {
   if (lesson.scenario === 'estop') {
     let state = 'wait', t0 = 0, react = null, stopT = null;
     S.update = (dt, clock) => {
-      if (state === 'wait' && test.sRoute > 180 && player.v > 6.5) { state = 'go'; t0 = clock; ui.banner('STOP!', 'stop'); }
+      if (state === 'wait' && test.sRoute > 180 && player.v > 6.5) { state = 'go'; t0 = clock; ui.banner('STOP', 'stop'); }
       if (state === 'go') {
         if (react === null && player.inp && player.inp.brake > 0.05) react = clock - t0;
-        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner('Thank you. Look round (B), then move off when it is safe.', 'info'); setTimeout(() => ui.banner(null), 4000); }
+        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner('Look round, then move off', 'info'); setTimeout(() => ui.banner(null), 4000); }
       }
     };
     S.result = () => {

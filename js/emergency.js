@@ -114,7 +114,7 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
       }
       car = pick; car.emergency = true; attachShell();
       phase = 'coming'; cameAt = clock; record('emergency-approach', { side: from, x: car.x, z: car.z });
-      ui.banner(from === 'oncoming' ? 'Blue lights coming towards you. Slow down and keep well to the left.' : 'Blue lights behind you. Check your mirrors.', 'info');
+      ui.banner(from === 'oncoming' ? 'Blue lights ahead' : 'Blue lights behind', 'warn');
       bannerUntil = clock + 5;
       return;
     }
@@ -144,14 +144,14 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
         if (k && k.offL > k.width / 2 - EMERGENCY.kerbRoom) pulledIn = true;
         if (Math.abs(player.v) < 0.4 && stoppedInTheWay()) badStop = true;
         if (clock > bannerUntil && near && followFor > 2.5 && !slowed && !pulledIn) {
-          ui.banner('Let it through: slow down and keep over to the left where it is safe.', 'warn'); bannerUntil = clock + 4;
+          ui.banner('Let it through', 'warn'); bannerUntil = clock + 4;
         }
       }
       const through = oncoming ? forward < -6 : forward > 6;
       if (through) {
         phase = 'passing'; passedAt = clock;
         record('emergency-passed', { side: from, followFor: Math.round(followFor * 10) / 10, slowed, pulledIn });
-        ui.banner('It is past. Carry on when it is safe.', 'info'); bannerUntil = clock + 4;
+        ui.banner(null); bannerUntil = 0;
         if (!faulted && !slowed && !pulledIn) {
           faulted = true;
           test.fault('D', 'Emergency vehicle', 'An emergency vehicle had to get past without you slowing down or making room', 'emergency-room', Infinity);

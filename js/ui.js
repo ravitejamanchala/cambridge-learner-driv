@@ -151,6 +151,17 @@ export function createUI(net) {
     if (t.mode === 'manoeuvre' && t.manoeuvreStatus) {
       const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = m.short; $('hudNextBox').setAttribute('aria-label',m.message); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
     }
+    // An alert takes the HUD box over while it lasts: the state goes where the learner already looks,
+    // and nothing is drawn across the road.
+    const alert = t.alert, boxEl = $('hudNextBox');
+    boxEl.classList.toggle('warn', alert?.tone === 'warn');
+    boxEl.classList.toggle('stop', alert?.tone === 'stop');
+    if (alert) {
+      $('hudNext').textContent = alert.tone === 'stop' ? alert.label : '';
+      $('hudDist').textContent = alert.tone === 'stop' ? '' : alert.label;
+      $('hudChecks').hidden = true; $('hudExit').hidden = true; $('hudLanes').hidden = true;
+      boxEl.setAttribute('aria-label', alert.label);
+    }
     // tip
     let key = 'keep';
     if (mph > limit + 1) key = 'speed';

@@ -7,6 +7,10 @@ are the first thing to check before adding a panel, a message or a control.
 
 The learner is looking at a road. Everything drawn on top of it costs them something.
 
+- **Nothing is drawn across the road. Ever.** There is no banner element any more: it was a slab of
+  text over the windscreen. Anything that must reach the learner mid-drive goes to the HUD box as
+  `test.alert = { label, tone }`, where `tone` is `info`, `warn` or `stop`, and the label is a few
+  words. That is where they already look for what to do next.
 - **No large panels during a drive.** A control is a pill or an icon button at the edge of the screen,
   not a card in the corner of the view. The parking control is the model: one small button, bottom
   centre, clear of the touch controls.
@@ -33,9 +37,12 @@ already has a distance field, a speedometer and an eye button; use them.
 | "Brake to stop: 18 metres left" | The distance field, which already reads in yards and metres |
 | "Hold 10–15 mph: 1.4 / 3 seconds" | A target band under the speed, and a count in the distance field |
 | "Repeat Interior, Right and Blind spot" | Three ticks that fill as each check is recorded |
+| "Blue lights coming towards you. Slow down and keep well to the left." | `Blue lights ahead`, amber, in the HUD box |
+| "It is past. Carry on when it is safe." | Nothing. The event is over; clear the alert |
 
 Scenarios report state through `test.basicStatus` — `{ label, value, band, checks }` — and `ui.hud()`
-draws it. They do not call `ui.banner()` during a drive.
+draws it. `ui.banner()` still exists for the scenarios that call it, but it now writes `test.alert`
+rather than painting anything over the road, and its text must be short enough for the HUD box.
 
 ## One control, and controls the learner already has
 
@@ -95,9 +102,10 @@ node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.
 ```
 
 Touch targets are at least 44 px on a coarse pointer, nothing overlaps, and nothing runs off the screen
-at 320 px wide. `npm run test:devices` checks all three, and `npm run test:drive` checks that no panel
-or banner sits over the road during the Getting started lessons at phone size, and that the HUD pieces
-do not overlap each other.
+at 320 px wide. `npm run test:devices` checks all three. `npm run test:drive` checks that the banner
+element does not exist at all, that no panel sits over the road during the Getting started lessons or
+while a blue-light vehicle is being dealt with at phone size, that the alert is short enough for the
+HUD, and that the HUD pieces do not overlap each other.
 
 When the course or the interface changes, regenerate the screenshots and commit them: `docs/screenshots.md`
 is the quickest way to see what a change did to every case at once.

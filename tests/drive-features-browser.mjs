@@ -81,14 +81,33 @@ try{
  assert.deepEqual(lesson.faults,[],JSON.stringify(lesson));
  assert.equal(lesson.result.ok,true,JSON.stringify(lesson));
  console.log('Blue light lesson: slowing down and letting it past is a clean pass.',JSON.stringify(lesson.result));
- // ---------- Getting started on a phone: nothing may sit over the road ----------
+ // ---------- on a phone: nothing may sit over the road, in any lesson ----------
  await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.locator('.banner').count(),0,'the banner slab is gone for good');
+ // the blue-light event used to put a slab of text across the windscreen mid-drive
+ await page.evaluate(async()=>{
+  const app=window.cambridgeDrive;
+  await app.pick('lesson','blue-light',true);app.manual(true);
+  const remove=app.addInput(()=>({throttle:1,brake:0,steer:0}));
+  for(let i=0;i<3000&&app.scenario?.phase!=='coming';i++)app.step(1);
+  remove();app.frame(0.2);
+ });
+ const lit=await page.evaluate(()=>{
+  const vis=el=>!!(el&&!el.hidden&&getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0);
+  return {phase:window.cambridgeDrive.scenario?.phase,alert:window.cambridgeDrive.test.alert?.label||null,
+   slab:vis(document.querySelector('.banner')),panel:vis(document.querySelector('#trainingControls'))};
+ });
+ assert.equal(lit.phase,'coming',JSON.stringify(lit));
+ assert.equal(lit.slab,false,'a blue-light message is over the road');
+ assert.equal(lit.panel,false,'a panel is over the road during the blue-light event');
+ assert.ok(lit.alert&&lit.alert.length<=24,'the alert belongs in the HUD and must stay short: '+JSON.stringify(lit));
+ console.log('Blue light on a phone: the warning is in the HUD, not across the windscreen —',JSON.stringify(lit.alert));
  for(const id of ['mirror-practice','controlled-stop','accel-decel']){
   await page.evaluate(async i=>{await window.cambridgeDrive.pick('lesson',i,true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0.2);},id);
   await page.evaluate(()=>{for(let i=0;i<40;i++)window.cambridgeDrive.step(1);window.cambridgeDrive.frame(0.2);});
   await page.waitForTimeout(150);
   const over=await page.evaluate(()=>{
-   const vis=el=>el&&!el.hidden&&getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0;
+   const vis=el=>!!(el&&!el.hidden&&getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0);
    const stage=document.querySelector('#stage').getBoundingClientRect();
    const area=el=>{const r=el.getBoundingClientRect();return Math.round(r.width*r.height/(stage.width*stage.height)*100);};
    const panel=document.querySelector('#trainingControls'), banner=document.querySelector('#banner');
@@ -101,6 +120,7 @@ try{
   });
   assert.equal(over.panel,false,`${id}: a control panel is sitting over the road`);
   assert.equal(over.banner,false,`${id}: a banner is sitting over the road`);
+  assert.ok(over.bannerArea===0,`${id}: something is covering the road`);
   assert.deepEqual(over.clashes,[],`${id}: HUD pieces overlap each other`);
  }
  console.log('Getting started on a phone: no panel, no banner, no overlapping HUD.');

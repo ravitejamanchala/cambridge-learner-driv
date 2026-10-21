@@ -288,7 +288,7 @@ async function boot() {
   $('assessParking').addEventListener('click', () => {
     if (!A.test?.running || !plan?.lesson?.manoeuvre) return;
     const op = player.operation;
-    if (!operate(op, 'parkingBrake', player.v, A.traffic.clock)) { banner('Come to a stop first.', 'warn'); setTimeout(() => banner(null), 2000); renderTrainingControls(); return; }
+    if (!operate(op, 'parkingBrake', player.v, A.traffic.clock)) { banner('Stop first', 'warn'); setTimeout(() => banner(null), 2000); renderTrainingControls(); return; }
     if (op.parkingBrake) scenario?.finishAttempt();
     renderTrainingControls();
   });
@@ -335,7 +335,9 @@ async function boot() {
   }
 
   // ---------- drive flow ----------
-  const banner = (text, kind) => { const el = $('banner'); el.hidden = !text; if (text) { el.textContent = text; el.className = 'banner ' + (kind || ''); } };
+  // Nothing is ever drawn over the road. What used to be a banner across the windscreen is now a
+  // state on the HUD box, where the learner already looks for what to do next.
+  const banner = (text, kind) => { if (A.test) A.test.alert = text ? { label: text, tone: kind || 'info' } : null; };
   // measured over one drive, for the feedback at the end
   const stats = { distance: 0, topSpeed: 0 };
   function showRunDetail(about) {
@@ -591,7 +593,7 @@ async function boot() {
     },
     pin: (x, z) => { if (!pinMesh) { pinMesh = new T.Mesh(new T.ConeGeometry(0.3, 1.2, 12), new T.MeshBasicMaterial({ color: 0xff3b30 })); pinMesh.rotation.x = Math.PI; } scene.add(pinMesh); pinMesh.position.set(x, 0.75, z); },
     lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net),
-    estopBanner: () => { const b = $('banner'); return !b.hidden && /STOP/.test(b.textContent); },
+    estopBanner: () => A.test?.alert?.tone === 'stop',
     setInput: (fn) => { botInput = fn; },
     botMode: (on) => { botMode = on; manual = on; },
     async start(kind, id, seed) {

@@ -29,7 +29,7 @@ test('the blue-light vehicle only appears once the learner is driving along the 
  h.player.v=12; h.step();
  assert.equal(h.event.phase,'coming'); assert.equal(h.placed.length,1);
  assert.ok(h.placed[0].cruise>1,'it travels above the limit');
- assert.match(h.banners.at(-1),/Blue lights behind you/);
+ assert.match(h.banners.at(-1),/Blue lights behind/);
 });
 test('slowing down and letting it past is a pass with no faults',()=>{
  const h=harness(); h.test.sRoute=100; h.player.v=12; h.step();
@@ -91,7 +91,7 @@ test('it can also come the other way, and is assessed the same',()=>{
  const h=harness({side:'oncoming'});
  h.test.sRoute=100; h.player.v=12; h.step();
  assert.equal(h.event.phase,'coming'); assert.equal(h.event.side,'oncoming');
- assert.match(h.banners.at(-1),/coming towards you/);
+ assert.match(h.banners.at(-1),/Blue lights ahead/);
  // it closes from ahead while the learner slows right down, then goes by
  h.player.v=1; for(let i=0;i<6;i++){place(h,40-i*5);h.step();}
  place(h,-20); h.step();
