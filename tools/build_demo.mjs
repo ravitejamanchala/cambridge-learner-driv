@@ -14,6 +14,7 @@ const assetVersion = sourceCommit || String(Date.now());
 let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8').replace('<script type="module" src="js/main.js"></script>', '<script type="module" src="app.js?v=' + assetVersion + '"></script>');
 html = html.replace('<head>', '<head><meta name="app-release" content="' + assetVersion + '">');
 html = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+if(process.argv.includes('--pages-preview')) html=html.replace('src="auth-config.js"','src="auth-config.js?v='+assetVersion+'"');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 for (const f of fs.readdirSync(path.join(SRC, 'data/areas'))) {
   const d = JSON.parse(fs.readFileSync(path.join(SRC, 'data/areas', f), 'utf8'));
