@@ -173,12 +173,16 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const crowns = trees.map(([x, z, s], i) => ({ x, z, s, c: CROWNS[i % CROWNS.length] }));
   inst(k.crownG, k.mats.crown, crowns, (b) => { M.makeScale(b.s, b.s * 1.1, b.s); M.setPosition(b.x, 4.6 * b.s, b.z); });
   inst(k.crownG, k.mats.crown, bushes, (b) => { M.makeScale(b.s, b.s * 0.8, b.s); M.setPosition(b.x, b.y + b.s, b.z); });
-  // the surveyed poles, each turned to face the road it stands beside
-  for (const [x, z] of surveyed) {
-    const nr = nearest(net, x, z);
-    if (!nr) { lamps.push([x, z, 0, 1]); continue; }
-    const dx = nr.x - x, dz = nr.z - z, L = Math.hypot(dx, dz) || 1;
-    lamps.push([x, z, dx / L, dz / L]);
+  // The surveyed poles. Each one is pushed out to the kerb if the survey put it inside the
+  // carriageway, and turned to face the road it stands beside. `nearest` reports the offset from the
+  // centre line rather than the point itself, so the point is reconstructed from it: q is the lamp
+  // stepped back across the road by `lat` along the normal to the tangent.
+  for (const [lx, lz] of surveyed) {
+    const nr = nearest(net, lx, lz); if (!nr) continue; // nothing to stand beside
+    const qx = lx - nr.lat * nr.tz, qz = lz + nr.lat * nr.tx;        // the point on the road's centre line
+    const side = nr.lat < 0 ? -1 : 1, off = Math.max(nr.way.w / 2 + 0.9, Math.abs(nr.lat)); // clear of the kerb
+    const x = qx + nr.tz * off * side, z = qz - nr.tx * off * side;
+    lamps.push([x, z, (qx - x) / off, (qz - z) / off]);              // the head reaches back over the road
   }
   inst(k.poleG, k.mats.pole, lamps, ([x, z]) => { M.makeTranslation(x, 0, z); });
   inst(k.headG, k.mats.lampHead, lamps, ([x, z, dx, dz]) => { E.set(0, Math.atan2(dx, dz), 0, 'YXZ'); Q.setFromEuler(E); M.compose(V.set(x + dx * 0.6, 6.95, z + dz * 0.6), Q, S.set(1, 1, 1)); }, false);

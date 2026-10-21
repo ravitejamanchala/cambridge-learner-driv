@@ -14,6 +14,18 @@
   - **483 surveyed street lamps**, used in place of the lamp posts the city builder spaces out along
     main roads. A spaced-out pole within 16 m of a surveyed one is dropped rather than standing next
     to it, and each surveyed pole turns to face the road it stands beside.
+  - **Lamp posts stood in the road, and their heads were placed from a point that does not exist.**
+    `nearest()` reports how far off the centre line you are, not the point on it, so reading `nr.x`
+    gave `NaN` and every surveyed lamp head got a nonsense transform. The point is now reconstructed
+    from the offset, and a lamp the survey put inside the carriageway is stepped out to the kerb —
+    the same 0.9 m stand-off the spaced-out poles use. 65 of 986 needed moving; none now stands
+    closer than 0.90 m to a carriageway edge.
+- **Roads had unmarked stretches.** A road is cut into one edge per junction, and the centre line and
+  lane dividers kept a fixed 9 m clear of each end — so any edge shorter than 18 m got no markings at
+  all, and the road looked bare between two marked stretches. A 12 m length of Hills Road and a 17 m
+  length of The Fen Causeway were among them. The clearance now scales with the edge, which takes the
+  unmarked total on the mock-test maps from 2,274 m to 98 m, all of it stubs under 5 m where a centre
+  line would be wrong anyway.
   - The one road-attribute correction in the file (Milton Road's width and lane count) was already
     what the map said, so nothing changed there.
 
