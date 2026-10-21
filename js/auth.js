@@ -1,7 +1,9 @@
+import { localAuthoring } from './local-library.js';
 import { setAccess, hasFullAccess, setAuthConfigured, setSignedIn } from './access.js';
 import { Profiles } from './profile.js';
 import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
+ if(localAuthoring()){setAccess(true);return;}
  setAccess(false);
  const config = window.LEARNER_CONFIG;
  if (!config?.CLERK_PUBLISHABLE_KEY || !config?.API_BASE_URL) return;

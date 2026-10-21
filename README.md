@@ -16,6 +16,10 @@ Learn with a course of short lessons, then take mock tests on full routes. Each 
   - *Manoeuvres and parking:* parallel parking at the kerb, between two parked cars on a real street
   - *Theory and show me, tell me:* quizzes on show me, tell me, road signs, stopping distances and priority. These are unofficial practice questions written for this project, not the DVSA theory test question bank.
 
+## Local admin JSON routes
+
+Run `npm ci` and `npm run dev:editor`, then open **http://127.0.0.1:8000 → Mock test**. Import a JSON export from the SlayDrive admin editor to save a local revision and drive it as a mock test. **Edit saved JSON** lets you change it in the browser and save another revision. Files persist under `.local-tracks/`; production tracks are untouched. See [Local mock editor setup](docs/LOCAL-MOCK-EDITOR.md) for limits, compatibility and tests.
+
 ## Development and checks
 
 ```sh

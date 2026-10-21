@@ -32,7 +32,7 @@ function ribbon(acc, e, o1, o2, y, s0 = 0, s1 = e.len) {
 }
 function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, side: T.DoubleSide }); m.depthWrite = false; return m; }
 
-export function buildWorld(scene, net, traffic) {
+export function buildWorld(scene, net, traffic, options = {}) {
   const W = WORLD;
   scene.background = new T.Color(W.sky); scene.fog = new T.Fog(W.sky, W.fogNear, W.fogFar);
   scene.add(new T.HemisphereLight(0xe3ecf5, 0x7d7666, 0.78));
@@ -219,7 +219,7 @@ export function buildWorld(scene, net, traffic) {
   const C = net.chunkSize;
   function buildChunk(key, cx, cz) {
     const edges = net.chunks.get(key);
-    const grp = edges ? buildChunkContent(net, edges, cx, cz, C, rng(key)) : new T.Group();
+    const grp = edges && !options.authored ? buildChunkContent(net, edges, cx, cz, C, rng(key)) : new T.Group();
     chunks.set(key, grp); scene.add(grp);
   }
   function updateChunks(px, pz, budget) {

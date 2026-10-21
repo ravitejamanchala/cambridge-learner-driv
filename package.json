@@ -14,7 +14,9 @@
     "test:mobile:live": "node tests/mobile-live.mjs",
     "test:access": "node tests/access-browser.mjs",
     "test:drive": "node tests/drive-features-browser.mjs",
-    "test:bots": "node tests/bots-browser.mjs"
+    "test:bots": "node tests/bots-browser.mjs",
+    "dev:editor": "node tools/local-editor-server.mjs",
+    "test:local-mocks": "node tests/local-tracks-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",

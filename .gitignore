@@ -9,3 +9,6 @@ __pycache__/
 .wrangler/
 .test-build/
 audit-server.json
+
+.local-tracks/
+test-results/

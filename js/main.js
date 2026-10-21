@@ -1,3 +1,6 @@
+import { loadLocalLibrary, mountLocalLibrary } from './local-library.js';
+import { addEditorObjects } from './local-world.js';
+import { obstacleContact } from './editor-collisions.js';
 import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
 import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
@@ -44,6 +47,7 @@ async function boot() {
   const assetURL = url => release ? url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(release) : url;
   const ix = await fetch(assetURL(AREAS_URL + 'index.json')); if (!ix.ok) throw new Error('Map index did not load (' + ix.status + ')');
   const index = await ix.json();
+  const localTracks = await loadLocalLibrary(index, ROUTES);
   const meta = (key) => index.plans[key] || { len: 0, n: 0, first: '' };
 
   let camInit = false, paused = false;
@@ -94,14 +98,16 @@ async function boot() {
       $('areaLoad').textContent = 'Loading map…';
       const info = index.areas.find(a => a.id === id); if (!info) throw new Error('Unknown map area ' + id);
       $('areaLoad').hidden = false;
-      const r = await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
-      const d = await r.json();
+      const r = localTracks.has(id) ? {ok:true} : await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
+      const d = localTracks.get(id) || await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
       const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
-      const net = buildNet(d);
+      const net = buildNet(d.network || d);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn);
+      const world = buildWorld(scene, net, traffic, {authored: d.sceneryMode === "authored"});
+      if(d.network) addEditorObjects(T,scene,d);
+      world.setShadows(shadowsOn);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
@@ -146,6 +152,8 @@ async function boot() {
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl));
+    const authored = localTracks.get(A.id);
+    if(authored) player.place(authored.spawn.x, authored.spawn.z, authored.spawn.heading);
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
@@ -175,6 +183,7 @@ async function boot() {
     loadPlan(pl); if (start) begin();
   }
   const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  mountLocalLibrary();
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
     if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
@@ -554,7 +563,10 @@ async function boot() {
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
+      const previous = {x:player.x,z:player.z};
       player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      const authored = localTracks.get(A.id);
+      if(authored && obstacleContact(player,authored.objects.filter(o=>["building","scenery","sign","light"].includes(o.type)),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       updateHeldLooks();

@@ -223,7 +223,7 @@ export function createHub({ meta, onPick, onStart }) {
     if (pl.kind === 'puzzle') { const i = PUZZLES.findIndex(z => z.id === pl.lesson.id), z = PUZZLES[i + 1]; return z && puzzleOpen(z) ? { kind: 'puzzle', id: z.id, title: z.title } : null; }
     return null;
   }
-  function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; return plan(); }
+  function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; else if(kind === 'mock'){const i=ROUTES.findIndex(r=>r.id===id);if(i<0)throw Error('Unknown mock route');st.route=i;} return plan(); }
   if (Profiles.current()) st.lesson = firstOpen();
   return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz, requestAccess };
 }
