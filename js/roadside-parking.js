@@ -36,8 +36,10 @@ ROADSIDE_PARKING.manoeuvres = {
   'parallel-park': {
     start: { x: 95, z: 347.6, th: EAST },
     legs: [
-      { gear: 'D', path: approach, target: READY, minTravel: 20 },
-      { gear: 'R', path: reverse, target: BAY, minTravel: 6 }
+      { gear: 'D', path: approach, target: READY, minTravel: 20,
+        coach: 'Drive past the parked cars and pull up alongside the front one, inside the box.' },
+      { gear: 'R', path: reverse, target: BAY, minTravel: 6,
+        coach: 'Hold the back arrow and reverse into the space, finishing parallel and close to the kerb.' }
     ],
     target: BAY
   }

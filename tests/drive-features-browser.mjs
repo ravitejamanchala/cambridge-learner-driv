@@ -136,6 +136,46 @@ try{
   assert.equal(words.alert,null,`${id}: an alert is repeating the lesson card`);
  }
  console.log('Getting started on a phone: no panel, no banner, no overlapping HUD.');
+ // ---------- coaching: off unless asked for, and inside the HUD when it is on ----------
+ const quiet=await page.evaluate(()=>{const el=document.querySelector('#hudCoach');
+  return {exists:!!el,shown:!!(el&&!el.hidden),coach:window.cambridgeDrive.test.coach||null};});
+ assert.equal(quiet.exists,true,'the coaching line is missing from the page');
+ assert.equal(quiet.shown,false,'coaching is talking without being asked to');
+ assert.equal(quiet.coach,null,'a coaching line is being fed with the setting off');
+ await page.evaluate(()=>{document.querySelector('#coSeg [data-co="1"]').click();});
+ await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','mirror-practice',true);window.cambridgeDrive.manual(true);});
+ await page.evaluate(()=>{for(let i=0;i<10;i++)window.cambridgeDrive.step(1);window.cambridgeDrive.frame(0.2);});
+ await page.waitForTimeout(150);
+ // the same line has to behave on a phone and on a desktop window
+ for(const vp of [{width:390,height:844},{width:820,height:1180},{width:1280,height:720}]){
+  await page.setViewportSize(vp); await page.evaluate(()=>window.cambridgeDrive.frame(0.2)); await page.waitForTimeout(150);
+  const coached=await page.evaluate(()=>{
+   const el=document.querySelector('#hudCoach'), r=el.getBoundingClientRect();
+   const box=document.querySelector('#hudNextBox').getBoundingClientRect();
+   const stage=document.querySelector('#stage').getBoundingClientRect();
+   const overlap=(a,b)=>!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top);
+   const near=['.speedo','.hud-map','.lookpair','#hudNextBox','.touch'].map(sel=>[sel,document.querySelector(sel)])
+     .filter(([,e])=>e&&!e.hidden).filter(([,e])=>overlap(r,e.getBoundingClientRect())).map(([sel])=>sel);
+   return {shown:!el.hidden,text:el.textContent,
+    area:Math.round(r.width*r.height/(stage.width*stage.height)*100),
+    offScreen:r.left<0||r.right>stage.width,
+    belowBox:r.top>=box.bottom-1, clashesBox:overlap(r,box), near};
+  });
+  const at=`${vp.width}px`;
+  assert.equal(coached.shown,true,`${at}: coaching was asked for and says nothing`);
+  assert.ok(coached.text.length>10,`${at}: the coaching line is empty`);
+  assert.equal(coached.clashesBox,false,`${at}: the coaching line overlaps the instruction box`);
+  assert.deepEqual(coached.near,[],`${at}: the coaching line overlaps ${coached.near.join(', ')}`);
+  assert.equal(coached.offScreen,false,`${at}: the coaching line runs off the screen`);
+  assert.ok(coached.area<=12,`${at}: the coaching line covers ${coached.area}% of the view`);
+  console.log(` coaching at ${at}: ${coached.area}% of the view, clear of the instruments`);
+ }
+ await page.setViewportSize({width:390,height:844});
+ await page.evaluate(()=>{document.querySelector('#coSeg [data-co="0"]').click();});
+ await page.evaluate(()=>{window.cambridgeDrive.step(2);window.cambridgeDrive.frame(0.2);});
+ await page.waitForTimeout(150);
+ assert.equal(await page.evaluate(()=>!document.querySelector('#hudCoach').hidden),false,'coaching stayed on after being switched off');
+ console.log('Coaching: off by default, under the instruction box at three widths when asked for, and off again on request.');
  await page.setViewportSize({width:1280,height:720});
  assert.equal(errors.length,0,errors.join('\n'));
 }finally{await browser?.close();server.kill();}

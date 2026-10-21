@@ -63,7 +63,10 @@ export function createParkingScenario(lesson, { net, player, test, traffic, ui }
     // The brief is given at the start of the lesson and the detail comes in the feedback afterwards,
     // so the only words during the manoeuvre are the stage label and anything that has gone wrong.
     const message = traffic.clock < warningUntil ? warning : '';
-    S.progress = { phase, gear: active.gear, leg: legIndex, path: active.path, target: active.target, grade: gradeParking(active.target, player), remaining, short, message };
+    // Said only to a learner who asked to be coached, on the line under the instruction box.
+    const coach = phase === 'secure' ? 'Stopped in the space. Tap Park to secure the car.'
+      : op.parkingBrake ? 'Tap Release parking brake to start the manoeuvre.' : active.coach || '';
+    S.progress = { phase, gear: active.gear, leg: legIndex, path: active.path, target: active.target, grade: gradeParking(active.target, player), remaining, short, message, coach };
     test.manoeuvreStatus = S.progress;
     // Keep active driving instructions in the HUD, leaving the parking view unobstructed.
     ui.banner(null);

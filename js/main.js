@@ -113,7 +113,7 @@ async function boot() {
   }
 
   // ---------- drives ----------
-  let route = null, nodes = null, plan = null, scenario = null, driveScope = null;
+  let route = null, nodes = null, plan = null, scenario = null, driveScope = null, coaching = false;
   const learnerScope = () => hub.Profiles.scope() + ":" + hub.Profiles.current()?.id;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
@@ -292,6 +292,17 @@ async function boot() {
     if (op.parkingBrake) scenario?.finishAttempt();
     renderTrainingControls();
   });
+  // What the coach line says, for a learner who has asked to be coached: the lesson's own brief for
+  // the first few seconds, then whatever the scenario is reporting as it goes. Null switches it off,
+  // which is every drive unless the setting is on.
+  const COACH_BRIEF = 8; // seconds the brief stays up before the running line takes over
+  function coachLine() {
+    if (!coaching || !A.test?.running) return null;
+    // the first sentence of the lesson's own brief: enough to start on, short enough for one line
+    if (plan?.lesson?.goal && (A.test.elapsed || 0) < COACH_BRIEF) return plan.lesson.goal.split(/(?<=\.)\s+/)[0];
+    const p = scenario?.progress;
+    return p?.coach || p?.message || null;
+  }
   function renderTrainingControls() {
     const parking = !!plan?.lesson?.manoeuvre, op = player.operation;
     const preparation = ['cockpit','engine'].includes(plan?.lesson?.scenario);
@@ -397,6 +408,7 @@ async function boot() {
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
   }
@@ -426,6 +438,10 @@ async function boot() {
   document.querySelectorAll('#shSeg [data-sh]').forEach(b => b.addEventListener('click', () => setSh(b.dataset.sh === '1')));
   const setMi = (on) => { mirrors.enabled = on; document.body.classList.toggle('no-mirrors', !on); seg('#miSeg [data-mi]', 'mi', on ? 1 : 0); prefs.mi = on ? 1 : 0; savePrefs(); layoutSoon(); };
   document.querySelectorAll('#miSeg [data-mi]').forEach(b => b.addEventListener('click', () => setMi(b.dataset.mi === '1')));
+  // Coaching: a running line of instruction for learners who want one. Off by default, because the
+  // lesson card has already said what to do and the view is what matters while driving.
+  const setCo = (on) => { coaching = on; seg('#coSeg [data-co]', 'co', on ? 1 : 0); prefs.co = on ? 1 : 0; savePrefs(); if (A.test) A.test.coach = null; };
+  document.querySelectorAll('#coSeg [data-co]').forEach(b => b.addEventListener('click', () => setCo(b.dataset.co === '1')));
   const setGd = (on) => { guide.enabled = on; seg('#gdSeg [data-gd]', 'gd', on ? 1 : 0); prefs.gd = on ? 1 : 0; savePrefs(); };
   document.querySelectorAll('#gdSeg [data-gd]').forEach(b => b.addEventListener('click', () => setGd(b.dataset.gd === '1')));
   // touch control size, 100-300% (capped so the controls always fit the screen)
@@ -528,7 +544,7 @@ async function boot() {
     const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(plan?.lesson?.manoeuvre ? 2 : p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
   }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0);
+  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
   function sim(dt) {
@@ -572,7 +588,7 @@ async function boot() {
     if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }
     if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
     if(drive||botMode)renderer.render(scene, camera);
-    uiT += dt; if (uiT > 0.1) { uiT = 0; ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
+    uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
   }
   requestAnimationFrame(frame);

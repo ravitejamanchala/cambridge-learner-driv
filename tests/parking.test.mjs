@@ -118,3 +118,18 @@ test('parking again mid-manoeuvre ends the attempt and is marked, rather than pa
  assert.equal(s.result().ok,false);
  assert.ok(t.faults.some(f=>f[1]==='Manoeuvre – accuracy'));
 });
+
+test('the coaching line names the stage, and the drive itself still says nothing',()=>{
+ const {player:p,scenario:s,plan}=harness();
+ s.update(.1);
+ assert.match(s.progress.coach,/Release parking brake/,'with the brake on, coaching says how to start');
+ assert.equal(s.progress.short,'','the drive carries no stage label whether coaching is on or not');
+ p.operation.parkingBrake=false; p.observations=[{at:10}]; s.update(.1);
+ assert.match(s.progress.coach,/alongside the front one/,'first leg: drive past and pull up alongside');
+ // drive the first leg, as the other tests here do, so the scenario moves on to the reverse
+ for(const q of plan.legs[0].path.slice(1)){const th=Math.atan2(-(q.x-p.x),-(q.z-p.z));Object.assign(p,q,{th,v:.8});s.update(1);}
+ Object.assign(p,plan.legs[0].target,{v:0}); s.update(.1);
+ assert.equal(s.progress.leg,1);
+ assert.match(s.progress.coach,/reverse into the space/i,'second leg: reverse in');
+ assert.equal(s.progress.message,'','nothing is said unless something has gone wrong');
+});

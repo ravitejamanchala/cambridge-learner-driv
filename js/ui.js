@@ -149,6 +149,11 @@ export function createUI(net) {
     if (t.mode === 'manoeuvre' && t.manoeuvreStatus) {
       const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = ''; $('hudNextBox').setAttribute('aria-label', 'Distance to the target'); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
     }
+    // Coaching, when the learner has asked for it: the scenario's own running line, under the
+    // instruction box. Off by default, so a drive carries nothing the lesson card already said.
+    const coach = $('hudCoach'), coachTxt = running ? t.coach || '' : '';
+    coach.hidden = !coachTxt;
+    if (coachTxt && coach.textContent !== coachTxt) coach.textContent = coachTxt;
     // An alert takes the HUD box over while it lasts: the state goes where the learner already looks,
     // and nothing is drawn across the road.
     const alert = t.alert, boxEl = $('hudNextBox');

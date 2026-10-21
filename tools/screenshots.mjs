@@ -112,6 +112,17 @@ try {
     await setView(page, 'chase');
   }
 
+  // Coaching is off for every other case here, which is what a learner sees by default.
+  if (want('coaching')) {
+    const setCoaching = (page, on) => page.evaluate(v => document.querySelector(`#coSeg [data-co="${v}"]`).click(), on ? 1 : 0);
+    await page.evaluate(async () => { await window.cambridgeDrive.pick('lesson', 'mirror-practice', true); window.cambridgeDrive.frame(0); });
+    await setView(page, 'chase'); await run(page, 3); await settle(page);
+    await capture(page, 'coaching-off', 'The default drive: readings only. Three ticks for the checks, a target band under the speed, and nothing repeating the lesson card.');
+    await setCoaching(page, true); await run(page, 1); await settle(page);
+    await capture(page, 'coaching-on', 'Coaching switched on in Settings: one line above the Highway Code tip, saying what to do as the drive goes on.');
+    await setCoaching(page, false); await run(page, 0.5);
+  }
+
   if (want('blue-light')) {
     await page.evaluate(async () => { await window.cambridgeDrive.pick('lesson', 'blue-light', true); window.cambridgeDrive.frame(0); });
     await setView(page, 'chase'); await run(page, 0.4);

@@ -67,6 +67,14 @@ already has a distance field, a speedometer and an eye button; use them.
 | "It is past. Carry on when it is safe." | Nothing. The event is over |
 | "Release the parking brake" as a stage label | Nothing. The button already says it, right below |
 
+The one exception is **Coaching** (Settings → Coaching, off by default). A learner who asks to be
+talked through a drive gets `test.coach` on a card in the `.hud-bl` column, above the Highway Code
+tip. Two rules hold it in place: it goes in that column, never a new absolutely-positioned box, so
+the column's own layout keeps it off the instruments at every width; and the default stays silent, so
+nothing above changes for anyone who has not asked. `npm run test:drive` checks both — hidden with
+the setting off, and clear of the map, speedometer, look buttons, instruction box and touch controls
+at 390, 820 and 1280 px when it is on.
+
 Scenarios report state through `test.basicStatus` — `{ label, value, band, checks }` — and `ui.hud()`
 draws it. `ui.banner()` still exists for the scenarios that call it, but it now writes `test.alert`
 rather than painting anything over the road, and its text must be short enough for the HUD box.

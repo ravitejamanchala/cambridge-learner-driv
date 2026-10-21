@@ -48,6 +48,14 @@ with `node tools/screenshots.mjs`.
 
 Hold <kbd>Z</kbd> to look left and <kbd>X</kbd> to look right, in the chase view or the driver view. This swings the camera only: the car carries on where it is pointed, so you can check a roundabout or a junction without steering into it. <kbd>B</kbd> still records an all-round check of the mirrors and blind spot, which is what the examiner marks. On a touch screen the two buttons beside the eye do the same, held down.
 
+### Coaching
+
+A drive is quiet by default: the lesson card says what to do before you press Start, the instruments
+carry the readings while you drive, and the detail comes in the feedback afterwards. Learners who
+would rather be talked through it can turn **Settings → Coaching** on, which adds a line above the
+Highway Code tip with the lesson's brief and then the running instruction for each stage. It is
+per-device and off until asked for.
+
 ### Parking
 
 The parallel parking lesson has one control. Tap it once to release the parking brake and set off, drive

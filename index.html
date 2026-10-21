@@ -221,6 +221,10 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .hud-next .tx{min-width:0;display:flex;flex-direction:column;gap:2px}
 .hud-next strong{font:600 14px/1.15 var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-next span{font:500 10.5px/1.2 var(--font-mono);color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Coaching, for learners who ask for it: a card at the top of the column that already carries the
+   Highway Code tip, so it is laid out by that column and can never land on an instrument. */
+.hud-coach{margin:0;padding:8px 11px;border-radius:14px;font:500 12px/1.35 var(--font-display);color:rgba(255,255,255,.94);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hud-coach[hidden]{display:none}
 .hud-right{position:absolute;right:calc(12px + var(--safe-r));top:calc(12px + var(--safe-t));display:flex;align-items:center;gap:8px}
 .speedo{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px}
 .hud-spd{font:600 24px/1 var(--font-mono);font-variant-numeric:tabular-nums}
@@ -264,7 +268,7 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 
 .banner.stop{background:#d2232a;font-size:48px;letter-spacing:.06em;padding:16px 36px;animation:pulse .6s var(--spring) infinite}
 .touch{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(12px + var(--safe-b));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
-@media (any-pointer:coarse){.parkctl button{min-height:44px;padding:13px 22px;font-size:14px}.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
+@media (any-pointer:coarse){.hud-coach{font-size:11.5px;-webkit-line-clamp:3}.parkctl button{min-height:44px;padding:13px 22px;font-size:14px}.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
 .touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
 .touch .c{display:flex;flex-direction:column;gap:10px;align-items:center}
 .touch{--ts:3;--bw:min(calc(70px * var(--ts)),27vh);--bh:var(--bw);--sw:min(calc(50px * var(--ts)),15vh);--sh:var(--sw)}
@@ -499,6 +503,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <svg id="sigR" viewBox="0 0 24 24" fill="currentColor"><path d="M14 4l8 8-8 8v-5H2V9h12z"/></svg>
     </div>
     <div class="hud-bl">
+      <p class="glass hud-coach" id="hudCoach" hidden role="status"></p>
       <button class="glass tipcard" id="tipCard" aria-expanded="false" title="Highway Code tip: tap to read"><div class="h"><b id="tipRule">Rule 160</b><span id="tipCtx">Normal driving</span></div><p id="tipTxt">Keep to the left unless road signs or markings tell you otherwise.</p></button>
       <section class="markboard" id="markBoard" aria-label="Examiner's marking" aria-live="polite" tabindex="0">
         <div class="mb-tally">
@@ -591,6 +596,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="set"><span>Camera<small>Also C while driving</small></span><div class="seg" id="camSeg"><button data-cam="1" aria-pressed="true">Driver</button><button data-cam="0" aria-pressed="false">Chase</button><button data-cam="2" aria-pressed="false">Overhead</button></div></div>
       <div class="set"><span>Mirrors<small>Rear-view and door mirrors in the driver view</small></span><div class="seg" id="miSeg"><button data-mi="1" aria-pressed="true">On</button><button data-mi="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Route guide<small>Arrows on the road and a marker at the next turn</small></span><div class="seg" id="gdSeg"><button data-gd="1" aria-pressed="true">On</button><button data-gd="0" aria-pressed="false">Off</button></div></div>
+      <div class="set"><span>Coaching<small>A line of instruction while you drive, the way an instructor would talk you through it. Off by default: the lesson card says what to do before you start.</small></span><div class="seg" id="coSeg"><button data-co="1" aria-pressed="false">On</button><button data-co="0" aria-pressed="true">Off</button></div></div>
       <div class="set"><span>Shadows<small>Turn off if it feels slow</small></span><div class="seg" id="shSeg"><button data-sh="1" aria-pressed="true">On</button><button data-sh="0" aria-pressed="false">Off</button></div></div>
     </div></div></div>
 
