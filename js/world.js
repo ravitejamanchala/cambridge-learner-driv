@@ -1,10 +1,10 @@
-import { buildParkingWorld } from './parking-view.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
 import { posAt, laneInfo, nearest } from './net.js';
 import { buildChunkContent } from './city.js';
 import { buildSigns } from './signs.js';
+import { createRoadsideParkingView } from './roadside-parking-view.js';
 
 const T = THREE;
 
@@ -33,7 +33,6 @@ function ribbon(acc, e, o1, o2, y, s0 = 0, s1 = e.len) {
 function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, side: T.DoubleSide }); m.depthWrite = false; return m; }
 
 export function buildWorld(scene, net, traffic) {
-  if (net.parking) return buildParkingWorld(scene, net.parking);
   const W = WORLD;
   scene.background = new T.Color(W.sky); scene.fog = new T.Fog(W.sky, W.fogNear, W.fogFar);
   scene.add(new T.HemisphereLight(0xe3ecf5, 0x7d7666, 0.78));
@@ -255,7 +254,9 @@ export function buildWorld(scene, net, traffic) {
     globeMat.color.setHex(Math.floor(clock * 1.6) % 2 ? 0x7a5a1c : 0xffb21a);
   }
   function setShadows(on) { sun.castShadow = !!on; }
-  return { updateChunks, updateSignals, updateSun, setShadows, chunkCount: () => chunks.size, pending: () => queue.length };
+  // roadside parallel parking draws its markings, parked cars and guide over the ordinary world
+  const roadside = createRoadsideParkingView(scene);
+  return { updateChunks, updateSignals, updateSun, setShadows, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
 }
 
 function dash(acc, e, s, len, off, y) {

@@ -221,6 +221,10 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .hud-next .tx{min-width:0;display:flex;flex-direction:column;gap:2px}
 .hud-next strong{font:600 14px/1.15 var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-next span{font:500 10.5px/1.2 var(--font-mono);color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Coaching, for learners who ask for it: a card at the top of the column that already carries the
+   Highway Code tip, so it is laid out by that column and can never land on an instrument. */
+.hud-coach{margin:0;padding:8px 11px;border-radius:14px;font:500 12px/1.35 var(--font-display);color:rgba(255,255,255,.94);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hud-coach[hidden]{display:none}
 .hud-right{position:absolute;right:calc(12px + var(--safe-r));top:calc(12px + var(--safe-t));display:flex;align-items:center;gap:8px}
 .speedo{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px}
 .hud-spd{font:600 24px/1 var(--font-mono);font-variant-numeric:tabular-nums}
@@ -258,13 +262,13 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 .mb-list li i{font:700 11px/22px var(--font-mono);text-align:center;border-radius:6px;background:#ffb21a;color:#2a1b00;font-style:normal}.mb-list li i.s{background:#ff5a5f;color:#fff}
 .mb-list li b{display:block;font:600 11px/1.2 var(--font-display);color:rgba(255,255,255,.62);text-transform:uppercase;letter-spacing:.04em}
 .mb-list li.new{animation:mbIn .35s ease-out}@keyframes mbIn{from{opacity:0;transform:translateY(-4px)}}
-.lookbtn{position:relative}.lookbtn kbd{position:absolute;right:3px;bottom:2px;font:600 9px/1 var(--font-mono);opacity:.65}.lookbtn.ask{box-shadow:0 0 0 3px #ffb21a}.lookbtn.done{box-shadow:0 0 0 3px #2fbf71}
+#hudNextBox.warn{box-shadow:0 0 0 2px #ffb21a}#hudNextBox.warn #hudDist{color:#ffb21a}#hudNextBox.stop{box-shadow:0 0 0 3px #ef4444;background:rgba(120,16,16,.86)}#hudNextBox.stop #hudNext{color:#fff}#hudNextBox.stop #hudDist{color:#ffd9d9}#runDetail{margin:0;font-size:13px}#runDetail summary{cursor:pointer;font-weight:600;color:var(--ink,#1e2a30);margin-bottom:6px}#runDetailList{margin:0;padding-left:18px;color:#5a6670}#runDetailList li{margin:2px 0}.checks{display:flex;gap:5px;margin-top:3px}.checks i{display:block;width:16px;height:4px;border-radius:2px;background:rgba(255,255,255,.28)}.checks i.on{background:#2fbf71}.speedo .spd-col{display:flex;flex-direction:column;align-items:center;gap:2px}.speedo .target{padding:1px 7px;border-radius:999px;font:700 10px/1.3 var(--font-mono);color:#fff;background:rgba(255,255,255,.18);white-space:nowrap}.speedo .target.on{background:#2fbf71}.hud-spd.inband #hudSpd{color:#2fbf71}.parkctl{position:absolute;left:calc(12px + var(--safe-l));top:calc(12px + var(--safe-t));z-index:9;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:auto}.parkctl button{appearance:none;border:0;cursor:pointer;min-height:36px;padding:9px 18px;border-radius:999px;font:700 13px/1 var(--font-display);color:#fff;background:var(--pink,#ef4f97);box-shadow:0 3px 0 #b8306f,0 8px 18px -10px rgba(0,0,0,.6);white-space:nowrap}.parkctl button:active{transform:translateY(1px)}.parkctl p{margin:0;padding:5px 12px;border-radius:12px;background:rgba(24,18,26,.82);color:#fff;font:600 11px/1.3 var(--font-body);max-width:min(260px,52vw)}.lookpair{display:flex;gap:6px}.lookbtn.on{box-shadow:0 0 0 3px #82d9ef}.lookbtn{position:relative}.lookbtn kbd{position:absolute;right:3px;bottom:2px;font:600 9px/1 var(--font-mono);opacity:.65}.lookbtn.ask{box-shadow:0 0 0 3px #ffb21a}.lookbtn.done{box-shadow:0 0 0 3px #2fbf71}
 @media (prefers-reduced-motion:reduce){.mb-list li.new{animation:none}.markboard,.mb-bar i{transition:none}}
 .hud-road{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);padding:7px 14px;font:600 13px/1 var(--font-display)}
-.banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:4;padding:14px 26px;border-radius:20px;font:700 22px/1.1 var(--font-display);background:rgba(24,18,26,.86);color:#fff;pointer-events:none;text-align:center;max-width:80%}
+
 .banner.stop{background:#d2232a;font-size:48px;letter-spacing:.06em;padding:16px 36px;animation:pulse .6s var(--spring) infinite}
 .touch{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(12px + var(--safe-b));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
-@media (any-pointer:coarse){.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
+@media (any-pointer:coarse){.hud-coach{font-size:11.5px;-webkit-line-clamp:3}.parkctl button{min-height:44px;padding:13px 22px;font-size:14px}.touch{display:flex}.hud-road{display:none}.hud-bl{bottom:auto;top:calc(20px + var(--safe-t) + clamp(130px,26vh,200px));max-width:42vw}.lookbtn kbd{display:none}.tipcard.open p{font-size:11px;-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}}
 .touch .grp{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
 .touch .c{display:flex;flex-direction:column;gap:10px;align-items:center}
 .touch{--ts:3;--bw:min(calc(70px * var(--ts)),27vh);--bh:var(--bw);--sw:min(calc(50px * var(--ts)),15vh);--sh:var(--sw)}
@@ -340,12 +344,12 @@ kbd{font:600 12px/1 var(--font-mono);min-width:30px;height:30px;padding:0 8px;bo
 #trainingControls button{min-height:40px;padding:8px 10px;margin:3px 2px;border-radius:12px;border:0;background:#fff;color:var(--ink);font:600 12px/1.25 var(--font-display);box-shadow:inset 0 0 0 2px var(--cream-2),0 2px 0 var(--cream-edge);cursor:pointer;transition:background .2s,box-shadow .2s}
 #trainingControls button[aria-pressed=true]{background:var(--lav);box-shadow:inset 0 0 0 2px var(--lav-deep),0 2px 0 var(--lav-deep);color:var(--plum)}
 #trainingControls button:active{transform:translateY(1px)}
-#trainingControls #assessParking{width:calc(100% - 4px);margin-top:10px;background:var(--pink);color:#fff;box-shadow:0 3px 0 #b8306f}
+
 #gearControls{display:flex;flex-wrap:wrap;gap:4px}#gearControls p{flex-basis:100%}#gearControls button{flex:1;margin:0;min-width:0}
 #parkingTask{border-left:3px solid var(--lav);padding-left:8px}
 #trainingControls[hidden]{display:none}
 
-body.parking-drive #mini{display:none}
+body.parking-drive .hud-map{display:none}
 body.parking-drive #trainingControls p{margin:4px 0}
 body.parking-drive #gearControls p{display:none}
 @media (any-pointer:coarse){#trainingControls button{min-height:44px;min-width:44px}}
@@ -411,7 +415,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 .full{background:radial-gradient(ellipse at 50% 43%,#a1cce5,#709fca);color:#fff}.full h1{text-shadow:0 2px 0 rgba(24,49,69,.2)}
 .hud-next .ico{background:#087f83}.glass{background:rgba(24,43,60,.84)}.tb{background:rgba(24,43,60,.64)}
 #trainingControls button[aria-pressed=true]{background:#b9eee3;color:#073c37}
-#trainingControls #assessParking{background:#b81f65}
+
 .tile[aria-checked=true],.item[aria-checked=true]{box-shadow:0 0 0 3px var(--lav-deep),0 4px 0 var(--lav-deep)}
 :focus-visible{outline-color:var(--lav-deep)}
 .sheet [fill="#b49cf5"]{fill:#38cbb9}.sheet [stroke="#8a6ae3"],.sheet [stroke="#6a4fc4"]{stroke:#087f83}
@@ -485,18 +489,21 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
   <!-- ================= DRIVING HUD ================= -->
   <div class="layer" id="hud">
     <div class="glass hud-map"><canvas id="mini" aria-label="Route map, heading up. Drag to pan, scroll or pinch to zoom."></canvas><button class="recentre" id="mapRecentre" hidden>Recentre</button></div>
-    <div class="glass hud-next" id="hudNextBox" role="status"><div class="ico"><span id="hudIco"></span><i class="exitn" id="hudExit" hidden></i></div><div class="tx"><strong id="hudNext">Ready</strong><span id="hudDist"></span></div><span class="lanes" id="hudLanes" hidden></span></div>
+    <div class="glass hud-next" id="hudNextBox" role="status"><div class="ico"><span id="hudIco"></span><i class="exitn" id="hudExit" hidden></i></div><div class="tx"><strong id="hudNext">Ready</strong><span id="hudDist"></span><span class="checks" id="hudChecks" hidden></span></div><span class="lanes" id="hudLanes" hidden></span></div>
     <div class="hud-right">
-      <div class="glass speedo"><div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div><div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div><div class="roundel" id="hudLimit">30</div></div>
-      <button class="glass pausebtn lookbtn" id="lookBtn" aria-label="Look round: mirrors and blind spot (B)" title="Look round: mirrors and blind spot (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><kbd>B</kbd></button>
+      <div class="glass speedo"><div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div><div class="spd-col"><div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div><div class="target" id="hudTarget" hidden></div></div><div class="roundel" id="hudLimit">30</div></div>
+      <button class="glass pausebtn lookbtn" id="lookBtn" aria-label="Interior mirror check (B)" title="Interior mirror check (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><kbd>B</kbd></button>
+      <div class="lookpair"><button class="glass pausebtn lookbtn" data-look="left" aria-label="Hold to look left (Z)" title="Hold to look left (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7 5 12l5 5"/><path d="M19 12H5.5"/></svg><kbd>Z</kbd></button><button class="glass pausebtn lookbtn" data-look="right" aria-label="Hold to look right (X)" title="Hold to look right (X)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 7l5 5-5 5"/><path d="M5 12h13.5"/></svg><kbd>X</kbd></button></div>
       <button class="glass pausebtn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
     </div>
+    <div class="parkctl" id="parkControls" hidden><button id="assessParking">Park</button><p id="parkingTask" hidden role="status"></p></div>
     <button class="recentre cam" id="camRecentre" hidden>Back to car</button>
     <div class="hud-sig" aria-hidden="true">
       <svg id="sigL" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4 2 12l8 8v-5h12V9H10z"/></svg>
       <svg id="sigR" viewBox="0 0 24 24" fill="currentColor"><path d="M14 4l8 8-8 8v-5H2V9h12z"/></svg>
     </div>
     <div class="hud-bl">
+      <p class="glass hud-coach" id="hudCoach" hidden role="status"></p>
       <button class="glass tipcard" id="tipCard" aria-expanded="false" title="Highway Code tip: tap to read"><div class="h"><b id="tipRule">Rule 160</b><span id="tipCtx">Normal driving</span></div><p id="tipTxt">Keep to the left unless road signs or markings tell you otherwise.</p></button>
       <section class="markboard" id="markBoard" aria-label="Examiner's marking" aria-live="polite" tabindex="0">
         <div class="mb-tally">
@@ -508,12 +515,12 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       </section>
     </div>
     <div class="glass hud-road" id="hudRoad">–</div>
-    <div class="banner" id="banner" role="status" hidden role="alert"></div>
+    
     <section id="trainingControls" hidden aria-label="Training controls">
       <h2>Driving controls</h2>
-      <p id="parkingTask" hidden role="status"></p><div id="cockpitControls"><p id="cockpitState" role="status"></p>
+      <div id="cockpitControls"><p id="cockpitState" role="status"></p>
         <button data-operation="doorClosed" aria-pressed="false">Door closed</button><button data-operation="seatSet" aria-pressed="false">Seat confirmed</button><button data-operation="mirrorsSet" aria-pressed="false">Mirrors confirmed</button><button data-operation="belt" aria-pressed="false">Belt fastened</button><button data-operation="engine" aria-pressed="false">Engine (I)</button><button data-operation="parkingBrake" aria-pressed="true">Parking brake (P)</button>
-      </div><div id="gearControls" hidden aria-label="Automatic selector"><p>Hold the footbrake and stop before selecting a gear.</p><button data-gear="P" aria-pressed="true">P · Park</button><button data-gear="R" aria-pressed="false">R · Reverse</button><button data-gear="N" aria-pressed="false">N · Neutral</button><button data-gear="D" aria-pressed="false">D · Drive</button></div><button id="assessParking" hidden>Assess parked position</button><div id="observationControls"><p>Use B or these buttons to record a check. Head movement is not measured.</p><button data-observe="interior">Interior mirror</button><button data-observe="right">Right mirror</button><button data-observe="blindspot">Right blind spot</button></div>
+      </div><div id="gearControls" hidden aria-label="Automatic selector"><p>Hold the footbrake and stop before selecting a gear.</p><button data-gear="P" aria-pressed="true">P · Park</button><button data-gear="R" aria-pressed="false">R · Reverse</button><button data-gear="N" aria-pressed="false">N · Neutral</button><button data-gear="D" aria-pressed="false">D · Drive</button></div>
     </section>
     <div class="touch" aria-label="Touch controls">
       <div class="grp">
@@ -573,7 +580,8 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Steer</dd>
       <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>Signal left / right</dd>
       <dt><kbd>C</kbd></dt><dd>Chase, driver or overhead view</dd>
-      <dt><kbd>B</kbd></dt><dd>Record look-round input; physical head movement is not measured</dd>
+      <dt><kbd>B</kbd></dt><dd>Interior mirror check. Physical head movement is not measured</dd>
+      <dt><kbd>Z</kbd><kbd>X</kbd></dt><dd>Look left / right: a tap is a mirror glance, holding it is a blind-spot check over your shoulder. The camera turns, the car does not</dd>
       <dt><kbd>Esc</kbd></dt><dd>Pause</dd>
       <dt><kbd>Drag</kbd></dt><dd>Pan the route map or overhead view; scroll or pinch to zoom</dd>
     </dl><p class="muted">Desktop: use the keyboard. Phone or tablet: use the touch buttons in portrait or landscape. Steering and indicators are on the left, brake and accelerator on the right. Hold a pedal and steering button together to drive and turn. Use the on-screen selector for automatic gears.</p></div></div></div>
@@ -588,6 +596,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="set"><span>Camera<small>Also C while driving</small></span><div class="seg" id="camSeg"><button data-cam="1" aria-pressed="true">Driver</button><button data-cam="0" aria-pressed="false">Chase</button><button data-cam="2" aria-pressed="false">Overhead</button></div></div>
       <div class="set"><span>Mirrors<small>Rear-view and door mirrors in the driver view</small></span><div class="seg" id="miSeg"><button data-mi="1" aria-pressed="true">On</button><button data-mi="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Route guide<small>Arrows on the road and a marker at the next turn</small></span><div class="seg" id="gdSeg"><button data-gd="1" aria-pressed="true">On</button><button data-gd="0" aria-pressed="false">Off</button></div></div>
+      <div class="set"><span>Coaching<small>A line of instruction while you drive, the way an instructor would talk you through it. Off by default: the lesson card says what to do before you start.</small></span><div class="seg" id="coSeg"><button data-co="1" aria-pressed="false">On</button><button data-co="0" aria-pressed="true">Off</button></div></div>
       <div class="set"><span>Shadows<small>Turn off if it feels slow</small></span><div class="seg" id="shSeg"><button data-sh="1" aria-pressed="true">On</button><button data-sh="0" aria-pressed="false">Off</button></div></div>
     </div></div></div>
 
@@ -613,6 +622,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="score"><div><b id="rD">0</b><span>Driving faults</span></div><div><b id="rS">0</b><span>Serious faults</span></div></div>
       <p id="rNote" style="margin:0"></p>
       <ul class="reasons" id="rReasons"></ul>
+      <details id="runDetail" open><summary>What you did on this run</summary><ul id="runDetailList"></ul></details>
       <p id="coachingReport" class="muted"></p><div class="btns"><button class="cbtn go" id="nextBtn" hidden>Next lesson</button><button class="cbtn alt" id="againBtn">Try again</button><button class="cbtn lav" id="hubBtn">Back to lobby</button></div>
     </div></div></div>
 

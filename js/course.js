@@ -6,6 +6,7 @@ import { enrichLesson } from './curriculum.js';
 import { BASIC_LESSONS } from './basic-lessons.js';
 import { createControlScenario } from './control-scenarios.js';
 import { createBasicScenario } from './basic-scenarios.js';
+import { createEmergencyEvent } from './emergency.js';
 // The learner course: units of short lessons on practice layouts built to teach one thing each
 // (tools/layouts.mjs). Each has a goal, a Highway Code rule, an optional scripted event, and its own pass check.
 // `area` names the practice layout; waypoints are x/z metres on it, snapped to the nearest junction on the named road.
@@ -136,6 +137,11 @@ export const LESSONS = [
     steps: ['Check your left mirror and blind spot before signalling', 'Do not overtake a cyclist just before you turn left', 'Wait for them to pass the side road, then turn'],
     rule: { n: 'Rule 183 and H3', t: 'When turning, give way to vehicles using a cycle lane, cycle track or bus lane from either direction (Rule 183). Do not cut across cyclists going ahead when you turn into or out of a junction (H3).' },
     waypoints: [pt(-250, -500, 'Bridge Street'), pt(-450, -700, 'Linden Close')], scenario: 'cyclist', focus: ['Clearance', 'Control – collision', 'Signals'], maxD: 2 },
+  { id: 'blue-light', unit: 'sharing', area: 'town', title: 'Blue light vehicle', road: 'Moor Road · 30 mph',
+    goal: 'Drive along Moor Road. An emergency vehicle will come up behind you with its blue lights on: let it past. Slow right down and pull in on the left where there is room.',
+    steps: ['Watch your mirrors: you will usually see the blue lights before you hear anything', 'Slow down and move over to the left where there is room for it to pass', 'Do not brake harshly, mount the kerb, or stop on a crossing or in a junction'],
+    rule: { n: 'Rule 219', t: 'Look and listen for ambulances, fire engines, police, doctors or other emergency vehicles using flashing blue lights, headlights or sirens. When one approaches, do not panic. Consider the route of such a vehicle and take appropriate action to let it pass, while complying with all traffic signs. If necessary, pull to the side of the road and stop, but do not endanger other road users, mount the kerb, or brake harshly or stop suddenly.' },
+    waypoints: [pt(-640, 600, 'Moor Road'), pt(560, 600, 'Moor Road')], scenario: 'blue-light', focus: ['Emergency vehicle'], maxD: 2 },
 
   { id: 'follow', unit: 'faster', area: 'roads', title: 'Two-second rule', road: 'Long Lane · 40 mph',
     goal: 'Follow the car in front all the way along Long Lane. Keep at least a two-second gap; more in the wet.',
@@ -167,6 +173,8 @@ export function createScenario(lesson, deps) {
   const basic = createBasicScenario(lesson, deps);
   if (basic) return basic;
   const { net, traffic, test, player, ui } = deps;
+  // blue light vehicle: the same event the mock tests use, triggered earlier on a short lesson route
+  if (lesson.scenario === 'blue-light') return createEmergencyEvent({ ...deps, trigger: 60 });
   const S = { ok: true, notes: [], update() {}, stop() {} };
   const route = () => test.route;
   // first feature on the route (stop line or zebra), with its distance along the route
@@ -318,10 +326,10 @@ export function createScenario(lesson, deps) {
   if (lesson.scenario === 'estop') {
     let state = 'wait', t0 = 0, react = null, stopT = null;
     S.update = (dt, clock) => {
-      if (state === 'wait' && test.sRoute > 180 && player.v > 6.5) { state = 'go'; t0 = clock; ui.banner('STOP!', 'stop'); }
+      if (state === 'wait' && test.sRoute > 180 && player.v > 6.5) { state = 'go'; t0 = clock; ui.banner('STOP', 'stop'); }
       if (state === 'go') {
         if (react === null && player.inp && player.inp.brake > 0.05) react = clock - t0;
-        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner('Thank you. Look round (B), then move off when it is safe.', 'info'); setTimeout(() => ui.banner(null), 4000); }
+        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner(null); }
       }
     };
     S.result = () => {

@@ -11,9 +11,11 @@ export function containsVehicle(target, pose, size = VEHICLE_ENVELOPE) {
     return Math.abs(dx * rx + dz * rz) <= target.width / 2 + 1e-6 && Math.abs(dx * fx + dz * fz) <= target.length / 2 + 1e-6;
   });
 }
+export const ANGLE_TOLERANCE = 8; // degrees off the target heading, unless the target asks for its own allowance
 export function gradeParking(target, pose) {
   const inside = containsVehicle(target, pose), angleDegrees = Math.abs(wrapAngle(pose.th - target.th)) * 180 / Math.PI;
-  return { inside, angleDegrees, aligned: angleDegrees <= 8, stopped: Math.abs(pose.v || 0) < 0.1, valid: inside && angleDegrees <= 8 && Math.abs(pose.v || 0) < 0.1 };
+  const tolerance = target.angleTolerance ?? ANGLE_TOLERANCE, aligned = angleDegrees <= tolerance;
+  return { inside, angleDegrees, tolerance, aligned, stopped: Math.abs(pose.v || 0) < 0.1, valid: inside && aligned && Math.abs(pose.v || 0) < 0.1 };
 }
 export function rectanglesOverlap(a, b) {
   const ap = rectangleCorners(a), bp = rectangleCorners(b);
@@ -33,8 +35,11 @@ export function sweptContact(previous, pose, layout) {
   return null;
 }
 
-export function nearContact(pose, layout, id) {
-  const size = { width: VEHICLE_ENVELOPE.width + .1, length: VEHICLE_ENVELOPE.length + .1 };
+// Still touching, within `margin`. A car held against an obstacle is pushed back to the pose it had a
+// frame earlier, which can be tens of centimetres clear of it, so the margin has to cover a frame of
+// travel or one sustained contact is logged over and over.
+export function nearContact(pose, layout, id, margin = 0.6) {
+  const size = { width: VEHICLE_ENVELOPE.width + margin, length: VEHICLE_ENVELOPE.length + margin };
   if (id === 'boundary') return !containsVehicle(layout.bounds, pose, size);
   const object = layout.obstacles.find(o => o.id === id);
   return !!object && rectanglesOverlap({ ...pose, ...size }, object);

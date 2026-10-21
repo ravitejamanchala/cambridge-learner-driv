@@ -10,7 +10,7 @@ export async function loadNet(url) {
 }
 
 export function buildNet(d) {
-  const net = { parking: d.parking || null, origin: d.origin, kx: d.kx, kz: d.kz, names: d.names, chunkSize: 400 };
+  const net = { origin: d.origin, kx: d.kx, kz: d.kz, names: d.names, chunkSize: 400 };
   // cl/cr: cycle lane on the left/right of the way's direction (0 none, 1 advisory, 2 mandatory, 3 separate track); cw: lane width
   const ways = d.ways.map(w => ({ name: d.names[w[0]], cls: d.classes[w[1]], mph: w[2], assumed: !!w[3], oneway: w[4], w: w[5], rb: !!w[6], lanes: w[7], cl: w[8] || 0, cr: w[9] || 0, cw: (w[10] || 15) / 10 }));
   const nN = d.nodes.length / 2;
@@ -108,7 +108,7 @@ function junctionFillets(net) {
       const ca = Math.hypot(C[0] - x, C[1] - z); if (ca > 40) continue;
       const A = [C[0] + a.ux * R, C[1] + a.uz * R], B = [C[0] + b.ux * R, C[1] + b.uz * R];
       const pts = []; for (let k = 0; k <= 10; k++) { const u = k / 10, m = 1 - u; pts.push([m * m * A[0] + 2 * u * m * C[0] + u * u * B[0], m * m * A[1] + 2 * u * m * C[1] + u * u * B[1]]); }
-      out.push({ node: v, C, A, B, pts, R, w: Math.max(a.e.way.w, b.e.way.w) });
+      out.push({ node: v, nx: x, nz: z, C, A, B, pts, R, w: Math.max(a.e.way.w, b.e.way.w) });
     }
   }
   return out;

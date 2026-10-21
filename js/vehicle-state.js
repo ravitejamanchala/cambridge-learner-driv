@@ -4,7 +4,10 @@ export function createVehicleState(enabled = false) {
     seatSet: !enabled, mirrorsSet: !enabled, belt: !enabled, events: [] };
 }
 export function canDrive(s) {
-  return !s.enabled || (s.engine && !s.parkingBrake && s.doorClosed && s.seatSet && s.mirrorsSet && s.belt && (s.transmission !== 'automatic' || ['D', 'R'].includes(s.gear)));
+  if (!s.enabled) return true;
+  // Manoeuvre exercises keep one control: the parking brake. No cockpit drill, no selector.
+  if (s.handbrakeOnly) return !s.parkingBrake;
+  return s.engine && !s.parkingBrake && s.doorClosed && s.seatSet && s.mirrorsSet && s.belt && (s.transmission !== 'automatic' || ['D', 'R'].includes(s.gear));
 }
 export function operate(s, action, speed, at) {
   if (Math.abs(speed) >= 0.3) return false;
@@ -21,4 +24,10 @@ export function selectGear(s, gear, speed, brake, at) {
   if (Math.abs(speed) >= 0.1 || brake < 0.5) return false;
   if (gear === s.gear) return true;
   s.gear = gear; s.events.push({ action: 'gear', value: gear, at }); return true;
+}
+
+// Parking and manoeuvring: the car is held on the parking brake, released and applied with one control.
+// Reverse comes from holding the brake once stopped, the way the simplified drivetrain already works.
+export function createManoeuvreState() {
+  return { ...createVehicleState(false), enabled: true, handbrakeOnly: true, parkingBrake: true };
 }

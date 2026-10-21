@@ -172,6 +172,8 @@ export function makeDriver(api) {
         if(tr.ringBikes.some(b=>b.alive!==false&&b.ring===ring&&wrapA(b.ang-crossing.angle)*ring.r> -25&&wrapA(b.ang-crossing.angle)*ring.r<5))stopAt(distance,8);
       }
     }
+    // a blue-light vehicle is working its way through: slow right down and let it past (Rule 219)
+    if (api.scenarioPhase?.() === 'coming') target = Math.min(target, 1.6);
     if (ins.signal && ahead < 80 && ahead > 3 && pl.indicator !== ins.signal && !(ins.kind === 'rb' && t.sRoute > ins.prevExitS - 0.3)) pl.signal(ins.signal);
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
     return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };

@@ -12,7 +12,9 @@
     "test:cars": "node tests/cars-browser.mjs",
     "test:mobile": "node tests/mobile-browser.mjs",
     "test:mobile:live": "node tests/mobile-live.mjs",
-    "test:access": "node tests/access-browser.mjs"
+    "test:access": "node tests/access-browser.mjs",
+    "test:drive": "node tests/drive-features-browser.mjs",
+    "test:bots": "node tests/bots-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",

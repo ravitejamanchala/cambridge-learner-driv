@@ -1,4 +1,4 @@
-import { setAccess, hasFullAccess } from './access.js';
+import { setAccess, hasFullAccess, setAuthConfigured, setSignedIn } from './access.js';
 import { Profiles } from './profile.js';
 import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
@@ -7,6 +7,8 @@ export async function initAuth() {
  if (!config?.CLERK_PUBLISHABLE_KEY || !config?.API_BASE_URL) return;
  const base = new URL(config.API_BASE_URL);
  if (base.protocol !== 'https:' && base.hostname !== 'localhost') return;
+ // From here on the deployment has an account service: driving stays locked until the learner signs in.
+ setAuthConfigured(true);
  const panel = document.createElement('aside'); panel.id = 'learnerAccount';
  panel.className = 'account-panel';
  panel.innerHTML = '<button data-login>Sign in / create account</button> <span data-avatar></span><button data-logout hidden>Sign out</button><button data-access hidden>Refresh access</button><div class="subscription-offer"><b>Learner Drive Plus · £4.99/month</b><p>Unlock the full course, mock tests and puzzles. Free access includes Highway Code and the first three practical lessons.</p><p>Renews monthly until cancelled. Cancel through Manage subscription; access continues until the paid period ends.</p><p data-billing-status role="status">Free plan</p><button data-subscribe>Subscribe · £4.99/month</button><button data-manage hidden>Manage subscription</button><p data-billing-mode hidden>Test mode — no real payments. Do not enter a real card.</p></div><p data-status>Guest progress stays on this device</p><button data-import hidden>Import guest progress</button><button data-retry hidden>Retry sync</button><button data-local hidden>Keep device progress</button><button data-cloud hidden>Use cloud progress</button>';
@@ -44,11 +46,11 @@ export async function initAuth() {
   el('manage').onclick=async()=>{try{redirect((await authenticatedRequest('/api/billing/portal',{})).url);}catch{billingStatus('Could not open subscription management. Please try again.');}};
   async function activate(user, force=false) {
    if (!force && (user?.id || null) === activeId) return;
-   setAccess(false);authenticatedRequest=null;el('manage').hidden=true;el('subscribe').hidden=false;
+   setAccess(false);setSignedIn(!!user);authenticatedRequest=null;el('manage').hidden=true;el('subscribe').hidden=false;
    activeId = user?.id || null; const epoch=++generation; unsubscribe?.(); sync?.close(); sync=null;
    clerk.unmountUserButton(el('avatar'));
    el('avatar').replaceChildren(); el('login').hidden=!!user; el('logout').hidden=!user; el('import').hidden=true; el('access').hidden=!user;
-   if (!user) { Profiles.useAccount(null); billingStatus('Free plan · sign in to subscribe');status('Free lessons stay on this device. Sign in to save across devices.'); return; }
+   if (!user) { Profiles.useAccount(null); billingStatus('Sign in to start');status('Sign in to start driving. Your progress is saved to your account.'); return; }
    el('access').onclick=()=>activate(clerk.user,true).catch(()=>status('Could not verify access. Try Refresh access again.'));
    clerk.mountUserButton(el('avatar'));
    const userId=user.id;

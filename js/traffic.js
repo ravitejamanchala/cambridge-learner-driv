@@ -221,18 +221,21 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     return vmax;
   }
   function updateAgent(a, dt) {
-    const w = a.e.way, bike = a.kind === 'bike';
+    const w = a.e.way, bike = a.kind === 'bike', blue = !!a.emergency;
+    // A vehicle on a shout drives hard: well above the limit, through corners faster, and it gives way
+    // to nobody. It still stops at red lights, which this training build does not let it run.
     let vmax = bike ? a.cruise : w.mph * 0.447 * a.cruise;
-    if (w.rb) vmax = Math.min(vmax, bike ? 4.5 : 7);
+    if (w.rb) vmax = Math.min(vmax, bike ? 4.5 : blue ? 11 : 7);
     const rem = a.e.len - a.s;
     if (a.next) {
       const p = along(a.e, a.e.len - 0.5, a.dir), q = along(a.next.e, Math.min(4, a.next.e.len / 2), a.next.dir);
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
-      if (miniNodes.has(endNode(a))) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 3));
-      if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(bike ? 3.5 : 4.5, rem - 6));
+      const corner = bike ? 3.5 : blue ? 8 : 4.5;
+      if (miniNodes.has(endNode(a))) vmax = Math.min(vmax, brakeTo(corner, rem - 3));
+      if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(corner, rem - 6));
       // minor-road give-way and mini-roundabouts: let the learner go first (the ghost timer breaks a stand-off)
-      if (rem < 24 && (giveKey.has(a.e.id + ':' + a.dir) || miniNodes.has(endNode(a))) && learnerApproaching(endNode(a))) vmax = Math.min(vmax, brakeTo(0, rem - 9));
-      if (a.next.e.way.rb && !w.rb && rem < 22 && !sigEntry(a.e, a.dir) && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 9)); // lights decide at signalled entries
+      if (!blue && rem < 24 && (giveKey.has(a.e.id + ':' + a.dir) || miniNodes.has(endNode(a))) && learnerApproaching(endNode(a))) vmax = Math.min(vmax, brakeTo(0, rem - 9));
+      if (!blue && a.next.e.way.rb && !w.rb && rem < 22 && !sigEntry(a.e, a.dir) && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 9)); // lights decide at signalled entries
       if (net.cycleRings.length && !bike) vmax = ringYield(a, rem, vmax);
       vmax = stopAhead(a, a.next.e, a.next.dir, rem, vmax);
     } else vmax = Math.min(vmax, brakeTo(0, rem - 2));
@@ -251,15 +254,28 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
       if (a.ghost > 0 && o.isPlayer && Math.abs(o.v) < 0.3 && lat > 1.3) continue; // squeeze past a learner who has stopped to one side
+      // A blue-light vehicle gets past once the learner has made room beside it, or has slowed to a
+      // crawl: a real crew would squeeze by rather than sit behind a car doing walking pace.
+      if (a.emergency && o.isPlayer && (lat > 1.6 || Math.abs(o.v) < 2) && Math.abs(o.v) < Math.max(2.5, a.v - 3)) continue;
+      // Ordinary traffic going the same way makes way for it (see below), so it filters through
+      // rather than queueing and never reaching the learner at all.
+      if (a.emergency && !o.isPlayer && !oncoming) continue;
       if (lat < width) {
-        vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : 6.5), 5));
+        vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : blue ? 4.5 : 6.5), blue ? 7 : 5));
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
     // cyclists pass a stopped car with room to spare (or wait until they can)
     if (bike) a.swing = blocked ? Math.min(1.9, (a.swing || 0) + dt * 1.2) : Math.max(0, (a.swing || 0) - dt * 0.6);
+    // everyone makes way for a blue light coming up behind: slow right down and let it through
+    if (!a.emergency) for (const o of all) {
+      if (!o.emergency || o.alive === false) continue;
+      const ofx = -Math.sin(o.th), ofz = -Math.cos(o.th), dx = a.x - o.x, dz = a.z - o.z;
+      const ahead = dx * ofx + dz * ofz;
+      if (ahead > 0 && ahead < 40 && Math.abs(dx * ofz - dz * ofx) < 6) { vmax = Math.min(vmax, 2.5); break; }
+    }
     // predict where the learner will be over the next 2 s and give way to them
-    if (player && !(a.ghost > 0) && Math.abs(player.v) + a.v > 0.5) {
+    if (player && !(a.ghost > 0) && !blue && Math.abs(player.v) + a.v > 0.5) {
       const pfx = -Math.sin(player.th), pfz = -Math.cos(player.th), pv = player.v;
       const rx0 = player.x - a.x, rz0 = player.z - a.z, ahead = rx0 * fx + rz0 * fz, side = Math.abs(rx0 * fz - rz0 * fx), cosH = pfx * fx + pfz * fz;
       const passing = cosH < -0.7 && side > 2; // oncoming in the other lane
@@ -286,7 +302,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   function setDensity(value) { if (!['normal', 'light', 'none'].includes(value)) throw new Error('Unsupported traffic density'); density = value; all.forEach(a => a.scripted = false); }
   function reset(px,pz,seed) {
     random=seededRandom(seed);clock=0;overrides.clear();
-    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;});
+    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;a.emergency=false;});
     all.forEach(a=>spawn(a,px,pz,true));
     net.zebras.forEach(z=>Object.assign(z.ped,{state:'idle',t:2+(z.id*7.1)%9,p:0,dir:1}));
     puffins.forEach(c=>{c.last='G';Object.assign(c.ped,{state:'idle',p:0,dir:1});});
@@ -318,7 +334,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
   // path (optional): route steps the car should follow instead of choosing turns at random
   function placeCar(c, e, dir, s, speed, cruise = 1, path = null) {
-    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path });
+    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, emergency: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };

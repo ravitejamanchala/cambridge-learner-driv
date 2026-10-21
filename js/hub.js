@@ -2,7 +2,7 @@
 // Highway Code and learner sheets, the course "pass" card, the selected-drive card and START.
 import { LESSONS } from './course.js';
 import { VISIBLE_LESSONS, VISIBLE_UNITS as UNITS } from './course-menu.js';
-import { hasFullAccess, canAccessPlan, isFreeLesson } from './access.js';
+import { hasFullAccess, canAccessPlan, isFreeLesson, needsLogin } from './access.js';
 import { TIERS, PUZZLES, starsFor } from './puzzles.js';
 import { ROUTES } from './config.js';
 import { Profiles } from './profile.js';
@@ -43,16 +43,19 @@ export function createHub({ meta, onPick, onStart }) {
   // ---------- sheets ----------
   let afterProfile = null;
   const protectedSheets = new Set(['mockSheet','puzzleSheet']);
+  const SIGN_IN_NOTICE='Sign in to start. Lessons, puzzles and mock tests need an account, and your progress is saved to it.';
+  const SUBSCRIBE_NOTICE='Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course, mock tests and puzzles. Renews monthly until cancelled.';
   function requestAccess() {
-    const notice=$('accessNotice'); if(notice)notice.hidden=false;
+    const notice=$('accessNotice'); if(notice){notice.hidden=false;notice.textContent=needsLogin()?SIGN_IN_NOTICE:SUBSCRIBE_NOTICE;}
     openSheet('profileSheet');
   }
   window.addEventListener('learner-access-change', render);
   function renderAccess() {
-    const allowed=hasFullAccess();
-    document.querySelectorAll('[data-open=mockSheet],[data-open=puzzleSheet]').forEach(b=>{b.setAttribute('aria-disabled',String(!allowed));b.classList.toggle('access-locked',!allowed);b.title=allowed?'':'Sign in with an account that has full access';});
-    for(const id of ['eventCard','playBtn']){const b=$(id),ok=canAccessPlan(plan());b.setAttribute('aria-disabled',String(!ok));b.classList.toggle('access-locked',!ok);b.title=ok?'':'Subscribe for £4.99/month to unlock';}
-    const notice=$('accessNotice');if(notice)notice.hidden=allowed;
+    const login=needsLogin(), allowed=!login&&hasFullAccess();
+    const why=login?'Sign in to start':'Subscribe for £4.99/month to unlock';
+    document.querySelectorAll('[data-open=mockSheet],[data-open=puzzleSheet]').forEach(b=>{b.setAttribute('aria-disabled',String(!allowed));b.classList.toggle('access-locked',!allowed);b.title=allowed?'':login?why:'Sign in with an account that has full access';});
+    for(const id of ['eventCard','playBtn']){const b=$(id),ok=canAccessPlan(plan());b.setAttribute('aria-disabled',String(!ok));b.classList.toggle('access-locked',!ok);b.title=ok?'':why;}
+    const notice=$('accessNotice');if(notice){notice.hidden=allowed;notice.textContent=login?SIGN_IN_NOTICE:SUBSCRIBE_NOTICE;}
   }
   const modal = s => s.id === 'pauseSheet' || s.id === 'resultSheet';
   function openSheet(id) { if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
@@ -86,17 +89,17 @@ export function createHub({ meta, onPick, onStart }) {
     let n = 0;
     $('lessonList').innerHTML = UNITS.map((u, ui) => `<div class="unit-h">Unit ${ui + 1} · ${esc(u.title)}</div><div class="tiles">` + VISIBLE_LESSONS.filter(l => l.unit === u.id).map(l => {
       const access = availability(l, Profiles.current());
-      const entitled=hasFullAccess()||isFreeLesson(l.id);
-      const [txt, cls] = !entitled?['Subscribe','locked']:access.available ? status(l.id) : ['Locked', 'locked']; n++;
+      const entitled=!needsLogin()&&(hasFullAccess()||isFreeLesson(l.id));
+      const [txt, cls] = needsLogin()?['Sign in','locked']:!entitled?['Subscribe','locked']:access.available ? status(l.id) : ['Locked', 'locked']; n++;
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
-        <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? '<span class="tick">✓</span>' : ''}<span class="tt">${esc(l.title)}${isFreeLesson(l.id)?' · Free':!hasFullAccess()?' · Plus':''}</span></button>`;
+        <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? '<span class="tick">✓</span>' : ''}<span class="tt">${esc(l.title)}${needsLogin()?'':isFreeLesson(l.id)?' · Free':!hasFullAccess()?' · Plus':''}</span></button>`;
     }).join('') + '</div>').join('');
     const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id), qz = !!l.questions;
     $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><p class="muted">${esc(l.difficulty)}${l.prerequisites.length ? ' · Prerequisites: ' + l.prerequisites.map(id => esc(LESSONS.find(x => x.id === id).title)).join(', ') : ''}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
       <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
-      <div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
+      <div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
   $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
 

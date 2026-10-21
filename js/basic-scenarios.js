@@ -9,12 +9,12 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
   let movedAt = null;
   const events = [];
   const record = (type, data = {}) => events.push({ type, at: traffic.clock, ...data });
-  const S = { events, notes: [], stop: () => ui.banner(null), result: () => ({ ok: passed && !failed,
+  const S = { events, notes: [], stop: () => { ui.banner(null); test.basicStatus = null; }, result: () => ({ ok: passed && !failed,
     why: passed && !failed ? 'All measured control objectives completed.' : 'Complete every control objective and finish without the recorded control errors.' }) };
   S.update = dt => {
     maxTravel = Math.max(maxTravel, Math.hypot(player.x - start.x, player.z - start.z));
     const v = Math.abs(player.v), mph = v * 2.23694, op = player.operation;
-    let message;
+    let message, status = null;
     if (kind === 'cockpit' || kind === 'engine') {
       if (maxTravel > 1) failed = true;
       const prepared = op.doorClosed && op.seatSet && op.mirrorsSet && op.belt;
@@ -30,6 +30,9 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
       }
       passed = movedAt !== null && observed(movedAt + 1) && test.sRoute > test.route.len - 50;
       message = movedAt === null ? 'Select Interior, Right and Blind spot before moving.' : 'Repeat Interior, Right and Blind spot before pulling up.';
+      // three ticks that fill as each check is recorded, instead of a sentence repeating the list
+      const since = movedAt === null ? startClock : movedAt + 1;
+      status = { checks: checks.map(view => player.observations.some(e => e.view === view && e.at >= since)) };
     } else if (kind === 'controlled-stop') {
       if (!started && test.sRoute > 45 && mph >= 10 && mph <= 15) { started = true; promptedAt = test.sRoute; record('stop-prompt', { routeDistance: promptedAt, speed: v }); }
       if (started && !passed && !failed) {
@@ -37,12 +40,19 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
         else if (v < 0.3 && player.inp?.brake > 0.05) { passed = true; test.parked = true; record('controlled-stop', { distance: test.sRoute - promptedAt }); }
       }
       message = !started ? 'Reach 10–15 mph on this straight.' : passed ? 'Stopped in the target distance. Check round (B), then continue.' : failed ? 'Stop target missed. Finish the route and retry.' : `Brake to stop: ${Math.max(0, Math.round(30 - test.sRoute + promptedAt))} metres left.`;
+      status = !started ? { band: [10, 15], mph } : passed || failed ? null
+        : { value: Math.max(0, Math.round(30 - test.sRoute + promptedAt)) + ' m' };
     } else {
       if (!started) { held = mph >= 10 && mph <= 15 ? held + dt : 0; if (held >= 3) { started = true; promptedAt = traffic.clock; record('speed-held', { seconds: held, mph }); } }
       if (started && !passed && traffic.clock > promptedAt && mph < 8 && !player.inp?.throttle) { passed = true; record('speed-reduced', { mph }); }
       message = passed ? 'Speed reduced. Continue to the finish.' : started ? 'Release accelerator and slow below 8 mph.' : `Hold 10–15 mph: ${Math.min(3, held).toFixed(1)} / 3 seconds.`;
+      status = passed ? null : started ? { band: [0, 8], mph }
+        : { band: [10, 15], mph, value: Math.min(3, held).toFixed(1) + ' / 3 s' };
     }
-    ui.banner(message, 'info');
+    // The lesson card carries the instructions before Start, so the drive never repeats them. What
+    // goes on the instruments is only what the learner cannot otherwise know: how far, how fast,
+    // how many checks are in.
+    test.basicStatus = status;
     S.progress = { complete: passed && !failed, failed, message };
   };
   return S;
