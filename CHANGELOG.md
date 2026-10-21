@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: map corrections, steering wheel, head angles and a mirror in the chase view
+
+- **The Cambridge map is corrected from street-level imagery.** A review of 568 Mapillary features in
+  the road inspector, applied to `data/cambridge.json` and kept in
+  [data/corrections](data/corrections/) as the provenance of the map:
+  - **244 roads have their corners rounded off.** The overrides only add intermediate points — every
+    polyline keeps its endpoints, and the centre line moves by at most 6 cm — so every mock-test route
+    came out the same length with the same examiner instructions afterwards.
+  - **21 zebra crossings and 17 stop lines** that the map did not have. The other 47 markings in the
+    file were already on the map within 12 m and were dropped: a second zebra beside an existing one
+    would have the examiner mark a learner twice for one crossing.
+  - **483 surveyed street lamps**, used in place of the lamp posts the city builder spaces out along
+    main roads. A spaced-out pole within 16 m of a surveyed one is dropped rather than standing next
+    to it, and each surveyed pole turns to face the road it stands beside.
+  - The one road-attribute correction in the file (Milton Road's width and lane count) was already
+    what the map said, so nothing changed there.
+
 ## Unreleased: sign-in gate, blue light vehicles, hold-to-look and parallel parking
 - **Sign in before driving.** Where the build is configured with an account service, the lobby, lessons, puzzles and mock tests all stay locked until the learner signs in, and the sign-in sheet says so. A build with no account service configured (local development, the demo build) still runs as a guest on the device, so those builds are not left unusable.
   - Signing out now drops verified paid access with the session, instead of leaving it behind until the next API call.

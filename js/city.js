@@ -97,14 +97,20 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const hit = (x, z, r) => { const gx = Math.floor(x / 12), gz = Math.floor(z / 12); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = occ.get((gx + i) * 100003 + gz + j); if (a) for (const b of a) if (Math.hypot(b[0] - x, b[1] - z) < (b[2] + r) * 0.9) return true; } return false; };
   const add = (x, z, r) => { const kk = Math.floor(x / 12) * 100003 + Math.floor(z / 12); let a = occ.get(kk); if (!a) occ.set(kk, a = []); a.push([x, z, r]); };
   const inChunk = (x, z) => Math.floor(x / C) === cx && Math.floor(z / C) === cz;
+  // Surveyed lamp posts in this chunk, and a test for "a real one already stands about here".
+  const SURVEYED_NEAR = 16;
+  const surveyed = (net.lamps || []).filter(([x, z]) => inChunk(x, z));
+  const surveyedNear = (x, z) => surveyed.some(([lx, lz]) => Math.hypot(lx - x, lz - z) < SURVEYED_NEAR);
   const centreDist = (x, z) => Math.hypot(x + 150, z + 380); // roughly Market Square
   for (const e of edges) {
     const cls = e.way.cls; if (/trunk/.test(cls) || e.way.rb || e.way.mph >= 50) continue; // no houses along fast roads and country lanes
     const main = /^(primary|secondary|tertiary)/.test(cls);
-    // street lamps on main roads
+    // Street lamps on main roads. Where the map carries surveyed positions (Mapillary, reviewed in the
+    // road inspector) those are used instead, and a spaced-out pole near one of them is dropped rather
+    // than standing next to it.
     if (main) for (let s = 10, i = 0; s < e.len - 6; s += 34, i++) {
       const p = posAt(e, s), side = i % 2 ? 1 : -1, o = e.way.w / 2 + 0.9, x = p.x + p.tz * side * o, z = p.z - p.tx * side * o;
-      if (inChunk(x, z)) lamps.push([x, z, -p.tz * side, p.tx * side]); // last two: direction from pole towards the road
+      if (inChunk(x, z) && !surveyedNear(x, z)) lamps.push([x, z, -p.tz * side, p.tx * side]); // last two: direction from pole towards the road
     }
     for (const side of [-1, 1]) {
       let s = 5;
@@ -167,6 +173,13 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const crowns = trees.map(([x, z, s], i) => ({ x, z, s, c: CROWNS[i % CROWNS.length] }));
   inst(k.crownG, k.mats.crown, crowns, (b) => { M.makeScale(b.s, b.s * 1.1, b.s); M.setPosition(b.x, 4.6 * b.s, b.z); });
   inst(k.crownG, k.mats.crown, bushes, (b) => { M.makeScale(b.s, b.s * 0.8, b.s); M.setPosition(b.x, b.y + b.s, b.z); });
+  // the surveyed poles, each turned to face the road it stands beside
+  for (const [x, z] of surveyed) {
+    const nr = nearest(net, x, z);
+    if (!nr) { lamps.push([x, z, 0, 1]); continue; }
+    const dx = nr.x - x, dz = nr.z - z, L = Math.hypot(dx, dz) || 1;
+    lamps.push([x, z, dx / L, dz / L]);
+  }
   inst(k.poleG, k.mats.pole, lamps, ([x, z]) => { M.makeTranslation(x, 0, z); });
   inst(k.headG, k.mats.lampHead, lamps, ([x, z, dx, dz]) => { E.set(0, Math.atan2(dx, dz), 0, 'YXZ'); Q.setFromEuler(E); M.compose(V.set(x + dx * 0.6, 6.95, z + dz * 0.6), Q, S.set(1, 1, 1)); }, false);
   return grp;

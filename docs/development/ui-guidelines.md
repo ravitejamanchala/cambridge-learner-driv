@@ -145,6 +145,10 @@ speedometer on a phone held sideways, where the same controls take a far taller 
 
 ## On the road
 
+- **The Cambridge map is surveyed, not guessed.** `data/corrections/` holds the correction sets the
+  road inspector produced from street-level imagery, and what was taken from each. Anything that adds
+  a marking the examiner marks against — a zebra, a stop line — is de-duplicated against what the map
+  already carries, because two crossings in one place means two faults for one mistake.
 - **UK conventions.** Parking bays are broken white lines. Give-way and stop lines, signals and signs
   follow the Highway Code, and each lesson cites the rule it teaches.
 - **Every vehicle comes from the shared catalogue** in `js/cars.js`: the learner's car, the background

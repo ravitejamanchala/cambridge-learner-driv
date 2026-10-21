@@ -52,6 +52,8 @@ export function buildNet(d) {
   for (const st of net.stops) { const c = cl.get(st.cluster) || new Set(); c.add(st.group); cl.set(st.cluster, c); }
   for (const st of net.stops) { st.single = cl.get(st.cluster).size < 2; st.offset = (st.cluster * 7.37) % 32; }
   net.zebras = d.zebras.map(([ei, s], id) => feature(net, { id, e: edges[ei], s: s / 10, dir: 1 }));
+  // Surveyed street-lamp positions, where the map has them. Flat x,z pairs in decimetres.
+  net.lamps = []; for (let i = 0; d.lamps && i < d.lamps.length; i += 2) net.lamps.push([d.lamps[i] / 10, d.lamps[i + 1] / 10]);
   net.giveways = d.giveways.map(([ei, s, dir, stop]) => feature(net, { e: edges[ei], s: s / 10, dir, stop: !!stop }));
   net.minis = d.minis.map(([x, z]) => ({ x: x / 10, z: z / 10 }));
   net.rbs = d.rbs.map(([x, z, r, w]) => ({ x: x / 10, z: z / 10, r: r / 10, w: w / 10 }));
