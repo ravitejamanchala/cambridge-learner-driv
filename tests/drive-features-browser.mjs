@@ -47,6 +47,104 @@ try{
  assert.ok(await page.evaluate(()=>window.cambridgeDrive.player.observations.some(o=>o.view==='left')&&window.cambridgeDrive.player.observations.some(o=>o.view==='right')));
  console.log('Hold-to-look swings the camera in chase and driver views, and never the car.');
 
+ // ---------- how far the head turns: a mirror glance, then a look over the shoulder ----------
+ const frames=n=>page.evaluate(k=>{for(let i=0;i<k;i++)window.cambridgeDrive.frame(0.05);},n);
+ await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),1);
+ await settle();
+ const straight=await heading(page);
+ const swungTo=async()=>Math.abs(wrap((await heading(page)).camera-straight.camera))*180/Math.PI;
+ await page.keyboard.down('KeyX'); await frames(7); // 0.35 s in: still a glance at the door mirror
+ const mirrorAngle=await swungTo();
+ await frames(40);                                  // held on: it becomes a blind-spot check
+ const shoulderAngle=await swungTo();
+ await page.keyboard.up('KeyX'); await settle();
+ assert.ok(mirrorAngle>35&&mirrorAngle<50,`a mirror glance should be about 45°, got ${mirrorAngle.toFixed(1)}°`);
+ assert.ok(shoulderAngle>85&&shoulderAngle<105,`a blind-spot check should be about 95°, got ${shoulderAngle.toFixed(1)}°`);
+ assert.ok(shoulderAngle-mirrorAngle>40,`the shoulder check must open out past the glance, got ${(shoulderAngle-mirrorAngle).toFixed(1)}°`);
+ console.log(`Head turn: ${mirrorAngle.toFixed(0)}° for the door mirror, ${shoulderAngle.toFixed(0)}° over the shoulder.`);
+
+ // ---------- the steering wheel follows the driver's hands ----------
+ const wheelAt=()=>page.evaluate(()=>window.cambridgeDrive.wheelAngle);
+ const wheelRest=await wheelAt();
+ await page.evaluate(()=>{window.__steer=window.cambridgeDrive.addInput(()=>({throttle:0.3,brake:0,steer:-0.8}));});
+ await frames(30);
+ const wheelRight=await wheelAt();
+ await page.evaluate(()=>{window.__steer();});
+ assert.ok(Math.abs(wheelRight-wheelRest)>0.8,`the steering wheel barely moved: ${wheelRest.toFixed(2)} to ${wheelRight.toFixed(2)} rad`);
+ assert.ok(wheelRight<wheelRest,'steering right must turn the wheel the same way');
+ await settle();
+ console.log(`Steering wheel turns ${(Math.abs(wheelRight-wheelRest)*180/Math.PI).toFixed(0)}° at the lock the input asked for.`);
+
+ // ---------- the rear-view mirror is in the chase view as well as the cockpit ----------
+ const panel=async()=>page.evaluate(()=>{let f=null;window.cambridgeDrive.camera.traverse(o=>{if(o.userData.chaseMirror)f=o;});
+   return f?{found:true,visible:f.visible,above:f.position.y>0}:{found:false};});
+ await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),0);
+ await frames(5);
+ const inChase=await panel();
+ assert.equal(inChase.found,true,'there is no rear-view panel for the chase view');
+ assert.equal(inChase.visible,true,'the chase view has no rear-view mirror');
+ assert.equal(inChase.above,true,'the rear-view panel should hang at the top of the view');
+ await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),1);
+ await frames(5);
+ assert.equal((await panel()).visible,false,'the chase panel is still showing in the driver view');
+ await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),0);
+ await frames(5);
+ // Where it lands on screen, against everything else drawn over the view. A phone is the tight case:
+ // the map, the speedometer and the look buttons all sit in the same band.
+ const panelRect=()=>page.evaluate(()=>{
+  let f=null; window.cambridgeDrive.camera.traverse(o=>{if(o.userData.chaseMirror)f=o;});
+  if(!f||!f.visible) return null;
+  const cam=window.cambridgeDrive.camera, glass=f.children[1]; glass.updateMatrixWorld(true);
+  const xs=[],ys=[];
+  for(const [x,y] of [[-0.5,-0.5],[0.5,-0.5],[-0.5,0.5],[0.5,0.5]]){
+   const v=new THREE.Vector3(x,y,0).applyMatrix4(glass.matrixWorld).project(cam);
+   xs.push((v.x*0.5+0.5)*window.innerWidth); ys.push((-v.y*0.5+0.5)*window.innerHeight);
+  }
+  const r={left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)};
+  const hit=['.hud-map','.speedo','#hudNextBox','.lookpair','.hud-bl','.touch','#lookBtn']
+   .map(sel=>[sel,document.querySelector(sel)]).filter(([,e])=>e&&!e.hidden&&e.getBoundingClientRect().width>0)
+   .filter(([,e])=>{const b=e.getBoundingClientRect();return !(r.right<=b.left||b.right<=r.left||r.bottom<=b.top||b.bottom<=r.top);})
+   .map(([sel])=>sel);
+  return {...r,hit,w:window.innerWidth,h:window.innerHeight};
+ });
+ for(const vp of [{width:1280,height:720},{width:390,height:844},{width:844,height:390}]){
+  await page.setViewportSize(vp); await page.waitForTimeout(260); await frames(6);
+  const r=await panelRect();
+  const at=`${vp.width}x${vp.height}`;
+  assert.ok(r,`${at}: the rear-view panel is not on screen in the chase view`);
+  assert.ok(r.left>=0&&r.right<=vp.width,`${at}: the rear-view panel runs off the side`);
+  assert.ok(r.top>=0,`${at}: the rear-view panel is off the top`);
+  assert.deepEqual(r.hit,[],`${at}: the rear-view panel overlaps ${r.hit.join(', ')}`);
+  const area=Math.round((r.right-r.left)*(r.bottom-r.top)/(vp.width*vp.height)*100);
+  assert.ok(area<=14,`${at}: the rear-view panel covers ${area}% of the view`);
+  console.log(` rear-view panel at ${at}: ${area}% of the view, clear of the instruments`);
+ }
+ // ---------- and the glass itself stays on screen in the cockpit, phone included ----------
+ // An upright phone starts in the chase view, so the driver view is chosen again after each resize.
+ for(const vp of [{width:1280,height:720},{width:390,height:844}]){
+  await page.setViewportSize(vp); await page.waitForTimeout(260);
+  await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),1); await frames(6);
+  const glass=await page.evaluate(()=>{
+   const cam=window.cambridgeDrive.camera; let m=null;
+   cam.traverse(o=>{ if(o.isMesh&&o.material?.map&&o.geometry?.type==='PlaneGeometry'&&o.parent?.parent?.visible&&!o.parent.userData.chaseMirror&&m===null) m=o; });
+   if(!m) return null; m.updateMatrixWorld(true);
+   const xs=[],ys=[],p=m.geometry.parameters;
+   for(const [x,y] of [[-0.5,-0.5],[0.5,-0.5],[-0.5,0.5],[0.5,0.5]]){
+    const v=new THREE.Vector3(x*p.width,y*p.height,0).applyMatrix4(m.matrixWorld).project(cam);
+    xs.push((v.x*0.5+0.5)*window.innerWidth); ys.push((-v.y*0.5+0.5)*window.innerHeight);
+   }
+   return {left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)};
+  });
+  const at=`${vp.width}x${vp.height}`;
+  assert.ok(glass,`${at}: no mirror glass in the cockpit`);
+  assert.ok(glass.left>=0&&glass.right<=vp.width,`${at}: the rear-view mirror runs off the side of the screen`);
+  assert.ok(glass.top>=0&&glass.bottom<=vp.height,`${at}: the rear-view mirror runs off the top or bottom`);
+  console.log(` rear-view glass at ${at}: on screen at x ${Math.round(glass.left)}–${Math.round(glass.right)}`);
+ }
+ await page.setViewportSize({width:390,height:844});
+ await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),0);
+ console.log('Rear-view mirror: a panel in the chase view, the glass on the windscreen in the cockpit.');
+
  // ---------- blue light vehicle: in a mock test, and assessed in its own lesson ----------
  await page.evaluate(()=>window.cambridgeDrive.manual(false));
  await page.locator('#blN').fill('1');await page.locator('#blSpd').selectOption('0');await page.locator('#blLoop').uncheck();

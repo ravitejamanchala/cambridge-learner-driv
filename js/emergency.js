@@ -17,22 +17,77 @@ export const EMERGENCY = {
   kerbRoom: 1.9      // metres from the nearside kerb that counts as having pulled in
 };
 
-// Two flashing blue lamps on a roof bar, sized to sit just above the car's roof.
+// The blue lights. The police model carries its own bar on the roof, with a `BlueLights` material on
+// the lenses, so that is what gets flashed rather than a second bar bolted on over the top. What makes
+// it carry at a distance is not the lens — a few pixels of blue in a mirror — but an additive halo
+// around it, which keeps a floor on its size however far away the car is.
+const LAMP = { lens: 0x8fc0ff, glow: 0x3f7bff, dim: 0x101a46, halo: 0x4b84ff };
+function haloTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), grd = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.3, 'rgba(150,195,255,0.75)');
+  grd.addColorStop(1, 'rgba(60,120,255,0)');
+  x.fillStyle = grd; x.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+function makeHalo(tex) {
+  const T = THREE;
+  const halo = new T.Sprite(new T.SpriteMaterial({ map: tex, color: LAMP.halo, blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+  halo.scale.set(1.4, 1.4, 1); halo.renderOrder = 6;
+  return halo;
+}
+// Every part of the model drawn with the blue-lens material, and where in the car those lenses sit.
+// The material is cloned first, because the model's materials are shared with every other car.
+function modelLamps(root) {
+  const T = THREE, mats = [], points = [];
+  root.updateMatrixWorld(true);
+  root.traverse(o => {
+    if (!o.isMesh || !o.geometry) return;
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    list.forEach((m, i) => {
+      if (!/blue\s*light/i.test(m?.name || '')) return;
+      const clone = m.clone(); clone.name = m.name;
+      if (Array.isArray(o.material)) o.material[i] = clone; else o.material = clone;
+      mats.push(clone);
+      const spots = lensSpots(o, i); for (const p of spots) points.push(p.applyMatrix4(o.matrixWorld));
+    });
+  });
+  return { mats, points };
+}
+// The left and right ends of the lens geometry, so a halo can sit on each one.
+function lensSpots(mesh, materialIndex) {
+  const T = THREE, g = mesh.geometry, pos = g.attributes.position, idx = g.index;
+  const groups = (g.groups || []).filter(gr => gr.materialIndex === materialIndex);
+  const ranges = groups.length ? groups : [{ start: 0, count: idx ? idx.count : pos.count }];
+  const box = new T.Box3();
+  const v = new T.Vector3();
+  for (const gr of ranges) for (let i = gr.start; i < gr.start + gr.count; i++) {
+    const k = idx ? idx.getX(i) : i;
+    box.expandByPoint(v.set(pos.getX(k), pos.getY(k), pos.getZ(k)));
+  }
+  if (box.isEmpty()) return [];
+  const c = box.getCenter(new T.Vector3()), w = box.max.x - box.min.x;
+  // one halo per end if the lenses run across the roof, otherwise a single one in the middle
+  return w > 0.25 ? [new T.Vector3(box.min.x + w * 0.22, c.y, c.z), new T.Vector3(box.max.x - w * 0.22, c.y, c.z)]
+    : [c.clone()];
+}
+// Fallback for a car with no model of its own: a white bar with two blue lamps on it.
 function lightBar(roof = 1.5) {
   const T = THREE, g = new T.Group();
   const bar = new T.Mesh(new T.BoxGeometry(1.1, 0.1, 0.3), new T.MeshLambertMaterial({ color: 0xe8ecf1 }));
   bar.position.y = roof + 0.06; g.add(bar);
-  const lamps = [-0.34, 0.34].map(x => {
-    const lamp = new T.Mesh(new T.SphereGeometry(0.14, 10, 8), new T.MeshBasicMaterial({ color: 0x0a1a66 }));
-    lamp.position.set(x, roof + 0.15, 0); g.add(lamp); return lamp;
+  const mats = [-0.34, 0.34].map(x => {
+    const lamp = new T.Mesh(new T.SphereGeometry(0.17, 12, 10), new T.MeshBasicMaterial({ color: LAMP.dim }));
+    lamp.position.set(x, roof + 0.17, 0); g.add(lamp); return lamp.material;
   });
-  g.userData.lamps = lamps;
-  return g;
+  g.userData.lamps = mats;
+  return { group: g, mats, points: [new T.Vector3(-0.34, roof + 0.17, 0), new T.Vector3(0.34, roof + 0.17, 0)] };
 }
 
 export function createEmergencyEvent({ net, traffic, test, player, ui, scene = null, body = null, trigger = EMERGENCY.trigger }) {
   const events = [], record = (type, data = {}) => events.push({ type, at: traffic.clock, ...data });
   let phase = 'idle', car = null, shell = null, bar = null, flash = 0, cameAt = 0, passedAt = null;
+  let lights = null; // { mats, halos } — whatever is doing the flashing on this car
   let slowed = false, pulledIn = false, followFor = 0, bannerUntil = 0, badStop = false, faulted = false, everNear = false, movingWhenNear = false, blockingFor = 0;
 
   const route = () => test.route;
@@ -71,10 +126,14 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
   }
   function buildShell() {
     const T = THREE, group = new T.Group();
-    let roof = 1.4;
+    let roof = 1.4, found = { mats: [], points: [] };
     const police = body ? body() : null;
-    if (police) { group.add(police); roof = new T.Box3().setFromObject(police).max.y; }
-    bar = lightBar(roof); group.add(bar);
+    if (police) { group.add(police); roof = new T.Box3().setFromObject(police).max.y; found = modelLamps(group); }
+    // The model has no blue lenses of its own (or there is no model at all): bolt a bar on instead.
+    if (!found.mats.length) { const fb = lightBar(roof); bar = fb.group; group.add(bar); found = fb; }
+    let tex = null; try { tex = haloTexture(); } catch (_) { /* headless: the lenses still flash */ }
+    const halos = tex ? found.points.map(p => { const h = makeHalo(tex); h.position.copy(p); group.add(h); return h; }) : [];
+    lights = { mats: found.mats, halos };
     return group;
   }
   // The police car follows the traffic agent, and the agent's own body is hidden while it does.
@@ -92,7 +151,7 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
       if (bar) bar.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     } catch (_) { /* nothing to tidy */ }
     if (car) { car.emergency = false; if (car.mesh) car.mesh.visible = true; }
-    shell = null; bar = null;
+    shell = null; bar = null; lights = null;
   }
 
   const S = { events, get phase() { return phase; }, get vehicle() { return car; }, get shell() { return shell; } };
@@ -117,10 +176,22 @@ export function createEmergencyEvent({ net, traffic, test, player, ui, scene = n
     if (!car) { phase = 'done'; return; }
     car.pinned = Math.max(car.pinned || 0, 8); // it must not be recycled mid-event
     if (shell) { shell.position.set(car.x, 0, car.z); shell.rotation.y = car.th; }
-    if (bar) { // flash the lamps alternately
+    if (lights) {
+      // The lenses pulse together — they are one material on the model — and the halos alternate end
+      // to end, which is what gives it the wig-wag of a real bar. Something is lit at every moment,
+      // so it never reads as a dark box in a mirror.
       flash += dt;
-      const on = Math.floor(flash * 4) % 2;
-      bar.userData.lamps.forEach((lamp, i) => lamp.material.color.setHex(i === on ? 0x3b6bff : 0x0a1a66));
+      const beat = Math.floor(flash * 7), side = beat % 2, bright = beat % 4 !== 3;
+      for (const m of lights.mats) {
+        m.color.setHex(bright ? LAMP.lens : LAMP.dim);
+        if (m.emissive) m.emissive.setHex(bright ? LAMP.glow : 0x000000);
+      }
+      // the halo keeps a floor on its size, so the light still registers far down the road
+      const d = Math.hypot(car.x - player.x, car.z - player.z), k = Math.max(1, Math.min(4.5, d / 14));
+      lights.halos.forEach((halo, i) => {
+        halo.visible = bright && (lights.halos.length < 2 || i === side);
+        if (halo.visible) halo.scale.set(1.4 * k, 1.4 * k, 1);
+      });
     }
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th);
     const forward = (car.x - player.x) * fx + (car.z - player.z) * fz;

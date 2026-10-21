@@ -8,6 +8,9 @@ A 3D mock UK driving test in the browser. `README.md` covers what it is and how 
   the learner sees while driving: keep the view clear, say less, one control per manoeuvre, never steer
   the car from the camera, and put the detail in the feedback after the run. Check it before adding a
   panel, a message or a control.
+- **[docs/development/reference/](docs/development/reference/)** — screenshots of a commercial UK
+  driving simulator, kept as the bar to clear. The interface guidelines say what we took from it and
+  where we deliberately differ.
 - [docs/screenshots.md](docs/screenshots.md) — one picture per case, regenerated with
   `node tools/screenshots.mjs`.
 

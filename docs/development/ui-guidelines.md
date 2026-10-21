@@ -99,6 +99,32 @@ rather than painting anything over the road, and its text must be short enough f
   cockpit group, or the bonnet swings and the car looks like it is turning.
 - **Do not force a camera view on the learner.** Parking does not switch them to the overhead view;
   they choose with `C` or the view buttons.
+- **How far the head turns is the point.** A glance in a door mirror is about **45°**; holding the
+  same key until it becomes a blind-spot check opens out to about **95°**, over the shoulder; `B` is
+  the interior mirror, so it barely moves the head at all (**15°**). The chase view uses 0.8 of those,
+  because the car is in shot as well. `LOOK` in `js/main.js` holds all three, and
+  `npm run test:drive` measures them.
+- **The steering wheel turns with the driver's hands, not the road wheels.** `WHEEL_LOCK` is 2.3 rad
+  at full lock — not the real 450°, which spins out of sight when full lock is one key press away.
+- **The rear-view mirror belongs in the chase view too.** It is the same camera and the same render
+  target as the glass on the windscreen, shown as a panel under the instruction box.
+
+## Mirrors and panels on a phone
+
+Anything drawn into the 3D view has to be placed from the interface's own measurements, not from a
+guessed share of the screen. A fraction that looks right on a desktop window goes straight through the
+speedometer on a phone held sideways, where the same controls take a far taller share.
+
+- Place it from `getBoundingClientRect()` on the real elements — see `hudChaseBox()` in `js/main.js`,
+  which hands `layoutChase` the bottom of the instruction box and the inside edges of the map and the
+  speedometer cluster — and never cache the measurement: it goes stale the moment the phone is turned.
+- **An upright phone starts in the chase view**, so anything that only exists in the cockpit has to be
+  reachable from the chase view as well, or a phone learner never sees it.
+- The driver's view is much narrower upright than it is on a desktop, so things off to the side fall
+  off the edge. `mirrors.fitView()` draws the rear-view mirror in towards the middle until it fits,
+  because that mirror is what the blue-light exercise is about.
+- `npm run test:drive` checks the lot at 1280×720, 390×844 and 844×390: on screen, clear of the map,
+  the speedometer, the look buttons, the instruction box and the touch controls.
 
 ## Feedback after every run
 
@@ -130,6 +156,31 @@ rather than painting anything over the road, and its text must be short enough f
   from the selected car via `carMetrics()`. A textured model carries its colour in the image, not the
   material, so the colour is sampled from the texture; and the body is the part with the most
   triangles, not the biggest box, or a black roof panel wins over the body around it.
+
+## What we are aiming at
+
+`docs/development/reference/` holds screenshots of a commercial UK driving simulator, kept as the bar
+to clear. They are reference material, not a style to copy: the house rules above win wherever the two
+disagree, and the quiet drive is deliberately quieter than theirs.
+
+| | |
+| --- | --- |
+| ![Chase view](reference/competitor-chase-view.webp) | ![Cockpit view](reference/competitor-cockpit-view.webp) |
+| ![Residential chase view](reference/competitor-chase-residential.webp) | |
+
+What they get right, and what we took from it:
+
+- **A rear-view mirror in the chase view**, not only in the cockpit. Ours is the panel under the
+  instruction box.
+- **A cockpit that reads as a car**: a real steering wheel with a rim, a hub and three spokes that
+  turns as you steer, a dashboard that closes off the bottom of the view, a windscreen header and
+  A-pillars, and door tops for the wing mirrors to sit on.
+- **Instruments, not prose** — the same conclusion as our own rules: speed, limit, a route map and
+  mirrors, with nothing written across the road.
+
+Where we deliberately differ: their screen carries a pedal and gear strip, a keyboard hint and a
+delivery timer. We do not. The view is the product, and everything the learner needs to be told is on
+the lesson card before Start or in the feedback afterwards.
 
 ## Before you call it done
 
