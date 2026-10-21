@@ -17,6 +17,32 @@ The learner is looking at a road. Everything drawn on top of it costs them somet
 - **Never cover the middle of the screen** with text while the car is moving.
 - Anything that can be read after the run belongs after the run.
 
+## Never say twice what the lesson card already said
+
+This is the rule most often broken, and the easiest to break by accident. The learner reads the goal
+and the steps on the lesson card, chooses to begin, and then drives. Repeating any of it while they
+are driving is clutter, and they skip it anyway.
+
+Before adding any text to a drive, ask two questions. If either answer is yes, it does not go on.
+
+1. **Is it on the lesson card?** "Let it through", "Hold the speed", "Reverse into the space",
+   "Check before moving" — all of these were already read before Start.
+2. **Can the learner see it for themselves?** A police car with its lights on does not need a caption
+   saying there is a police car. Nor does a highlighted parking bay need a label.
+
+What is left, and all that is left:
+
+- **Readings the learner cannot otherwise know** — a distance counting down, a speed band, `0/3`
+  checks recorded, metres to the target. Numbers and marks, not sentences.
+- **Navigation** — which way to go at the next junction. The card never said that.
+- **Something has gone wrong and needs recovery** — "Stop first" when Park is tapped on the move.
+- **A stimulus with nothing to see** — the examiner's "STOP" in the emergency stop. There is no police
+  car to notice and no card entry that says *when*: the moment is the exercise.
+
+A label that merely names the stage is not state, it is the card again. The parking lesson shows the
+distance to the target and nothing else: the one button names the action and the highlighted bay shows
+where it is.
+
 ## Say less
 
 - **Instructions belong on the lesson card, before Start.** The learner reads the goal and the steps
@@ -37,8 +63,9 @@ already has a distance field, a speedometer and an eye button; use them.
 | "Brake to stop: 18 metres left" | The distance field, which already reads in yards and metres |
 | "Hold 10–15 mph: 1.4 / 3 seconds" | A target band under the speed, and a count in the distance field |
 | "Repeat Interior, Right and Blind spot" | Three ticks that fill as each check is recorded |
-| "Blue lights coming towards you. Slow down and keep well to the left." | `Blue lights ahead`, amber, in the HUD box |
-| "It is past. Carry on when it is safe." | Nothing. The event is over; clear the alert |
+| "Blue lights coming towards you…" | Nothing. It is on the card, and the police car is visible |
+| "It is past. Carry on when it is safe." | Nothing. The event is over |
+| "Release the parking brake" as a stage label | Nothing. The button already says it, right below |
 
 Scenarios report state through `test.basicStatus` — `{ label, value, band, checks }` — and `ui.hud()`
 draws it. `ui.banner()` still exists for the scenarios that call it, but it now writes `test.alert`

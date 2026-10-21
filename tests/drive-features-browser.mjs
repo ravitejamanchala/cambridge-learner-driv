@@ -100,8 +100,8 @@ try{
  assert.equal(lit.phase,'coming',JSON.stringify(lit));
  assert.equal(lit.slab,false,'a blue-light message is over the road');
  assert.equal(lit.panel,false,'a panel is over the road during the blue-light event');
- assert.ok(lit.alert&&lit.alert.length<=24,'the alert belongs in the HUD and must stay short: '+JSON.stringify(lit));
- console.log('Blue light on a phone: the warning is in the HUD, not across the windscreen —',JSON.stringify(lit.alert));
+ assert.equal(lit.alert,null,'the blue light is on the lesson card and visible on the road: say nothing');
+ console.log('Blue light on a phone: nothing announced, nothing over the road.');
  for(const id of ['mirror-practice','controlled-stop','accel-decel']){
   await page.evaluate(async i=>{await window.cambridgeDrive.pick('lesson',i,true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0.2);},id);
   await page.evaluate(()=>{for(let i=0;i<40;i++)window.cambridgeDrive.step(1);window.cambridgeDrive.frame(0.2);});
@@ -122,6 +122,13 @@ try{
   assert.equal(over.banner,false,`${id}: a banner is sitting over the road`);
   assert.ok(over.bannerArea===0,`${id}: something is covering the road`);
   assert.deepEqual(over.clashes,[],`${id}: HUD pieces overlap each other`);
+  // the drive must not repeat the lesson card: readings only, no sentences
+  const words=await page.evaluate(()=>{
+   const t=window.cambridgeDrive.test;
+   return {alert:t.alert?.label||null,label:t.basicStatus?.label||null,stage:t.manoeuvreStatus?.short||null};
+  });
+  assert.equal(words.label,null,`${id}: a status label is repeating the lesson card`);
+  assert.equal(words.alert,null,`${id}: an alert is repeating the lesson card`);
  }
  console.log('Getting started on a phone: no panel, no banner, no overlapping HUD.');
  await page.setViewportSize({width:1280,height:720});

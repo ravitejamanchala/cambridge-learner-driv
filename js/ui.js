@@ -144,12 +144,10 @@ export function createUI(net) {
     document.querySelector('.hud-spd').classList.toggle('inband', !!inBand);
     if (basic) {
       if (basic.value) $('hudNext').textContent = basic.value;
-      $('hudDist').textContent = basic.label || '';
-      $('hudNextBox').setAttribute('aria-label', basic.label || '');
       if (basic.checks) $('hudNext').textContent = basic.checks.filter(Boolean).length + '/3';
     }
     if (t.mode === 'manoeuvre' && t.manoeuvreStatus) {
-      const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = m.short; $('hudNextBox').setAttribute('aria-label',m.message); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
+      const m = t.manoeuvreStatus; $('hudNext').textContent = Math.round(m.remaining) + ' m'; $('hudDist').textContent = ''; $('hudNextBox').setAttribute('aria-label', 'Distance to the target'); $('hudExit').hidden = true; $('hudLanes').hidden = true; $('hudIco').innerHTML = ICON.look; lastIco = 'parking';
     }
     // An alert takes the HUD box over while it lasts: the state goes where the learner already looks,
     // and nothing is drawn across the road.

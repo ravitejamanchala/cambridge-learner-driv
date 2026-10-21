@@ -100,10 +100,10 @@ test('one control runs the whole manoeuvre: release to set off, apply to park',(
  s.update(.1);
  assert.equal(s.result().ok,true,s.result().why);
 });
-test('the running commentary stays quiet: a stage label, and words only when something is wrong',()=>{
+test('the drive says nothing unless something has gone wrong',()=>{
  const {player:p,scenario:s}=harness();
- assert.equal(s.progress.message,'','nothing to say at the start beyond the label');
- assert.match(s.progress.short,/parking brake/i);
+ assert.equal(s.progress.message,'','no running commentary');
+ assert.equal(s.progress.short,'','no stage label either: the button names the action');
  assert.equal(s.finishAttempt(),false); // nothing has been attempted yet
  assert.match(s.progress.message,/release the parking brake/i,'a warning does get through');
 });

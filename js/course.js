@@ -329,7 +329,7 @@ export function createScenario(lesson, deps) {
       if (state === 'wait' && test.sRoute > 180 && player.v > 6.5) { state = 'go'; t0 = clock; ui.banner('STOP', 'stop'); }
       if (state === 'go') {
         if (react === null && player.inp && player.inp.brake > 0.05) react = clock - t0;
-        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner('Look round, then move off', 'info'); setTimeout(() => ui.banner(null), 4000); }
+        if (Math.abs(player.v) < 0.3) { stopT = clock - t0; state = 'done'; test.parked = true; ui.banner(null); }
       }
     };
     S.result = () => {

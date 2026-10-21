@@ -58,7 +58,8 @@ export function createParkingScenario(lesson, { net, player, test, traffic, ui }
     const active = plan.legs[Math.min(legIndex, plan.legs.length - 1)];
     S.target = active.target; S.layout = layout;
     const remaining = Math.hypot(active.target.x - player.x, active.target.z - player.z);
-    const short = phase === 'prepare' ? 'Release the parking brake' : phase === 'secure' ? 'Tap Park' : lesson.parkingKind === 'parallel-park' ? (legIndex === 0 ? 'Pull up alongside the front car' : 'Reverse into the space') : `${active.gear === 'R' ? 'Reverse' : 'Drive'} into the highlighted bay`;
+    // No stage label: the one button names the action, and the highlighted target shows where to go.
+    const short = '';
     // The brief is given at the start of the lesson and the detail comes in the feedback afterwards,
     // so the only words during the manoeuvre are the stage label and anything that has gone wrong.
     const message = traffic.clock < warningUntil ? warning : '';

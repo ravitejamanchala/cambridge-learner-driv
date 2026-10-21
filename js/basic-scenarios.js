@@ -22,7 +22,6 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
       const secure = prepared && op.parkingBrake && !op.engine && v < 0.3;
       passed = secure && (kind === 'cockpit' || (engineEvents.some(e => e.value) && engineEvents.at(-1)?.value === false));
       message = kind === 'cockpit' ? 'Prepare the cockpit: door, seat, mirrors and belt. Keep engine off and parking brake on.' : 'Prepare cockpit → engine on → engine off. Keep parking brake on.';
-      status = { label: kind === 'cockpit' ? 'Prepare the cockpit' : 'Engine on, then off' };
       if (passed && !failed) { record('controls-complete'); test.finish(); return; }
     } else if (kind === 'mirrors') {
       if (movedAt === null && v > 0.8) {
@@ -33,8 +32,7 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
       message = movedAt === null ? 'Select Interior, Right and Blind spot before moving.' : 'Repeat Interior, Right and Blind spot before pulling up.';
       // three ticks that fill as each check is recorded, instead of a sentence repeating the list
       const since = movedAt === null ? startClock : movedAt + 1;
-      status = { label: movedAt === null ? 'Check before moving' : 'Check again before stopping',
-        checks: checks.map(view => player.observations.some(e => e.view === view && e.at >= since)) };
+      status = { checks: checks.map(view => player.observations.some(e => e.view === view && e.at >= since)) };
     } else if (kind === 'controlled-stop') {
       if (!started && test.sRoute > 45 && mph >= 10 && mph <= 15) { started = true; promptedAt = test.sRoute; record('stop-prompt', { routeDistance: promptedAt, speed: v }); }
       if (started && !passed && !failed) {
@@ -42,19 +40,18 @@ export function createBasicScenario(lesson, { player, test, traffic, ui }) {
         else if (v < 0.3 && player.inp?.brake > 0.05) { passed = true; test.parked = true; record('controlled-stop', { distance: test.sRoute - promptedAt }); }
       }
       message = !started ? 'Reach 10–15 mph on this straight.' : passed ? 'Stopped in the target distance. Check round (B), then continue.' : failed ? 'Stop target missed. Finish the route and retry.' : `Brake to stop: ${Math.max(0, Math.round(30 - test.sRoute + promptedAt))} metres left.`;
-      status = !started ? { label: 'Build up speed', band: [10, 15], mph }
-        : passed ? { label: 'Stopped' } : failed ? { label: 'Finish the route' }
-        : { label: 'Brake to stop', value: Math.max(0, Math.round(30 - test.sRoute + promptedAt)) + ' m' };
+      status = !started ? { band: [10, 15], mph } : passed || failed ? null
+        : { value: Math.max(0, Math.round(30 - test.sRoute + promptedAt)) + ' m' };
     } else {
       if (!started) { held = mph >= 10 && mph <= 15 ? held + dt : 0; if (held >= 3) { started = true; promptedAt = traffic.clock; record('speed-held', { seconds: held, mph }); } }
       if (started && !passed && traffic.clock > promptedAt && mph < 8 && !player.inp?.throttle) { passed = true; record('speed-reduced', { mph }); }
       message = passed ? 'Speed reduced. Continue to the finish.' : started ? 'Release accelerator and slow below 8 mph.' : `Hold 10–15 mph: ${Math.min(3, held).toFixed(1)} / 3 seconds.`;
-      status = passed ? { label: 'Continue to the finish' }
-        : started ? { label: 'Ease off', band: [0, 8], mph }
-        : { label: 'Hold the speed', band: [10, 15], mph, value: Math.min(3, held).toFixed(1) + ' / 3 s' };
+      status = passed ? null : started ? { band: [0, 8], mph }
+        : { band: [10, 15], mph, value: Math.min(3, held).toFixed(1) + ' / 3 s' };
     }
-    // The lesson card carries the instructions before Start. During the drive the state goes to the
-    // instruments the learner already has: the distance field, the speedo and the mirror ticks.
+    // The lesson card carries the instructions before Start, so the drive never repeats them. What
+    // goes on the instruments is only what the learner cannot otherwise know: how far, how fast,
+    // how many checks are in.
     test.basicStatus = status;
     S.progress = { complete: passed && !failed, failed, message };
   };
