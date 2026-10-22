@@ -27,6 +27,7 @@ try{
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('mock','east-road',true);});assert.equal(await page.evaluate(()=>window.cambridgeDrive.area),'a1');
  // Save a browser JSON edit as a fresh revision, retaining the original.
  console.log('Opening local simulator');await page.goto(url,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);console.log('Opening mock tests');await page.locator('[data-open=mockSheet]').click();
+ await page.locator('#routePick button').filter({hasText:'Local browser test road'}).click();
  await page.locator('#localTrackLibrary summary').click();
  const text=page.getByLabel('Editor track JSON',{exact:true});await text.fill((await text.inputValue()).replace('Local browser test road','Edited mock route'));
  await page.getByRole('button',{name:'Save as new revision'}).click();

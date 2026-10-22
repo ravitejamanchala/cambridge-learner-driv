@@ -1,3 +1,4 @@
+import {prepareEditorTrack} from './editor-routing.js';
 // Version 1 editor envelope validation, shared with SlayDriveAdmin.
 import { buildNet, buildRoute, snapWaypoint, nearest } from "./net.js";
 export function validate(d) {
@@ -153,7 +154,7 @@ export function inspectTrack(track) {
  let segments=0;
  for(const edge of n.edges){for(let i=2;i<edge[3].length;i+=2){segments++;if(Math.hypot(edge[3][i]-edge[3][i-2],edge[3][i+1]-edge[3][i-1])>20000)throw Error('Road segments must be shorter than 2 km');}}
  if(segments>60000)throw Error('Too many road geometry segments');
- const net=buildNet(track.network), nodes=track.plan.waypoints.map(w=>snapWaypoint(net,w));
+ const prepared=prepareEditorTrack(track),net=buildNet(prepared.network),nodes=prepared.nodes;
  const spawnRoad=nearest(net,track.spawn.x,track.spawn.z);
  if(!spawnRoad || spawnRoad.d>50)throw Error("Spawn must be within 50 metres of a road");
  const route=buildRoute(net,nodes);

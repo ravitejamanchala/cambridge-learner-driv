@@ -26,10 +26,11 @@ function progress(p) {
 }
 
 // meta(key) -> { len, n, first } for 'route:<id>', 'lesson:<id>', 'puzzle:<id>' (from data/areas/index.json)
-export function createHub({ meta, onPick, onStart }) {
+export function createHub({ meta, onPick, onStart, initialMockId = null }) {
   Profiles.init();
   window.addEventListener('learner-account-change', () => render());
   const st = { kind: 'lesson', lesson: VISIBLE_LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, scenarioId: null };
+  const initialRoute=ROUTES.findIndex(r=>r.id===initialMockId);if(initialRoute>=0){st.kind='mock';st.route=initialRoute;}
   const status = (id) => { const L = Profiles.lesson(id); return !L ? ['New', 'new'] : L.passed ? ['Passed', 'ok'] : ['Tried ' + L.attempts + '×', 'try']; };
   const firstOpen = () => (recommendedLesson(hasFullAccess()?VISIBLE_LESSONS:VISIBLE_LESSONS.filter(l=>isFreeLesson(l.id)), Profiles.current()) || VISIBLE_LESSONS[0]).id;
   const tierOpen = (ti) => ti === 0 || PUZZLES.some(z => z.tier === TIERS[ti - 1].id && (Profiles.lesson(z.id) || {}).passed);

@@ -1,4 +1,4 @@
-import { loadLocalLibrary, mountLocalLibrary } from './local-library.js';
+import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
 import { addEditorObjects } from './local-world.js';
 import { obstacleContact } from './editor-collisions.js';
 import { canAccessPlan } from './access.js';
@@ -143,7 +143,7 @@ async function boot() {
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
     const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
-    nodes = wps.map(w => snapWaypoint(A.net, w));
+    nodes = pl.kind==='mock' && ROUTES[pl.index].localNodes ? [...ROUTES[pl.index].localNodes] : wps.map(w => snapWaypoint(A.net, w));
     route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
@@ -170,6 +170,7 @@ async function boot() {
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    notifyLocalRoute(pl);
     if(start&&!canAccessPlan(pl)){hub.requestAccess();return false;}
     if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
     if (pl.kind === 'lesson' && !pl.lesson.questions) pl = { ...pl, scenarioDefinition: resolveScenario(pl.lesson, pl.scenarioId) };
@@ -182,8 +183,8 @@ async function boot() {
     if (tok !== pickTok || !A.net || A.id !== areaOf(pl)) return false;
     loadPlan(pl); if (start) begin();
   }
-  const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
-  mountLocalLibrary();
+  const hub = createHub({ meta, initialMockId: preferredLocalRoute(), onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
     if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}

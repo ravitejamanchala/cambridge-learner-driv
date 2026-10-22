@@ -3,7 +3,7 @@ const require=createRequire(import.meta.url),root=await fs.mkdtemp(path.join(os.
 try{
  await fs.symlink(path.resolve('dist'),path.join(root,'cambridge-learner-driv'));
  server=spawn('python3',['-m','http.server','8789','--bind','127.0.0.1','--directory',root],{stdio:'ignore'});const url='http://127.0.0.1:8789/cambridge-learner-driv/';
- for(let i=0;i<100;i++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ for(let i=0;i<100;i++){try{const response=await fetch(url);await response.arrayBuffer();if(response.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(process.env.CI?undefined:'/usr/bin/chromium'),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],localRequests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('/__local/'))localRequests.push(r.url());});
  const three=path.dirname(require.resolve('three/package.json'));await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:''}));
  console.log('Opening static Pages build under repository path');await page.goto(url,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);

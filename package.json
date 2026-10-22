@@ -18,7 +18,8 @@
     "dev:editor": "node tools/local-editor-server.mjs",
     "test:local-mocks": "node tests/local-tracks-browser.mjs",
     "build:pages": "node tools/build_demo.mjs . dist --pages-preview",
-    "test:pages": "node tests/pages-browser.mjs"
+    "test:pages": "node tests/pages-browser.mjs",
+    "test:imports": "node tests/three-imports-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
