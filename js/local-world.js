@@ -1,3 +1,4 @@
+import {styleEditorBuilding} from './city.js';
 import { footprintGeometry } from './editor-footprint.js';
 // Authored scenery uses the same transforms and polygon footprints as the editor.
 export function addEditorObjects(T,scene,track) {
@@ -7,6 +8,6 @@ export function addEditorObjects(T,scene,track) {
   const geometry=o.type==='building'&&o.properties.footprint?.length>2?footprintGeometry(T,o.properties.footprint,o.properties.holes||[]):new T.BoxGeometry(1,1,1);
   const material=new T.MeshLambertMaterial({color:colours[o.type]});
   const m=new T.Mesh(geometry,geometry.groups.length>1?[material,material]:material);
-  m.position.set(o.x,o.y+o.sy/2,o.z);m.rotation.y=o.rotation;m.scale.set(o.sx,o.sy,o.sz);m.castShadow=true;m.receiveShadow=true;m.userData.editorObjectId=o.id;scene.add(m);
+  m.position.set(o.x,o.y+o.sy/2,o.z);m.rotation.y=o.rotation;m.scale.set(o.sx,o.sy,o.sz);m.castShadow=true;m.receiveShadow=true;m.userData.editorObjectId=o.id;if(o.type==='building')styleEditorBuilding(m,o);scene.add(m);
  }
 }

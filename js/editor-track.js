@@ -146,11 +146,11 @@ export function inspectTrack(track) {
  for(const o of track.objects){
   if(Math.max(o.sx,o.sy,o.sz)>2000)throw Error('Object dimensions exceed 2 km');
   for(const ring of [o.properties.footprint,...(o.properties.holes||[])].filter(Boolean)){
-   if(!Array.isArray(ring)||ring.length<3||ring.length>5000||!ring.every(p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&Math.abs(p.x)<=30000&&Math.abs(p.z)<=30000))throw Error('Invalid building footprint');
+   if(!Array.isArray(ring)||ring.length<3||ring.length>5000||!ring.every(p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&Math.abs(p.x)<=50000&&Math.abs(p.z)<=50000))throw Error('Invalid building footprint');
   }
  }
  const n=track.network;
- if(n.nodes.some(v=>Math.abs(v)>300000) || n.edges.some(e=>e[3].some(v=>Math.abs(v)>300000))) throw Error('Local map coordinates must be within 30 km of origin');
+ if(n.nodes.some(v=>Math.abs(v)>500000) || n.edges.some(e=>e[3].some(v=>Math.abs(v)>500000))) throw Error('Local map coordinates must be within 50 km of origin');
  let segments=0;
  for(const edge of n.edges){for(let i=2;i<edge[3].length;i+=2){segments++;if(Math.hypot(edge[3][i]-edge[3][i-2],edge[3][i+1]-edge[3][i-1])>20000)throw Error('Road segments must be shorter than 2 km');}}
  if(segments>60000)throw Error('Too many road geometry segments');

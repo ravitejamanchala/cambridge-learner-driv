@@ -1,3 +1,4 @@
+import {ribbon,dash,roadBoundsVisible} from './road-ribbon.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
@@ -17,19 +18,6 @@ class Acc {
     const m = new T.Mesh(g, mat); m.renderOrder = order || 0; m.frustumCulled = false; return m;
   }
 }
-// ribbon along an edge polyline, offsets o1..o2 from centreline (left positive)
-function ribbon(acc, e, o1, o2, y, s0 = 0, s1 = e.len) {
-  const pts = [];
-  for (let i = 0; i < e.n; i++) if (e.cum[i] > s0 && e.cum[i] < s1) pts.push(i);
-  const P = [posAt(e, s0)]; for (const i of pts) { const a = posAt(e, e.cum[i] - 0.01), b = posAt(e, e.cum[i] + 0.01); P.push({ x: e.px[i], z: e.pz[i], tx: (a.tx + b.tx) / 2, tz: (a.tz + b.tz) / 2 }); }
-  P.push(posAt(e, s1));
-  for (let i = 0; i < P.length - 1; i++) {
-    const p = P[i], q = P[i + 1];
-    const pl = Math.hypot(p.tx, p.tz) || 1, ql = Math.hypot(q.tx, q.tz) || 1;
-    const pnx = p.tz / pl, pnz = -p.tx / pl, qnx = q.tz / ql, qnz = -q.tx / ql;
-    acc.quad(p.x + pnx * o1, p.z + pnz * o1, p.x + pnx * o2, p.z + pnz * o2, q.x + qnx * o2, q.z + qnz * o2, q.x + qnx * o1, q.z + qnz * o1, y);
-  }
-}
 function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, side: T.DoubleSide }); m.depthWrite = false; return m; }
 
 export function buildWorld(scene, net, traffic, options = {}) {
@@ -44,7 +32,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   const SUN_OFF = new T.Vector3(-150, 230, 110);
   function updateSun(x, z) { const sx = Math.round(x / 4) * 4, sz = Math.round(z / 4) * 4; sun.target.position.set(sx, 0, sz); sun.position.set(sx + SUN_OFF.x, SUN_OFF.y, sz + SUN_OFF.z); }
   const groundMat = new T.MeshLambertMaterial({ color: W.ground }); groundMat.depthWrite = false;
-  const ground = new T.Mesh(new T.PlaneGeometry(30000, 30000), groundMat);
+  const ground = new T.Mesh(new T.PlaneGeometry(120000, 120000), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.renderOrder = -1; ground.receiveShadow = true; scene.add(ground);
 
   // road surfaces, split into chunks so only nearby roads are drawn
@@ -61,7 +49,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
       const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
-    if (!wy.rb && e.len > 16) {
+    if (!wy.rb && e.len > 16 && w >= 5.5) {
       // lane dividers within each direction: dashed, then long solid-looking dashes on the last 30 m before a junction
       for (const dir of wy.oneway ? [1] : [1, -1]) {
         const L = laneInfo(e, dir);
@@ -129,6 +117,8 @@ export function buildWorld(scene, net, traffic, options = {}) {
     for (const [acc, mat, ord] of [[A.pave, pm, 1], [A.road, rm, 2], [A.cyc, cm, 3], [A.white, wm, 4]]) {
       if (!acc.idx.length) continue; const m = acc.mesh(mat, ord); m.frustumCulled = true; m.receiveShadow = true; A.meshes.push(m); scene.add(m);
     }
+    A.bounds = new T.Box3();
+    for(const m of A.meshes){m.geometry.computeBoundingBox();A.bounds.union(m.geometry.boundingBox);}
     A.cx = Math.floor(key / 8192) - 4000; A.cz = (key % 8192) - 4000; A.pave = A.road = A.cyc = A.white = null;
   }
   // bike symbols painted in cycle lanes
@@ -237,7 +227,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
       g.visible = Math.hypot((cx + 0.5) * C - px, (cz + 0.5) * C - pz) < WORLD.hideRadius;
     }
     for (const A of roadChunks.values()) {
-      const vis = Math.hypot((A.cx + 0.5) * C - px, (A.cz + 0.5) * C - pz) < WORLD.hideRadius + 200;
+      const vis = roadBoundsVisible(A.bounds,px,pz,WORLD.hideRadius+200);
       for (const m of A.meshes) m.visible = vis;
     }
   }
@@ -259,12 +249,6 @@ export function buildWorld(scene, net, traffic, options = {}) {
   return { updateChunks, updateSignals, updateSun, setShadows, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
 }
 
-function dash(acc, e, s, len, off, y) {
-  const a = posAt(e, s), b = posAt(e, Math.min(e.len, s + len));
-  const ax = a.x + a.tz * off, az = a.z - a.tx * off, bx = b.x + b.tz * off, bz = b.z - b.tx * off;
-  const nx = a.tz * 0.07, nz = -a.tx * 0.07;
-  acc.quad(ax + nx, az + nz, ax - nx, az - nz, bx - nx, bz - nz, bx + nx, bz + nz, y);
-}
 function bikeTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   g.strokeStyle = '#f2f2ec'; g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round';

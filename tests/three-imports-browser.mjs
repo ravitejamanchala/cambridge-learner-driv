@@ -23,7 +23,8 @@ try{
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download JSON'}).click();const file=await download;assert.deepEqual(JSON.parse(await fs.readFile(await file.path(),'utf8')),track);assert.ok(file.suggestedFilename().includes(ids[i].slice(0,8)));
   await page.locator('#mockDetail [data-start]').click();await page.waitForFunction(()=>document.body.dataset.mode==='drive');
   const world=await page.evaluate(()=>{const a=window.cambridgeDrive;return {x:a.player.x,z:a.player.z,firstX:a.net.nx[0],length:a.test.route.len,buildings:a.camera.parent.children.filter(o=>o.userData.editorObjectId).length,area:a.area};});
-  assert.equal(world.x,track.spawn.x);assert.equal(world.z,track.spawn.z);assert.equal(world.firstX,i*500);assert.equal(Math.round(world.length),60+i*40);assert.equal(world.buildings,i+1);assert.equal(world.area,'local:'+ids[i]);
+  assert.equal(world.x,track.spawn.x);assert.equal(world.z,track.spawn.z);assert.equal(world.firstX,i*500);assert.equal(Math.round(world.length),60+i*40);assert.equal(world.buildings,i+1);
+  assert.ok(await page.evaluate(()=>cambridgeDrive.camera.parent.children.filter(o=>o.userData.editorObjectId).every(o=>o.material[1]?.map?.isCanvasTexture)), 'authored buildings use simulator window facades');assert.equal(world.area,'local:'+ids[i]);
   await fs.mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/import-world-'+i+'.png'});
   await page.goto(url,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
  }
