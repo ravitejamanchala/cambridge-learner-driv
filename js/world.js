@@ -1,4 +1,3 @@
-import {longitudinalPattern,paintIntervals,transverseMarkings} from './uk-road-markings.js';
 import {ribbon,dash,roadBoundsVisible} from './road-ribbon.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
@@ -47,18 +46,23 @@ export function buildWorld(scene, net, traffic, options = {}) {
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
     ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
     ribbon(road, e, -w / 2, w / 2, 0.04);
-    const lanePattern=longitudinalPattern('lane',wy.mph),centrePattern=longitudinalPattern('centre',wy.mph);
-    const setback=Math.max(9,w/2+2);
-    if(wy.rb && wy.lanes>=2){
-      const L=laneInfo(e,1);
-      for(let k=1;k<L.n;k++)for(const [at,len]of paintIntervals(e.len,lanePattern,2))dash(white,e,at,len,L.outer-L.laneW*k,.07,lanePattern.width);
+    if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
+      const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
-    if(!wy.rb && e.len>16 && w>=5.5){
-      for(const dir of wy.oneway?[1]:[1,-1]){
-        const L=laneInfo(e,dir);
-        for(let k=1;k<L.n;k++)for(const [at,len]of paintIntervals(e.len,lanePattern,setback))dash(white,e,at,len,(L.outer-L.laneW*k)*dir,.07,lanePattern.width);
+    if (!wy.rb && e.len > 16 && w >= 5.5) {
+      // lane dividers within each direction: dashed, then long solid-looking dashes on the last 30 m before a junction
+      for (const dir of wy.oneway ? [1] : [1, -1]) {
+        const L = laneInfo(e, dir);
+        for (let k = 1; k < L.n; k++) {
+          const o = (L.outer - L.laneW * k) * dir;
+          for (let s = 8; s < e.len - 8; s += 9) {
+            const toEnd = dir > 0 ? e.len - s : s; // distance to the junction you are driving towards
+            dash(white, e, s, toEnd < 38 ? 7 : 3, o, 0.07);
+          }
+        }
       }
-      if(!wy.oneway && wy.lanes>=2)for(const [at,len]of paintIntervals(e.len,centrePattern,setback))dash(white,e,at,len,0,.07,centrePattern.width);
+      // centre line on two-way main roads, kept clear of junctions
+      if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2)) for (let s = 9; s < e.len - 9; s += 9) dash(white, e, s, 3.2, 0, 0.07);
     }
     // cycle lanes: red surface, solid edge line if mandatory, long dashes if advisory, bike symbols
     for (const [code, side] of [[wy.cl, 1], [wy.cr, -1]]) {
@@ -72,8 +76,11 @@ export function buildWorld(scene, net, traffic, options = {}) {
   }
   // rounded kerbs at junction corners (see net.js junctionFillets)
   for (const f of net.fillets) { const road = accFor(f.C[0], f.C[1]).road; for (let k = 0; k < f.pts.length - 1; k++) road.quad(f.C[0], f.C[1], f.pts[k][0], f.pts[k][1], f.pts[k + 1][0], f.pts[k + 1][1], f.pts[k + 1][0], f.pts[k + 1][1], 0.04); }
-  for(const st of net.stops)for(const p of transverseMarkings({...st,signal:true}))bar(accFor(st.x,st.z).white,st,p.from,p.to,p.width,p.back);
-  for(const g of net.giveways)for(const p of transverseMarkings(g))bar(accFor(g.x,g.z).white,g,p.from,p.to,p.width,p.back);
+  for (const st of net.stops) bar(accFor(st.x, st.z).white, st, st.e.way.oneway ? -st.w / 2 + 0.3 : 0.2, st.w / 2 - 0.3, 0.35);
+  for (const g of net.giveways) {
+    const white = accFor(g.x, g.z).white;
+    for (const back of [0, 0.7]) for (let o = 0.3; o < g.w / 2 - 0.3; o += 1) bar(white, g, o, Math.min(o + 0.55, g.w / 2 - 0.3), 0.25, back);
+  }
   for (const z of net.zebras) {
     const white = accFor(z.x, z.z).white;
     for (let o = -z.w / 2 + 0.3; o < z.w / 2 - 0.3; o += 1) {
