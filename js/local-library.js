@@ -1,3 +1,4 @@
+import {clearRoadBuildings} from './editor-road-clearance.js';
 import {prepareEditorTrack} from './editor-routing.js';
 import {browserEntries,saveBrowserTrack} from './browser-track-store.js';
 export const localAuthoring = () => ['localhost','127.0.0.1','[::1]'].includes(location.hostname) && window.LEARNER_CONFIG?.LOCAL_AUTHORING === true;
@@ -11,8 +12,8 @@ export async function loadLocalLibrary(index,routes) {
  const tracks=new Map(); if(!authoringEnabled()) return tracks;
  for(const entry of await entries()) {
   const id='local:'+entry.id;
-  const prepared=prepareEditorTrack(entry.track);
-  tracks.set(id,{...entry.track,network:prepared.network,plan:{...entry.track.plan,waypoints:prepared.waypoints}});
+  const clean=clearRoadBuildings(entry.track),prepared=prepareEditorTrack(clean);
+  tracks.set(id,{...clean,network:prepared.network,plan:{...entry.track.plan,waypoints:prepared.waypoints}});
   index.areas.push({id,file:''}); index.plans['route:'+id]={...entry.meta,area:id};
   routes.push({id,name:entry.track.title+' · local '+entry.id.slice(0,8),blurb:'Local editor revision '+entry.id+'. '+(entry.track.attribution||''),waypoints:prepared.waypoints,localNodes:prepared.nodes});
  }
@@ -34,7 +35,7 @@ export function mountLocalLibrary({onSelect,selectedRoute}={}){
   const entry=library.find(e=>'local:'+e.id===id);
   currentId=entry?.id||null;select.value=currentId||'';textarea.value=entry?JSON.stringify(entry.track,null,2):'';
   textarea.disabled=save.disabled=downloadButton.disabled=!entry;
-  if(entry){const track=entry.track,first=track.plan.waypoints[0],last=track.plan.waypoints.at(-1);summary.textContent=track.title+' · revision '+entry.id.slice(0,8)+' · '+track.network.edges.length+' road segments · '+track.objects.filter(o=>o.type==='building').length+' buildings · start '+first.x.toFixed(1)+', '+first.z.toFixed(1)+' → finish '+last.x.toFixed(1)+', '+last.z.toFixed(1)+' · spawn '+track.spawn.x.toFixed(1)+', '+track.spawn.z.toFixed(1);}
+  if(entry){const track=entry.track,clean=clearRoadBuildings(track),first=track.plan.waypoints[0],last=track.plan.waypoints.at(-1);summary.textContent=track.title+' · revision '+entry.id.slice(0,8)+' · '+track.network.edges.length+' road segments · '+clean.objects.filter(o=>o.type==='building').length+' buildings'+(clean.buildingClearance.excluded.length?' · '+clean.buildingClearance.excluded.length+' road overlaps excluded':'')+' · start '+first.x.toFixed(1)+', '+first.z.toFixed(1)+' → finish '+last.x.toFixed(1)+', '+last.z.toFixed(1)+' · spawn '+track.spawn.x.toFixed(1)+', '+track.spawn.z.toFixed(1);}
   else summary.textContent='Select an imported route to edit or download its JSON. Built-in mock tests use their own maps.';
  }
  textarea.disabled=save.disabled=downloadButton.disabled=true;

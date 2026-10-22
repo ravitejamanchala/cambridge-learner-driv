@@ -105,7 +105,7 @@ async function boot() {
       const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
       const net = buildNet(d.network || d);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic, {authored: d.sceneryMode === "authored"});
+      const world = buildWorld(scene, net, traffic, {authored: !!d.network || d.sceneryMode === "authored"});
       if(d.network) addEditorObjects(T,scene,d);
       world.setShadows(shadowsOn);
       const test = createTest(net, traffic, player);
