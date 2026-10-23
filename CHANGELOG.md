@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased: map corrections, steering wheel, head angles and a mirror in the chase view
+
+- **The Cambridge map is corrected from street-level imagery.** A review of 568 Mapillary features in
+  the road inspector, applied to `data/cambridge.json` and kept in
+  [data/corrections](data/corrections/) as the provenance of the map:
+  - **244 roads have their corners rounded off.** The overrides only add intermediate points — every
+    polyline keeps its endpoints, and the centre line moves by at most 6 cm — so every mock-test route
+    came out the same length with the same examiner instructions afterwards.
+  - **21 zebra crossings and 17 stop lines** that the map did not have. The other 47 markings in the
+    file were already on the map within 12 m and were dropped: a second zebra beside an existing one
+    would have the examiner mark a learner twice for one crossing.
+  - **483 surveyed street lamps**, used in place of the lamp posts the city builder spaces out along
+    main roads. A spaced-out pole within 16 m of a surveyed one is dropped rather than standing next
+    to it, and each surveyed pole turns to face the road it stands beside.
+  - **Lamp posts stood in the road, and their heads were placed from a point that does not exist.**
+    `nearest()` reports how far off the centre line you are, not the point on it, so reading `nr.x`
+    gave `NaN` and every surveyed lamp head got a nonsense transform. The point is now reconstructed
+    from the offset, and a lamp the survey put inside the carriageway is stepped out to the kerb —
+    the same 0.9 m stand-off the spaced-out poles use. 65 of 986 needed moving; none now stands
+    closer than 0.90 m to a carriageway edge.
+- **Roads had unmarked stretches.** A road is cut into one edge per junction, and the centre line and
+  lane dividers kept a fixed 9 m clear of each end — so any edge shorter than 18 m got no markings at
+  all, and the road looked bare between two marked stretches. A 12 m length of Hills Road and a 17 m
+  length of The Fen Causeway were among them. The clearance now scales with the edge, which takes the
+  unmarked total on the mock-test maps from 2,274 m to 98 m, all of it stubs under 5 m where a centre
+  line would be wrong anyway.
+  - The one road-attribute correction in the file (Milton Road's width and lane count) was already
+    what the map said, so nothing changed there.
+
 ## Unreleased: sign-in gate, blue light vehicles, hold-to-look and parallel parking
 - **Sign in before driving.** Where the build is configured with an account service, the lobby, lessons, puzzles and mock tests all stay locked until the learner signs in, and the sign-in sheet says so. A build with no account service configured (local development, the demo build) still runs as a guest on the device, so those builds are not left unusable.
   - Signing out now drops verified paid access with the session, instead of leaving it behind until the next API call.
@@ -21,10 +50,37 @@
 - **Parking is one control.** Tap once to release the parking brake, hold the back arrow to reverse, tap once to park. The P/R/N/D selector and the cockpit drill are gone from the manoeuvre, and the control is a small button in the corner rather than a panel across the view.
   - Parking no longer forces the overhead view on the learner.
   - Parking bays are marked with broken white lines, as on a UK road.
+- **A steering wheel you can see working.** The cockpit had a thin ring with one bar across it, which
+  gave no sense of rotation at all — a bar at 180° looks exactly like a bar at 0°. It is now a rim, a
+  centre hub and three spokes on a tilted column, turning with the driver's input (2.3 rad at full
+  lock, not the real 450°, which spins out of sight when full lock is one key press away).
+- **The cockpit reads as a car.** A dashboard that closes off the bottom of the view instead of
+  letting you see the road underneath it, a windscreen header, slimmer A-pillars at the edges of the
+  glass, an instrument binnacle behind the wheel, and a roof rail and door waist down each side — so
+  the wing mirrors are mounted on something rather than floating in mid-air.
+- **How far the head turns now matches what the check is.** A glance in a door mirror swings about
+  **45°** (it was 106°); holding the same key until it becomes a blind-spot check opens out to about
+  **95°**, over the shoulder; `B` is the interior mirror, so it barely moves the head (15°, down from
+  100°). The chase view uses 0.8 of those, because the car is in shot as well. `npm run test:drive`
+  measures all three.
+- **The rear-view mirror is in the chase view as well**, as a panel under the instruction box. It is
+  the same camera and the same render target as the glass on the windscreen, so it costs no extra draw.
+- **The blue lights are the police car's own.** The model carries a light bar with a `BlueLights`
+  material on the lenses; that is what flashes now, rather than a second bar bolted over the top. The
+  lenses pulse together and an additive halo alternates end to end, so something is lit at every
+  moment — the old pattern left the bar dark half the time, which is why it was easy to miss in a
+  mirror. The halo keeps a floor on its size, so the light still registers far down the road.
+- **Mobile.** Anything drawn into the 3D view is now placed from the interface's own measurements
+  rather than a guessed share of the screen: a fixed fraction put the rear-view panel straight through
+  the speedometer on a phone held sideways. The rear-view mirror in the cockpit is also drawn in
+  towards the middle on an upright phone, where it used to sit off the left edge entirely — and that
+  is the mirror the whole blue-light exercise depends on. `npm run test:drive` checks both at
+  1280×720, 390×844 and 844×390.
 - **Coaching, for learners who want it** (Settings → Coaching, off by default). A quiet drive stays what everyone gets: the lesson card before Start, readings on the instruments, detail in the feedback. Switched on, a line appears above the Highway Code tip with the lesson's own brief for the first eight seconds, then whatever the exercise is reporting as it goes — including named stages for the parallel park ("pull up alongside the front one", "reverse into the space"). It lives in the column that already carries the tip card, so it is laid out with that column and can never land on an instrument; measured at 2–5% of the view at 390, 820 and 1280 px.
 - **Less to read while driving, more afterwards.** The lesson card carries the instructions before Start; the drive shows a short stage label and nothing else unless something has gone wrong; the result sheet now carries a measured account of the run — how long, how far, each stage with the distance travelled, contacts, final position and angle, observations and every fault.
 - **Looking round no longer swings the car.** The cockpit is attached to the camera, so turning the driver's head used to carry the bonnet and dashboard round with it and look like steering. The cockpit now stays with the car.
 - Contact with a parked car is logged once per object rather than once per frame: a car pushed back from an obstacle can sit a few centimetres clear, which used to read as a fresh impact every frame.
+- Docs: screenshots of a commercial UK driving simulator in [docs/development/reference](docs/development/reference/), kept as the bar to clear, with a section in the interface guidelines on what we took from it and where we deliberately differ.
 - Docs: [interface guidelines](docs/development/ui-guidelines.md) for anything the learner sees while driving, and [screenshots](docs/screenshots.md) of every case, generated by `node tools/screenshots.mjs`.
 - Checks: `npm run test:bots` drives every lesson, puzzle or mock test with the Bot lab's own driver and reports how each one ended. `lesson:rb-big` stalls on the two-lane roundabout; that predates these changes and is listed as a known stall rather than hidden.
 - **Getting started has no overlays at all.** The three-button mirror card is gone, and so is the running commentary in the mirrors, controlled-stop and acceleration lessons. The state now goes on the instruments the car already has: three ticks that fill as each check is recorded, a target band under the speedometer, and the stop countdown in the distance field.

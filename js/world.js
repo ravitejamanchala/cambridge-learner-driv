@@ -61,20 +61,27 @@ export function buildWorld(scene, net, traffic) {
     if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
       const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
-    if (!wy.rb && e.len > 16) {
+    if (!wy.rb && e.len > 5) {
+      // How far the markings stay clear of the junction at each end. A road is cut into an edge per
+      // junction, so a fixed clearance left every short edge bare: a stretch of Hills Road 12 m long
+      // got no centre line at all, and the road looked unmarked between two marked stretches.
+      const clear = (want) => Math.min(want, e.len * 0.28);
       // lane dividers within each direction: dashed, then long solid-looking dashes on the last 30 m before a junction
       for (const dir of wy.oneway ? [1] : [1, -1]) {
-        const L = laneInfo(e, dir);
+        const L = laneInfo(e, dir), c = clear(8);
         for (let k = 1; k < L.n; k++) {
           const o = (L.outer - L.laneW * k) * dir;
-          for (let s = 8; s < e.len - 8; s += 9) {
+          for (let s = c; s + 1.2 < e.len - c; s += 9) {
             const toEnd = dir > 0 ? e.len - s : s; // distance to the junction you are driving towards
-            dash(white, e, s, toEnd < 38 ? 7 : 3, o, 0.07);
+            dash(white, e, s, Math.min(toEnd < 38 ? 7 : 3, e.len - c - s), o, 0.07);
           }
         }
       }
       // centre line on two-way main roads, kept clear of junctions
-      if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2)) for (let s = 9; s < e.len - 9; s += 9) dash(white, e, s, 3.2, 0, 0.07);
+      if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2)) {
+        const c = clear(9);
+        for (let s = c; s + 1.2 < e.len - c; s += 9) dash(white, e, s, Math.min(3.2, e.len - c - s), 0, 0.07);
+      }
     }
     // cycle lanes: red surface, solid edge line if mandatory, long dashes if advisory, bike symbols
     for (const [code, side] of [[wy.cl, 1], [wy.cr, -1]]) {

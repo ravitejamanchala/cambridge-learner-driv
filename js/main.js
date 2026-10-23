@@ -246,6 +246,10 @@ async function boot() {
   // A glance in the mirror and a look over the shoulder are the same movement, held for longer:
   // a tap records the mirror, keeping it held records the blind spot behind it.
   const BLIND_SPOT_HOLD = 0.55;
+  // How far the head turns, in radians. A door mirror is a glance of about 45 degrees; the blind spot
+  // behind it is a real look over the shoulder, so it goes much further. The interior mirror is
+  // almost straight ahead, so B barely moves the head at all.
+  const LOOK = { mirror: 0.79, shoulder: 1.66, interior: 0.26 };
   const heldSince = { left: 0, right: 0 }, shoulder = { left: false, right: false };
   function holdLook(side, down) {
     if (down) {
@@ -253,6 +257,15 @@ async function boot() {
       lookHold[side] = 1; heldSince[side] = A.traffic ? A.traffic.clock : 0; shoulder[side] = false;
       look(side === 'left' ? 'left' : 'right');
     } else { lookHold[side] = 0; shoulder[side] = false; }
+  }
+  // How far the head is turned right now: the mirror angle, opening out to the shoulder angle once the
+  // hold has become a blind-spot check. Eased, so the view does not snap round the moment it registers.
+  let swing = LOOK.mirror;
+  const lookSwing = () => swing;
+  function updateLookSwing(dt) {
+    const side = lookHold.right ? 'right' : lookHold.left ? 'left' : null;
+    const want = side && shoulder[side] ? LOOK.shoulder : LOOK.mirror;
+    swing += (want - swing) * (1 - Math.exp(-dt * 6));
   }
   // called every frame: once the look has been held long enough it becomes a blind-spot check
   function updateHeldLooks() {
@@ -337,7 +350,7 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); } };
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; } };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
@@ -452,13 +465,49 @@ async function boot() {
   const cockpit = new T.Group(); scene.add(camera); camera.add(cockpit); cockpit.visible = false;
   const dashM = new T.MeshLambertMaterial({ color: 0x1d2124 }), trimM = new T.MeshLambertMaterial({ color: 0x2b3135 });
   const bonnetM = new T.MeshLambertMaterial({ color: 0x1d6a46 });
-  const bonnet = new T.Mesh(new T.BoxGeometry(1.9, 0.06, 1.7), bonnetM); bonnet.position.set(-CAR.seat.x, -0.66, -1.95); bonnet.rotation.x = 0.06; cockpit.add(bonnet);
-  const dash = new T.Mesh(new T.BoxGeometry(2.3, 0.26, 0.55), dashM); dash.position.set(-CAR.seat.x, -0.52, -0.92); cockpit.add(dash);
-  const binn = new T.Mesh(new T.BoxGeometry(0.42, 0.12, 0.2), trimM); binn.position.set(0, -0.36, -0.78); cockpit.add(binn);
-  const wheel = new T.Mesh(new T.TorusGeometry(0.19, 0.024, 8, 28), trimM); wheel.position.set(0, -0.44, -0.56); wheel.rotation.x = -0.35; cockpit.add(wheel);
-  const spoke = new T.Mesh(new T.BoxGeometry(0.36, 0.035, 0.02), trimM); wheel.add(spoke);
-  const pillars = [-1, 1].map(sx => { const pil = new T.Mesh(new T.BoxGeometry(0.022, 1.0, 0.022), dashM); pil.position.set(-CAR.seat.x + sx * 0.95, 0.12, -1.15); pil.rotation.z = -sx * 0.32; pil.rotation.x = -0.5; cockpit.add(pil); return pil; });
-  mirrors.mount(cockpit, CAR.seat.x);
+  // Parts that run the width of the car. They are placed on the car's centre line rather than the
+  // driver's, and widen together when a wider car is selected.
+  const spanning = [];
+  const across = (mesh) => { spanning.push(mesh); cockpit.add(mesh); return mesh; };
+  const bonnet = across(new T.Mesh(new T.BoxGeometry(1.9, 0.06, 1.7), bonnetM)); bonnet.position.set(-CAR.seat.x, -0.66, -1.95); bonnet.rotation.x = 0.06;
+  // The dashboard: a top roll running across under the windscreen, and a face below it that closes off
+  // the bottom of the view. Without the face you looked under the dash and out at the road beneath.
+  const dash = across(new T.Mesh(new T.BoxGeometry(2.3, 0.22, 0.72), dashM)); dash.position.set(-CAR.seat.x, -0.56, -1.02);
+  const dashFace = across(new T.Mesh(new T.BoxGeometry(2.3, 0.75, 0.42), trimM)); dashFace.position.set(-CAR.seat.x, -1.02, -0.80);
+  // Windscreen header: the top of the frame, so the glass has an edge and the mirror has something
+  // to hang from.
+  const header = across(new T.Mesh(new T.BoxGeometry(2.3, 0.10, 0.62), dashM)); header.position.set(-CAR.seat.x, 0.63, -0.95);
+  const roof = across(new T.Mesh(new T.BoxGeometry(2.3, 0.05, 1.1), trimM)); roof.position.set(-CAR.seat.x, 0.66, -0.2);
+  // The instrument binnacle sits behind the wheel, on the driver's own centre line.
+  const binn = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.22, 22, 1, true), trimM);
+  binn.rotation.x = Math.PI / 2 - 0.35; binn.position.set(0, -0.33, -0.82); cockpit.add(binn);
+  // The steering wheel: a rim, a centre hub and three spokes, tilted on its column. It is spun about
+  // its own axis by the driver's input, so what the hands are doing is visible — a single bar gave no
+  // sense of rotation at all, because a bar at 180 degrees looks exactly like a bar at 0.
+  const rimM = new T.MeshLambertMaterial({ color: 0x191d20 });
+  const wheel = new T.Group(); wheel.position.set(0, -0.33, -0.68); wheel.rotation.x = -0.35; cockpit.add(wheel);
+  wheel.add(new T.Mesh(new T.TorusGeometry(0.23, 0.032, 10, 40), rimM));
+  const wheelHub = new T.Mesh(new T.CylinderGeometry(0.062, 0.062, 0.036, 18), trimM); wheelHub.rotation.x = Math.PI / 2; wheel.add(wheelHub);
+  for (const a of [Math.PI, 0, -Math.PI / 2]) { // three spokes: left, right and down, as on most cars
+    const sp = new T.Mesh(new T.BoxGeometry(0.17, 0.034, 0.02), trimM);
+    sp.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0); sp.rotation.z = a; wheel.add(sp);
+  }
+  // How far the rim turns at full lock. Not the real 450 degrees: that spins out of sight on a
+  // keyboard, where full lock is one key press away.
+  const WHEEL_LOCK = 2.3;
+  // A-pillars at the edges of the windscreen, and a door top under each wing mirror so the mirror is
+  // mounted on something rather than hanging in mid-air.
+  const pillars = [-1, 1].map(sx => { const pil = new T.Mesh(new T.BoxGeometry(0.06, 1.3, 0.07), dashM); pil.position.set(-CAR.seat.x + sx * 0.99, 0.2, -1.22); pil.rotation.z = -sx * 0.28; pil.rotation.x = -0.4; cockpit.add(pil); return pil; });
+  // Each side gets a roof rail and a door waist, with the side window as the gap between them. That
+  // gap is what the wing mirror is seen through, and it is what makes the windscreen read as glass in
+  // a frame rather than the view simply running off the edge of the screen.
+  const doors = [];
+  for (const sx of [-1, 1]) {
+    const rail = new T.Mesh(new T.BoxGeometry(0.1, 0.09, 1.9), dashM); rail.position.set(-CAR.seat.x + sx * 1.02, 0.5, -0.1);
+    const waist = new T.Mesh(new T.BoxGeometry(0.12, 0.85, 1.9), trimM); waist.position.set(-CAR.seat.x + sx * 1.02, -0.62, -0.1);
+    cockpit.add(rail, waist); doors.push(rail, waist);
+  }
+  mirrors.mount(cockpit, CAR.seat.x); mirrors.mountChase(camera);
   // Fit the driver's seat to the car that is actually selected: its colour over the bonnet, its width,
   // how high the bonnet sits ahead of you, and an eye line that is higher in a tall car than a low one.
   // The hand-built cockpit is an impression of a car rather than a model of one, and the proportions
@@ -470,12 +519,11 @@ async function boot() {
     const m = carMetrics(model); if (!m) return;
     bonnetM.color.setHex(m.colour);
     const width = Math.max(1.5, Math.min(2.2, m.width));
-    bonnet.scale.x = width / REFERENCE.width;
-    dash.scale.x = width / REFERENCE.width;
     seat.x = CAR.seat.x * (width / REFERENCE.width);
     seat.y = CAR.seat.y + Math.max(-0.12, Math.min(0.2, (m.height - REFERENCE.height) * 0.5));
-    bonnet.position.x = dash.position.x = -seat.x;
-    for (const [i, pil] of pillars.entries()) pil.position.x = -seat.x + (i ? 1 : -1) * width * 0.5;
+    for (const part of spanning) { part.scale.x = width / REFERENCE.width; part.position.x = -seat.x; }
+    for (const [i, d] of doors.entries()) d.position.x = -seat.x + (i < 2 ? -1 : 1) * width * 0.54;
+    for (const [i, pil] of pillars.entries()) pil.position.x = -seat.x + (i ? 1 : -1) * width * 0.52;
     mirrors.mount(cockpit, seat.x);
     camInit = false;
   }
@@ -497,25 +545,43 @@ async function boot() {
   let chaseZ = prefs.cz || 1;
   $('camRecentre').addEventListener('click', () => { ov.px = ov.pz = 0; ov.h = 95; showCamRecentre(); });
 
+  // How far down the screen the interface reaches at the top: the instruction box and the right-hand
+  // cluster. Measured from the page rather than assumed, because the controls are a much bigger share
+  // of a phone held sideways than of a desktop window. Re-measured when the window changes shape.
+  // Where the interface already reaches, measured from the page itself: the bottom of the instruction
+  // box, and the inside edges of the map and the speedometer cluster. The rear-view panel is placed
+  // from these, so it follows the controls instead of assuming a share of the screen that only holds
+  // on one shape of window. Measured each frame it is used, because a cached figure goes stale the
+  // moment the window is resized or the phone is turned.
+  function hudChaseBox() {
+    const rect = sel => { const el = document.querySelector(sel); if (!el || el.hidden) return null;
+      const r = el.getBoundingClientRect(); return r.width ? r : null; };
+    const centre = rect('#hudNextBox'); if (!centre) return null;
+    const left = rect('.hud-map'), right = rect('.hud-right');
+    return { below: centre.bottom, left: left ? left.right : 0, right: right ? right.left : window.innerWidth,
+      viewW: window.innerWidth, viewH: window.innerHeight };
+  }
+
   // ---------- camera ----------
   const camPos = new T.Vector3(), camLook = new T.Vector3(); let farMode = -2, orbit = 0, lookBlend = 0;
   function updateCamera(dt) {
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th), rx = -fz, rz = fx; let px, py, pz, lx, ly, lz, k = 1 - Math.exp(-dt * 4.2);
     const lobby = document.body.dataset.mode === 'lobby';
     if (lookAnim > 0) lookAnim = Math.max(0, lookAnim - dt / 1.1);
+    updateLookSwing(dt);
     const lookTarget = (lookHold.right ? 1 : 0) - (lookHold.left ? 1 : 0);
     lookBlend += (lookTarget - lookBlend) * (1 - Math.exp(-dt * 9));
     if (Math.abs(lookBlend - lookTarget) < 0.002) lookBlend = lookTarget;
     if (lobby) { orbit += dt * 0.12; const a = player.th + 2.4 + Math.sin(orbit) * 0.7; px = player.x + Math.sin(a) * 7.2; py = 2.3; pz = player.z + Math.cos(a) * 7.2; lx = player.x; ly = 0.85; lz = player.z; k = 1 - Math.exp(-dt * 3); }
     else if (cam === 0) { const P = camera.aspect < 1, z = chaseZ, b = (P ? 7 : 6.2) * z, h = 1.25 + (P ? 2.4 : 1.4) * z, a = P ? 4 : 6;
       // looking round swings the camera about the car; the car itself is unaffected
-      const ya = lookBlend * 0.95, c = Math.cos(ya), sn = Math.sin(ya), gx = fx * c + rx * sn, gz = fz * c + rz * sn;
+      const ya = lookBlend * lookSwing() * 0.8, c = Math.cos(ya), sn = Math.sin(ya), gx = fx * c + rx * sn, gz = fz * c + rz * sn;
       px = player.x - gx * b; py = h; pz = player.z - gz * b; lx = player.x + gx * a; ly = P ? -1.6 : 1.1; lz = player.z + gz * a; k = 1 - Math.exp(-dt * 7); } // close behind the car, so it fills the view
     else if (cam === 1) {
       const s = seat; px = player.x + rx * s.x + fx * -s.z; py = s.y; pz = player.z + rz * s.x + fz * -s.z;
       // a held look wins over the B glance; both only turn the driver's head, never the car
-      const glance = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * 1.75 : 0;
-      const turn = lookBlend !== 0 ? lookBlend * 1.85 : glance, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
+      const glance = lookAnim > 0 ? Math.sin(Math.PI * (1 - lookAnim)) * LOOK.interior : 0;
+      const turn = lookBlend !== 0 ? lookBlend * lookSwing() : glance, lfx = fx * Math.cos(turn) + rx * Math.sin(turn), lfz = fz * Math.cos(turn) + rz * Math.sin(turn);
       lx = px + lfx * 20; ly = 0.9; lz = pz + lfz * 20; k = 1;
     }
     else { lx = player.x + ov.px; ly = 0; lz = player.z + ov.pz; px = lx; py = ov.h; pz = lz + ov.h * 0.38; k = 1 - Math.exp(-dt * 12); }
@@ -525,7 +591,7 @@ async function boot() {
       scene.fog.near = WORLD.fogNear + extra; scene.fog.far = WORLD.fogFar + extra; camera.far = WORLD.fogFar + 200 + extra; camera.updateProjectionMatrix();
     }
     showCamRecentre();
-    cockpit.visible = cam === 1 && !lobby; player.mesh.visible = cam !== 1 || lobby; wheel.rotation.z = player.steer * 1.8;
+    cockpit.visible = cam === 1 && !lobby; player.mesh.visible = cam !== 1 || lobby; wheel.rotation.z = player.steer * WHEEL_LOCK;
     if (!camInit) { camPos.set(px, py, pz); camLook.set(lx, ly, lz); camInit = true; }
     camPos.lerp(new T.Vector3(px, py, pz), k); camLook.lerp(new T.Vector3(lx, ly, lz), k);
     camera.position.copy(camPos); camera.lookAt(camLook);
@@ -586,7 +652,9 @@ async function boot() {
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
     guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive && !plan?.lesson?.manoeuvre;
     if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }
-    if (drive && cam === 1) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player); guide.group.visible = gv; }
+    mirrors.layoutChase(camera, drive && cam === 0, drive && cam === 0 ? hudChaseBox() : null);
+    if (drive && cam === 1) mirrors.fitView(camera);
+    if (drive && cam < 2) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player, cam === 1 ? 'cockpit' : 'chase'); guide.group.visible = gv; }
     if(drive||botMode)renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }

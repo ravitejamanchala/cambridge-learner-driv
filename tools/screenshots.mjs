@@ -112,6 +112,20 @@ try {
     await setView(page, 'chase');
   }
 
+  if (want('cockpit')) {
+    await page.evaluate(async () => { await window.cambridgeDrive.pick('lesson', 'lane-choice', true); window.cambridgeDrive.frame(0); });
+    await setView(page, 'driver'); await run(page, 3);
+    // enough lock to show the wheel turned, over a short enough moment to stay on the road
+    await page.evaluate(() => { const a = window.cambridgeDrive; window.__st = a.addInput(() => ({ throttle: a.player.v < 7 ? 0.5 : 0, brake: 0, steer: 0.4 })); });
+    await run(page, 1.1); await settle(page);
+    await capture(page, 'cockpit-steering', "The driver's seat: a steering wheel that turns with your hands, the dashboard, the windscreen frame and the mirrors. The paint on the bonnet is the car you chose.");
+    await page.evaluate(() => window.__st());
+    await run(page, 1.5); await settle(page);
+    await capture(page, 'cockpit-straight', 'The same seat running straight, with the rear-view mirror and the right-hand door mirror in use.');
+    await setView(page, 'chase'); await run(page, 1); await settle(page);
+    await capture(page, 'chase-mirror', 'The chase view carries the rear-view mirror too, as a panel under the instruction box.');
+  }
+
   // Coaching is off for every other case here, which is what a learner sees by default.
   if (want('coaching')) {
     const setCoaching = (page, on) => page.evaluate(v => document.querySelector(`#coSeg [data-co="${v}"]`).click(), on ? 1 : 0);
