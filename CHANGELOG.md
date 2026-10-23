@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased: motorways, junction markings and pull-request previews
+
+- **A preview for every pull request.** Each one is deployed to `https://pr-<number>.learner-drive-app.pages.dev/`, with the link posted on the pull request. Previews run as a guest with the whole course open, never touch production, and carry a small "Preview build" label in the lobby. See [deployment](docs/deployment.md#pull-request-previews).
+
 ## Unreleased: map corrections, steering wheel, head angles and a mirror in the chase view
 
 - **The Cambridge map is corrected from street-level imagery.** A review of 568 Mapillary features in

@@ -4,6 +4,9 @@ import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
  setAccess(false);
  const config = window.LEARNER_CONFIG;
+ // Pull-request preview builds (tools/build_demo.mjs --preview) open the whole course to a guest so a
+ // reviewer can reach every lesson. Only a preview build writes this flag; production never does.
+ if (config?.PREVIEW === true) { setAccess(true); return; }
  if (!config?.CLERK_PUBLISHABLE_KEY || !config?.API_BASE_URL) return;
  const base = new URL(config.API_BASE_URL);
  if (base.protocol !== 'https:' && base.hostname !== 'localhost') return;
