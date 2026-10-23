@@ -1,0 +1,77 @@
+name: Preview pull request
+
+# Every pull request gets its own copy of the app on a Cloudflare Pages *branch* deployment:
+#   https://pr-<number>.learner-drive-app.pages.dev
+# Branch deployments never touch production (the project's production branch is main, deployed by
+# deploy.yml). The preview build runs as a guest with the whole course open and no account service,
+# so nothing a reviewer does reaches a learner's account. The link is posted on the pull request and
+# kept up to date on every push.
+#
+# GitHub Pages is not used for previews: the local-mock sandbox publishes there and replaces the
+# whole tree each time, so anything else put there would be wiped.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PAGES_PROJECT: learner-drive-app
+  WRANGLER_SEND_METRICS: 'false'
+  WRANGLER_LOG_PATH: /tmp/wrangler.log
+
+jobs:
+  preview:
+    # Pull requests from forks get no secrets, so only previews for branches in this repository.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: node tools/build_demo.mjs . dist --preview
+
+      - name: Deploy preview to Cloudflare Pages
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUD_FLAIR_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUD_FLAIR_ID }}
+          ALIAS: pr-${{ github.event.pull_request.number }}
+        run: |
+          npx --yes wrangler@4 pages deploy dist --project-name "$PAGES_PROJECT" \
+            --branch "$ALIAS" --commit-hash "${{ github.event.pull_request.head.sha }}" | tee deploy.log
+          echo "url=https://$ALIAS.$PAGES_PROJECT.pages.dev/" >> "$GITHUB_OUTPUT"
+          echo "build=$(grep -Eo 'https://[a-z0-9]+\.'"$PAGES_PROJECT"'\.pages\.dev' deploy.log | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Post the preview link on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.deploy.outputs.url }}
+          BUILD: ${{ steps.deploy.outputs.build }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body="<!-- learner-drive-preview -->
+          **Preview:** $URL
+
+          Commit \`${SHA:0:7}\` · this exact build: ${BUILD:-$URL}
+
+          Runs as a guest with every lesson open. Not production; nothing here reaches a learner's account."
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            -q '.[] | select(.body | startswith("<!-- learner-drive-preview -->")) | .id' | head -1)
+          if [ -n "$id" ]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" >/dev/null; fi

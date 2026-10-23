@@ -26,6 +26,34 @@ Cut-over order (sign-in is unavailable between steps 3 and 5, so do them togethe
 
 The Stripe webhook stays at the Worker URL and needs no change.
 
+## Pull request previews
+
+Every pull request from a branch in this repository is built and deployed by
+`.github/workflows/preview.yml` to its own Cloudflare Pages branch deployment:
+
+    https://pr-<number>.learner-drive-app.pages.dev/
+
+The link is posted as a comment on the pull request and updated on every push. Branch deployments never
+touch production — the project's production branch is `main`, which only `deploy.yml` deploys.
+
+A preview is built with `node tools/build_demo.mjs . dist --preview`. It writes
+`window.LEARNER_CONFIG = {"PREVIEW":true}` instead of the committed account configuration, because the
+production sign-in key is bound to the production domain and would leave a preview stuck at the sign-in
+gate. The preview runs as a guest with the whole course open, syncs nothing, and shows a small
+"Preview build · <commit>" label in the lobby (never while driving). `tests/preview-build.test.mjs`
+checks that a production build never carries the flag or the label.
+
+**Do not publish previews to GitHub Pages.** The local-mock sandbox (`development/local-mock-library`)
+publishes there and replaces the whole tree each time, so anything else put there is wiped.
+
+## Merging a stack of pull requests
+
+When several pull requests build on each other, each is opened against the branch below it, so its diff
+shows only its own change and its preview shows everything up to and including it. Merge from the
+bottom up: once the lowest one is merged into `main`, change the next one's base to `main` (GitHub does
+this automatically if the merged branch is deleted) and merge that. Each merge to `main` is a production
+deploy, so check the preview first.
+
 ## Original GitHub Pages notes
 
 The simulator remains vanilla JavaScript on GitHub Pages. The independent Hono Worker in `server/` uses Clerk session tokens and Neon PostgreSQL through Drizzle and the Neon HTTPS driver. No React/Next.js is introduced. This recovery branch does not deploy either service.

@@ -14,6 +14,10 @@ const assetVersion = sourceCommit || String(Date.now());
 let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8').replace('<script type="module" src="js/main.js"></script>', '<script type="module" src="app.js?v=' + assetVersion + '"></script>');
 html = html.replace('<head>', '<head><meta name="app-release" content="' + assetVersion + '">');
 html = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+// A preview build is for reviewing a pull request on its own Cloudflare branch URL. It must never be
+// mistaken for production, so the lobby carries a small label saying what it is and which commit.
+const preview = process.argv.includes('--preview');
+if (preview) html = html.replace('</body>', '<div class="preview-tag">Preview build · ' + (sourceCommit || 'local').slice(0, 7) + '</div><style>.preview-tag{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:50;padding:4px 10px;border-radius:999px;background:#1d2b3a;color:#ffd166;font:600 11px/1.4 system-ui,sans-serif;letter-spacing:.04em;pointer-events:none}body:not([data-mode=lobby]) .preview-tag{display:none}</style></body>');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 for (const f of fs.readdirSync(path.join(SRC, 'data/areas'))) {
   const d = JSON.parse(fs.readFileSync(path.join(SRC, 'data/areas', f), 'utf8'));
@@ -26,4 +30,9 @@ console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length }));
 
-fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
+// Production copies the committed account configuration. A preview has no account service: the
+// production sign-in key is bound to the production domain and would leave a preview stuck at the
+// sign-in gate. Instead it runs as a guest with the whole course open, so a reviewer can reach every
+// lesson. Nothing is synced, and nothing a preview does reaches a learner's account.
+if (preview) fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG = {"PREVIEW":true};\n');
+else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
