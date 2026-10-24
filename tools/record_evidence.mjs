@@ -215,6 +215,56 @@ GROUPS.exits = {
         if (ctx.dive && !ctx.end && (e == null || e < -330)) { ctx.end = true; await p.evaluate(() => window.cambridgeDrive.test.finish()); } } },
   ],
 };
+GROUPS.evening = {
+  dir: 'docs/evidence/10-evening-motorway',
+  title: 'Evening motorway driving (issue #10)',
+  driverNote: 'The careful drives use the Bot lab\'s reference driver (`js/bots.js`), which switches dipped headlights on before moving off; the careless one uses the scriptable driver from `npm run test:motorway` (`tests/mw-driver.mjs`) and leaves them off.',
+  clips: [
+    { name: '01-joining-at-dusk', driver: 'bot', lesson: { id: 'mw-dusk-join', scenario: 'motorway' }, seconds: 36,
+      caption: 'Joining at dusk from the driver\'s seat: dipped headlights on, the slip road\'s green studs, the lit junction, and the traffic in the left-hand lane read by its headlights in the mirror.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-dusk-join'); await camera(p, 1); } },
+    { name: '02-following-by-brake-lights', driver: 'bot', lesson: { id: 'mw-dusk-following', scenario: 'motorway' }, seconds: 30,
+      caption: 'Following as the traffic slows at dusk: the brake lights ahead give the warning, and the gap stays over two seconds. Chase view, then the driver\'s view.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-dusk-following'); await camera(p, 0); await ffUntil(p, a => a.traffic.clock > 25); },
+      script: (p) => { const toDriver = once(() => camera(p, 1)); return t => at(t, 14, toDriver); } },
+    { name: '03-signs-and-studs-at-the-exit', driver: 'bot', lesson: { id: 'mw-dusk-exit', scenario: 'motorway' }, seconds: 36,
+      caption: 'Leaving at junction 3 at dusk: the ½-mile sign and the countdown markers lit, the green studs where the slip road leaves, red studs along the left edge, and the lighting columns at the junction.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-dusk-exit'); await camera(p, 1); await ffUntil(p, exitIn(900)); } },
+    { name: '04-no-headlights-and-what-it-is-marked-for', driver: 'scripted', seconds: 26,
+      caption: 'The same following lesson driven with the headlights left off: the tail lights and studs still show, but the car is not lit ahead. The result marks it, once, as a driving fault under ancillary controls (Rules 113 and 115).',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-dusk-following'); await camera(p, 0); await ctx.d.set({ gap: 2.6, mph: 70 }); },
+      script: (p) => { const end = once(() => p.evaluate(() => window.cambridgeDrive.test.finish())); return t => at(t, 18, end); } },
+    { name: '05-free-drive-at-dusk', seconds: 18,
+      caption: 'Free drive on the three-lane circuit at dusk, from the chase view: every vehicle\'s lamps, the lit junction, and the studs marking the lanes.',
+      async setup(p) { await startDrive(p, 'free', 'm3-dusk'); await p.evaluate(() => { window.__target = 31; window.cambridgeDrive.player.headlights = true; }); const j = await nextExit(p, 900); await placeOnRoute(p, j.s - 420, 31); await camera(p, 0); } },
+  ],
+  // the same spot by day and at dusk, from the driver's seat, and what each costs to draw
+  async extra(open, dir) {
+    const shots = [], times = [];
+    const spot = async (page, id, lp) => { await startDrive(page, 'lesson', id); await installMwDriver(page).then(d => d.set({ mph: 64, gap: 2.5 }));
+      if (id.includes('dusk')) await page.evaluate(() => { window.cambridgeDrive.player.headlights = true; });
+      await page.evaluate(lp => document.querySelector(`#lpSeg [data-lp="${lp ? 1 : 0}"]`).click(), lp);
+      await camera(page, 1); await ffUntil(page, exitIn(330)); await page.evaluate(() => { for (let i = 0; i < 40; i++) window.cambridgeDrive.frame(0.05); }); await page.waitForTimeout(300); };
+    for (const [id, lp, name] of [['mw-exit', false, 'day'], ['mw-dusk-exit', false, 'dusk'], ['mw-dusk-exit', true, 'dusk-low-power']]) {
+      const page = await open({ width: 1280, height: 720 }); await spot(page, id, lp);
+      await page.screenshot({ path: path.join(dir, `still-${name}.jpg`), type: 'jpeg', quality: 86 }); shots.push(name); await page.close();
+    }
+    // draw time per frame, in this headless software renderer (SwiftShader): a comparison, not a device figure
+    for (const view of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) for (const [id, lp, name] of [['mw-exit', false, 'day'], ['mw-dusk-exit', false, 'dusk'], ['mw-dusk-exit', true, 'dusk, low power']]) {
+      const page = await open(view); await spot(page, id, lp);
+      const ms = await page.evaluate(async () => { const a = window.cambridgeDrive, out = [];
+        for (let k = 0; k < 3; k++) { await new Promise(r => requestAnimationFrame(r)); const t0 = performance.now(); for (let i = 0; i < 30; i++) a.frame(0.05); out.push((performance.now() - t0) / 30); }
+        out.sort((x, y) => x - y); return out[1]; });
+      times.push({ view: `${view.width}×${view.height}`, name, ms: ms.toFixed(1) }); await page.close();
+    }
+    return ['## The same spot by day and at dusk', '',
+      'From the driver\'s seat, 330 m before junction 3 with the headlights on: by day, at dusk, and at dusk on low-power graphics (no shadows, no headlight beam or light pools, the lamps still on).', '',
+      ...shots.map(n => `![${n}](still-${n}.jpg)`), '',
+      '## What it costs to draw', '',
+      'Milliseconds per frame (simulation and drawing, median of three runs of 30 frames) at the same spot. Measured in the headless software renderer these clips are made with, so the numbers compare day, dusk and low power with each other; they are not what a phone or laptop GPU will do, which still needs measuring on real devices.', '',
+      '| Window | Lighting | ms per frame |', '|---|---|---|', ...times.map(t => `| ${t.view} | ${t.name} | ${t.ms} |`), ''];
+  },
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
@@ -224,10 +274,8 @@ try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   fs.mkdirSync(group.dir, { recursive: true });
   const made = [];
-  for (const c of group.clips) {
-    if (process.argv[3] && !c.name.includes(process.argv[3])) continue;
-    // a fresh page per clip, so one clip's state never leaks into the next
-    const page = await browser.newPage({ viewport: VIEW }), errors = [];
+  // a fresh page per clip, so one clip's state never leaks into the next
+  const open = async (viewport = VIEW) => { const page = await browser.newPage({ viewport }), errors = []; page.errors = errors;
     page.on('pageerror', e => errors.push(e.message));
     await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', r => r.fulfill({ path: three + '/build/three.min.js', contentType: 'application/javascript' }));
     await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', r => r.fulfill({ path: three + '/examples/js/loaders/GLTFLoader.js', contentType: 'application/javascript' }));
@@ -236,6 +284,11 @@ try {
     await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv')?.hidden, {}, { timeout: 45000 }); await signedIn(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' });
     await page.waitForTimeout(5000); // let the car models arrive, so nothing on the road is still a box
+    return page; };
+  let extra = [];
+  for (const c of group.clips) {
+    if (process.argv[3] && !c.name.includes(process.argv[3])) continue;
+    const page = await open(), errors = page.errors;
     // the scripted driver is the one tests/motorway-lessons-browser.mjs uses (tests/mw-driver.mjs), so a
     // clip shows exactly the drive the check makes
     const ctx = {};
@@ -245,12 +298,13 @@ try {
     if (errors.length) throw new Error(`${c.name}: ${errors.join('; ')}`);
     await page.close();
   }
+  if (group.extra && (!process.argv[3] || process.argv[3] === 'extra')) extra = await group.extra(open, group.dir);
   if (!process.argv[3]) {
     const lines = [`# ${group.title}`, '', `Recorded with \`node tools/record_evidence.mjs ${process.argv[2]}\` on ${new Date().toISOString().slice(0, 10)}: the real application,`,
       `stepped at ${FPS} frames a second and captured frame by frame, so each clip plays at true speed unless it says otherwise.`,
       group.driverNote || 'The car is driven by the same steady driver the browser checks use.', ''];
     for (const m of made) lines.push(`## ${m.name.replace(/^\d+-/, '').replace(/-/g, ' ').replace(/^./, c => c.toUpperCase())}`, '', m.caption, '',
       `[${m.file}](${m.file}) · ${m.seconds} s${m.speed > 1 ? ` (${m.seconds * m.speed} s of driving at ${m.speed}× speed)` : ''} · ${m.mb} MB`, '');
-    fs.writeFileSync(path.join(group.dir, 'README.md'), lines.join('\n'));
+    fs.writeFileSync(path.join(group.dir, 'README.md'), [...lines, ...extra].join('\n'));
   }
 } finally { await browser?.close(); server.kill(); }

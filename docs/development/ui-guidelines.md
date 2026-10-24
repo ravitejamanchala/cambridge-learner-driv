@@ -217,6 +217,19 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
 - **Instruments for the motorway:** the lane strip by the instruction box shows the lanes that are right
   for you now (amber) and the one you are in (marked underneath); the following lesson shows your gap to
   the car ahead in seconds, because nothing else on screen can tell you that.
+- **At dusk, lighting is all that changes** (issue #10). A lesson or free drive sets `timeOfDay: 'dusk'`
+  in its own data; the road, the traffic's priorities and every assessment rule are the same as by day,
+  and `npm run test:motorway` drives the same careless lesson in both and requires the same faults. What
+  the learner sees changes: a dusk sky and fog that never closes in nearer than 600 m, lamps on every
+  vehicle, road studs (white between lanes, red on the left edge, amber by the central reservation,
+  green across slip roads), lit columns at the junctions, and signs that glow as they would in
+  headlights. Nothing the examiner marks may be hidden by the lighting: if a hazard cannot be seen, it
+  cannot be judged. The one thing assessed is the headlights themselves: driving off without dipped
+  headlights is a single driving fault under ancillary controls (Rules 113 and 115). The lights button
+  shows only at dusk, beside the look buttons, with **H** on a keyboard.
+- **Low-power graphics** (Settings → Graphics) drop shadows, the headlight beam, the light pools and the
+  pixel ratio; the lamps stay, so it is still plain whether the headlights are on. Menus honour
+  `prefers-reduced-motion`, which `npm run test:access` checks.
 - **Navigation names the next junction, not the end of the circuit.** The instruction box counts down
   to `J2 · Ashwell`; the turn beacon stays hidden, because you pass most junctions straight by.
 
@@ -258,8 +271,8 @@ npm run test:cars
 npm run test:access      # needs a server on 127.0.0.1:8000
 npm run test:browser     # the course end to end: prerequisites, control lessons, saved progress
 npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
-npm run test:free        # motorway free drive: both layouts, a 14-minute drive with memory sampled
-npm run test:motorway    # motorway lessons: careless driving marked, repeatably; lane strip and gap reading
+npm run test:free        # motorway free drive: both layouts and dusk, a 14-minute dusk drive with memory sampled
+npm run test:motorway    # motorway lessons: careless driving marked, repeatably; lane strip, gap reading, dusk
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
 npm run evidence -- <group>  # real-time videos of a feature, into docs/evidence/
 ```

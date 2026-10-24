@@ -199,6 +199,46 @@ try {
     console.log('Cutting across the hatching:', r.faults.filter(f => /^S/.test(f)).map(f => f.split(': ').slice(1).join(': ').slice(0, 60)).join(' | '));
   }
 
+  // ---------- at dusk (issue #10): lighting is all that changes ----------
+  {
+    // the same careless drive by day and at dusk, with dipped headlights on: the same faults, fault for fault
+    const tailgate = async (id) => { await start(id); if (id.includes('dusk')) await page.click('#lightsBtn'); await set({ gap: 0.7, mph: 70 }); await untilDone(); return outcome(); };
+    const day = await tailgate('mw-following'), eve = await tailgate('mw-dusk-following');
+    assert.deepEqual(eve.faults, day.faults, 'the same drive was marked differently at dusk');
+    // a careful drive at dusk passes, and the result names the headlights it measured
+    await start('mw-dusk-following'); await page.keyboard.press('KeyH'); await set({ gap: 2.6, mph: 70 }); await untilDone(); const good = await outcome();
+    assert.equal(good.verdict, 'Lesson passed', show(good) + '\n' + good.reasons.join('\n'));
+    assert.ok(good.reasons.some(l => /Dipped headlights on before you moved off/.test(l)), good.reasons.join('\n'));
+    // what the learner sees: lamps on every car, a fog that never hides what is marked, lit signs and studs
+    await start('mw-dusk-exit'); await steps(20); await page.evaluate(() => { for (let i = 0; i < 4; i++) window.cambridgeDrive.frame(0.05); });
+    const seen = await page.evaluate(() => { const a = window.cambridgeDrive, sc = a.camera.parent; let cars = 0, lit = 0, studs = 0, signs = 0, glowing = 0;
+      for (const c of a.traffic.cars) { if (!c.alive || !c.mesh) continue; cars++; const g = c.mesh.getObjectByName('lamps'); if (g && g.visible && g.userData.front.visible) lit++; }
+      sc.traverse(o => { if (o.isInstancedMesh && o.userData.studs) studs += o.visible ? o.count : 0; if (o.userData.motorwaySign) { signs++; o.traverse(m => { if (m.material && m.material.emissive && m.material.emissive.getHex() > 0) glowing++; }); } });
+      return { cars, lit, fogFar: sc.fog.far, studs, signs, glowing, button: !document.querySelector('#lightsBtn').hidden, dusk: document.body.classList.contains('dusk'), headlights: a.player.headlights }; });
+    assert.ok(seen.dusk && seen.button, 'a dusk lesson should show the lights button: ' + JSON.stringify(seen));
+    assert.equal(seen.headlights, false, 'the learner starts with the headlights off: switching them on is the lesson');
+    assert.ok(seen.cars > 0 && seen.lit === seen.cars, `every other vehicle should show its lamps at dusk: ${seen.lit} of ${seen.cars}`);
+    assert.ok(seen.fogFar >= 600, `the dusk fog may not hide the road ahead: far ${seen.fogFar} m`);
+    assert.ok(seen.studs > 100, 'the road studs should show at dusk: ' + seen.studs);
+    assert.ok(seen.glowing > 0, 'the signs should be lit at dusk: ' + JSON.stringify(seen));
+    // driving off with the lights off is a driving fault, marked once, and named in the feedback
+    await set({ mph: 60 }); await steps(400);
+    let f = await page.evaluate(() => window.cambridgeDrive.test.faults.filter(f => /headlights/.test(f.text)).map(f => `${f.kind} ${f.cat}: ${f.text}`));
+    assert.equal(f.length, 1, 'no-headlights should be marked once: ' + f.join(' | '));
+    assert.match(f[0], /^D Control – ancillary controls: Drove at dusk without dipped headlights/);
+    // with the lights on from the start: no fault, the beam shows, and low power keeps the lamps but drops the beam
+    await start('mw-dusk-exit'); await page.keyboard.press('KeyH'); await set({ mph: 60 }); await steps(400);
+    f = await page.evaluate(() => window.cambridgeDrive.test.faults.filter(f => /headlights/.test(f.text)).length);
+    assert.equal(f, 0, 'headlights on: no fault');
+    const beam = async () => page.evaluate(() => { const a = window.cambridgeDrive; a.frame(0.05); let spot = false, front = false; a.camera.parent.traverse(o => { if (o.isSpotLight && o.visible) spot = true; });
+      const g = a.player.mesh.getObjectByName('lamps'); front = !!(g && g.visible && g.userData.front.visible); return { spot, front }; });
+    assert.deepEqual(await beam(), { spot: true, front: true });
+    await page.evaluate(() => document.querySelector('#lpSeg [data-lp="1"]').click());
+    assert.deepEqual(await beam(), { spot: false, front: true }, 'low power should keep the lamps and drop the beam');
+    await page.evaluate(() => document.querySelector('#lpSeg [data-lp="0"]').click());
+    console.log('Dusk:', `same faults by day and dusk (${day.faults.length});`, `${seen.lit}/${seen.cars} cars lit, fog ${seen.fogFar} m, ${seen.studs} studs, ${seen.glowing} lit sign faces;`, 'no lights →', 'one driving fault; lights on → none.');
+  }
+
   assert.deepEqual(errors, []);
-  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes; exits signed, careless exits and recovery marked, a missed exit carried on safely passes.');
+  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes; exits signed, careless exits and recovery marked, a missed exit carried on safely passes; at dusk only the lighting changes.');
 } finally { await browser?.close(); server.kill(); }

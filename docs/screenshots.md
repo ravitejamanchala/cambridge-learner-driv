@@ -338,6 +338,24 @@ Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3
 
 If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.
 
+### Joining at dusk
+
+![Joining at dusk — J1 slip road → M100 · dusk. The light is going. Dipped headlights on before you set off, then join as you would by day: other drivers' speed is harder to judge in the dusk, so take a bigger gap if you are unsure.](screenshots/lesson-mw-dusk-join.jpg)
+
+Joining at dusk — J1 slip road → M100 · dusk. The light is going. Dipped headlights on before you set off, then join as you would by day: other drivers' speed is harder to judge in the dusk, so take a bigger gap if you are unsure.
+
+### Following at dusk
+
+![Following at dusk — M100 · three lanes · dusk. Follow the traffic as it slows and speeds up again, in the dusk. Two seconds is the least you may leave: at dusk, when you cannot see as far, leave more, and drive at a speed you could stop at within the distance you can see.](screenshots/lesson-mw-dusk-following.jpg)
+
+Following at dusk — M100 · three lanes · dusk. Follow the traffic as it slows and speeds up again, in the dusk. Two seconds is the least you may leave: at dusk, when you cannot see as far, leave more, and drive at a speed you could stop at within the distance you can see.
+
+### Leaving the motorway at dusk
+
+![Leaving the motorway at dusk — M100 → J3 Kingsmere · dusk. Leave at junction 3 as the light goes. The signs and the studs in the road stay bright in your headlights: use them. Mirror and signal by the 300-yard marker, keep your speed until you are on the slip road, then slow for the bend.](screenshots/lesson-mw-dusk-exit.jpg)
+
+Leaving the motorway at dusk — M100 → J3 Kingsmere · dusk. Leave at junction 3 as the light goes. The signs and the studs in the road stay bright in your headlights: use them. Mirror and signal by the 300-yard marker, keep your speed until you are on the slip road, then slow for the bend.
+
 ### Parallel parking at the kerb
 
 ![Parallel parking at the kerb — Elm Road · 20 mph. Park at the kerb between two cars: pull up alongside the front one, then reverse in.](screenshots/lesson-parallel-park.jpg)

@@ -14,7 +14,9 @@ export const FREE_DRIVES = [
   { id: 'm3', area: 'm3', lanes: 3, title: 'Motorway · three lanes', road: 'M100 · 70 mph',
     blurb: 'A 15-mile circuit with three lanes each way, gentle bends and four junctions. Drive as long as you like.' },
   { id: 'm2', area: 'm2', lanes: 2, title: 'Motorway · two lanes', road: 'M100 · 70 mph',
-    blurb: 'The same circuit with two lanes each way: less room to overtake, so more planning.' }
+    blurb: 'The same circuit with two lanes each way: less room to overtake, so more planning.' },
+  { id: 'm3-dusk', area: 'm3', lanes: 3, title: 'Motorway at dusk', road: 'M100 · three lanes · evening', timeOfDay: 'dusk',
+    blurb: 'The three-lane circuit as the light goes: headlights on (H), lit junctions, and studs in the road.' }
 ].map(d => { const w = lap(d.lanes); return { ...d, lap: w, waypoints: [...w, w[1]] }; });
 // `waypoints` is a lap and a quarter: the route carries on past its own start, so the examiner can step
 // progress back one lap without the car ever being off the route (see test.js useLap).
