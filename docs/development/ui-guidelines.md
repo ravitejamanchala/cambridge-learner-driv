@@ -198,6 +198,16 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   vehicle behind keeps 1.5 s and is not closing within 4 s; otherwise it drops back behind, and with no
   gap it waits at the end of the acceleration lane, before the taper, because the taper is in the lane
   itself. Nothing on the motorway brakes or moves over for it, and none of it is scripted to collide.
+- **Exits are signed the UK way** (issue #9): advance direction signs at 1 mile and ½ mile, countdown
+  markers at 300, 200 and 100 yards, and the final sign where the slip road leaves, all placed from
+  `MW.advance` and `MW.countdown` and checked in both lane variants. The assessor reads the same 300-yard
+  figure. Leaving is a lane change from lane 1 onto the slip road, with a left mirror and signal, and the
+  speed kept until on the slip road (slowing by over 20 mph before it is marked). The slip road's bend is
+  judged against its own geometry (over 3.5 m/s² sideways is too fast), and crossing the hatching to
+  reach it, cutting across from another lane at the last moment, stopping on the carriageway and
+  reversing are serious. Not being in the left-hand lane by 300 yards is only marked if there was a
+  usable gap within reach after the 1-mile sign; boxed in, carrying on is the right answer, and a missed
+  exit always routes on to the next junction, never to an impossible "turn round".
 - **One set of junction numbers.** The slip roads' shape (`tools/layouts.mjs`), their markings
   (`js/world.js`), the AI's merge zone (`js/traffic.js`) and the lessons all read `MW.junction.accel`,
   `MW.junction.decel` and `MW.taper`, and `tests/motorway.test.mjs` measures every slip road against them.

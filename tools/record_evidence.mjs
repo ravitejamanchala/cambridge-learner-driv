@@ -182,6 +182,39 @@ GROUPS.joining = {
         return async t => { await at(t, 24, end); }; } },
   ],
 };
+const exitIn = (d) => `a => { const t = a.test, R = t.route, k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'); return k > 0 && R.stepS[k] - t.sRoute < ${d}; }`;
+GROUPS.exits = {
+  dir: 'docs/evidence/9-motorway-exits',
+  title: 'Leaving the motorway, and missing your exit (issue #9)',
+  driverNote: 'The careful drives use the Bot lab\'s reference driver (`js/bots.js`); the careless ones use the scriptable driver from `npm run test:motorway` (`tests/mw-driver.mjs`), making the same mistakes the checks make.',
+  clips: [
+    { name: '01-the-advance-signs', driver: 'bot', lesson: { id: 'mw-exit', scenario: 'motorway' }, seconds: 36,
+      caption: 'Approaching junction 3 from the driver\'s seat: the blue advance direction signs at 1 mile and ½ mile, with the junction number, the destination and the distance; the instruction box counts down to J3 · Kingsmere.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-exit'); await camera(p, 1); await ffUntil(p, exitIn(1760)); } },
+    { name: '02-countdown-markers-and-leaving', driver: 'bot', lesson: { id: 'mw-exit', scenario: 'motorway' }, seconds: 30,
+      caption: 'The countdown markers at 300, 200 and 100 yards (three, two and one bars), the final direction sign, and leaving: mirror and signal by the first marker, the speed of the traffic kept until on the slip road, then slowing on it for the bend and the roundabout.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-exit'); await camera(p, 1); await ffUntil(p, exitIn(430)); } },
+    { name: '03-the-whole-exit', driver: 'bot', lesson: { id: 'mw-exit', scenario: 'motorway' }, seconds: 50, speed: 2,
+      caption: 'The whole exit from the chase view, at twice real speed: the signs going by, into the slip road, a gentle bend at a speed that suits it, giving way at the roundabout, and away along the A301 to pull up.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-exit'); await camera(p, 0); await ffUntil(p, exitIn(700)); } },
+    { name: '04-a-careless-exit-and-what-it-is-marked-for', driver: 'scripted', seconds: 30,
+      caption: 'The careless version: no mirror and no signal, braking hard on the motorway at the 300-yard marker, then into the slip road\'s bend far too fast. The result names each one.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-exit'); await camera(p, 0); await ctx.d.set({ mph: 64, gap: 2.5 }); await ffUntil(p, exitIn(330)); },
+      script: (p, ctx) => async (t) => { const d = ctx.d, e = await d.exitIn();
+        if (!ctx.brake && e != null && e < 270) { ctx.brake = true; await d.set({ mph: 25 }); }
+        if (ctx.brake && !ctx.fast && e != null && e < 0) { ctx.fast = true; await d.set({ mph: 75, gap: null }); }
+        if (ctx.fast && !ctx.end && (e == null || e < -640)) { ctx.end = true; await p.evaluate(() => window.cambridgeDrive.test.finish()); } } },
+    { name: '05-missing-your-exit', driver: 'bot', lesson: { id: 'mw-missed-exit', scenario: 'motorway' }, seconds: 50,
+      caption: 'If you miss your exit (Rule 263). A solid line of lorries in the left-hand lane: there is no safe gap, so the driver lets junction 3 go and carries on. The instruction box points on to J4 · Harlow Cross. The lesson passes: carrying on is exactly right.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-missed-exit'); await camera(p, 0); } },
+    { name: '06-cutting-across-the-hatching', driver: 'scripted', seconds: 24,
+      caption: 'The wrong way to recover: diving across the left-hand lane and the hatched area to reach the slip road at the last moment. Both are marked serious.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-missed-exit'); await camera(p, 0); await ctx.d.set({ lane: 1, want: 1, mph: 58, road: true }); await ffUntil(p, exitIn(60)); },
+      script: (p, ctx) => async (t) => { const d = ctx.d, e = await d.exitIn();
+        if (!ctx.dive && e != null && e < -120) { ctx.dive = true; await d.look('left'); await d.signal('L'); await d.set({ road: false, want: 0 }); }
+        if (ctx.dive && !ctx.end && (e == null || e < -330)) { ctx.end = true; await p.evaluate(() => window.cambridgeDrive.test.finish()); } } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });

@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildNet, buildRoute, snapWaypoint, paved, nearestWhere } from '../js/net.js';
+import { buildNet, buildRoute, snapWaypoint, paved, nearestWhere, posAt } from '../js/net.js';
 import { MW, JUNCTIONS, centreLine, circuitLength, onCarriageway, separation, junctionSpan } from '../js/motorway.js';
 import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from '../js/free-drive.js';
 import { buildLayout } from '../tools/layouts.mjs';
@@ -47,7 +47,20 @@ for (const id of ['m2', 'm3']) test(`${id}: the committed area matches the layou
   const touches = (n) => net.out[n].some(o => o.e.way.cls === 'motorway');
   const exits = net.edges.filter(e => e.way.cls === 'motorway_link' && touches(e.a)), entries = net.edges.filter(e => e.way.cls === 'motorway_link' && touches(e.b));
   assert.equal(exits.length, JUNCTIONS.length * 2); assert.equal(entries.length, JUNCTIONS.length * 2);
-  assert.equal(net.mwSigns.length, JUNCTIONS.length * 2, 'every exit needs its advance sign');
+  // every exit: advance signs at 1 mile and ½ mile, countdown markers at 300, 200 and 100 yards, and the
+  // final sign at the slip road, each on the nearside verge at that distance before the diverge (#9)
+  const want = [...MW.advance.map(a => a.at), ...MW.countdown.map(c => c.at), 30];
+  assert.equal(net.mwSigns.length, JUNCTIONS.length * 2 * want.length);
+  for (const side of ['A', 'B']) for (const j of JUNCTIONS) {
+    const sp = junctionSpan(j, side), k = side === 'A' ? 1 : -1;
+    for (const before of want) {
+      const sg = net.mwSigns.find(x => x.j === j.n && x.before === before && Math.hypot(x.x - onCarriageway(centreLine(), lanes, side, sp.diverge - before * k).x, x.z - onCarriageway(centreLine(), lanes, side, sp.diverge - before * k).z) < 20);
+      assert.ok(sg, `${side} J${j.n}: no sign ${before} m before the exit`);
+      const p = onCarriageway(centreLine(), lanes, side, sp.diverge - before * k);
+      assert.ok(Math.abs(Math.hypot(sg.x - p.x, sg.z - p.z) - (lanes * MW.laneW / 2 + MW.shoulder + 2.2)) < 0.2, `${side} J${j.n} ${before} m: not on the nearside verge`);
+      assert.equal(sg.kind, before === 30 ? 'exit' : MW.countdown.some(c => c.at === before) ? 'count' : 'advance');
+    }
+  }
   assert.ok(net.barriers.length > 0, 'no central reservation barrier');
 });
 
@@ -110,6 +123,18 @@ for (const id of ['m2', 'm3']) test(`${id}: every slip road runs beside the carr
     }
   }
   assert.ok(checked > 200, `only ${checked} slip-road points checked`);
+});
+
+// Issue #9: slip roads sweep away gently, as real ones do; none has a bend that needs much under 45 mph
+// (the roundabout at the end, and the ends where they meet it, aside)
+for (const id of ['m2', 'm3']) test(`${id}: no slip road has a bend tighter than 120 m radius`, () => {
+  const net = buildNet(area(id));
+  for (const e of net.edges.filter(x => x.way.cls === 'motorway_link')) for (let s = 15; s < e.len - 45; s += 5) {
+    const a = posAt(e, s - 12), b = posAt(e, s), c = posAt(e, s + 12);
+    const ab = Math.hypot(b.x - a.x, b.z - a.z), bc = Math.hypot(c.x - b.x, c.z - b.z), ca = Math.hypot(a.x - c.x, a.z - c.z), k = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+    const r = k > 1e-6 ? ab * bc * ca / (2 * k) : Infinity;
+    assert.ok(r > 120, `${e.way.name}: a ${Math.round(r)} m bend ${s} m along`);
+  }
 });
 test('free-drive summary: speeding under a lower limit is not "never over the limit"', () => {
   const st = createFreeStats();

@@ -372,9 +372,12 @@ function motorway(lanes) {
       B.road(local, [R(bOut), at(J.out + r, sideOff + 120), far]);
       B.giveways.push([exitE, dm(B.edges[exitE].len - (7.5 / 2 + 0.8)), 1, 0]); // the slip road gives way at the roundabout
       B.giveWay([at(J.out + r, sideOff + 120), R(bOut)], 7.5 / 2 + 0.8);
-      // the exit sign stands on the nearside verge just before the slip road leaves
-      const sg = onCarriageway(line, lanes, side, sp.diverge - 30 * k, cw / 2 + MW.shoulder + 2.2);
-      B.mwSigns.push({ kind: 'exit', x: +sg.x.toFixed(2), z: +sg.z.toFixed(2), tx: +sg.tx.toFixed(4), tz: +sg.tz.toFixed(4), j: j.n, to: j.to });
+      // signs on the nearside verge: advance direction signs at 1 mile and ½ mile, countdown markers at
+      // 300, 200 and 100 yards, and the final direction sign just before the slip road leaves
+      const verge = (before, extra) => { const p = onCarriageway(line, lanes, side, sp.diverge - before * k, cw / 2 + MW.shoulder + 2.2); return { x: +p.x.toFixed(2), z: +p.z.toFixed(2), tx: +p.tx.toFixed(4), tz: +p.tz.toFixed(4), j: j.n, to: j.to, before, ...extra }; };
+      for (const a of MW.advance) B.mwSigns.push(verge(a.at, { kind: 'advance', distance: a.text }));
+      for (const c of MW.countdown) B.mwSigns.push(verge(c.at, { kind: 'count', n: c.n }));
+      B.mwSigns.push(verge(30, { kind: 'exit' }));
       B.motorway.junctions.push({ n: j.n, side, to: j.to, diverge: Math.round(sp.diverge), merge: Math.round(sp.merge), roundabout: G.map(v => +v.toFixed(1)), local: far.map(v => +v.toFixed(1)) });
     }
   }

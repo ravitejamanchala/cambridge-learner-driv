@@ -187,3 +187,60 @@ test('making room for traffic joining from a slip road is not hogging', () => {
   const alone = run({ v: 62 * MPH, lane: 1, others: [], seconds: 14 });
   assert.ok(alone.faults.some(f => /middle lane with nothing to overtake/.test(f.text)), 'with nobody joining, the middle lane is hogging');
 });
+
+// ---------- leaving the motorway (issue #9): "lane -1" is the slip road again ----------
+test('leaving: mirror, signal at the 300-yard marker, out at the slip road, is not marked', () => {
+  const r = run({ v: 65 * MPH, exitAt: 600, seconds: 26, script: (t, me) => {
+    const at = (600 - 274) / me.v; if (t === +at.toFixed(1)) return { look: 'left', signal: 'L' };
+    if (Math.abs(t - at - 0.3) < 0.05) return { look: 'left-blindspot' };
+    if (!me.out && me.s > 600) { me.out = true; return { target: -1, look: 'left' }; } } });
+  assert.deepEqual(cats(r), []);
+  const e = r.events.find(x => x.type === 'leave');
+  assert.ok(e && e.mirror && e.signalFor > 4 && !e.gore && e.slowedBy === 0, JSON.stringify(e));
+});
+
+test('leaving without a signal or a mirror check is marked for each', () => {
+  const r = run({ v: 65 * MPH, exitAt: 300, seconds: 16, script: (t, me) => { if (!me.out && me.s > 300) { me.out = true; return { target: -1 }; } } });
+  assert.ok(r.faults.some(f => /Left the motorway without signalling left/.test(f.text)), cats(r).join('\n'));
+  assert.ok(r.faults.some(f => /Left the motorway without checking the left mirror/.test(f.text)), cats(r).join('\n'));
+});
+
+test('slowing right down on the carriageway before the slip road is marked', () => {
+  const r = run({ v: 65 * MPH, exitAt: 600, seconds: 30, script: (t, me) => {
+    if (t === 1) return { look: 'left', signal: 'L' };
+    if (me.s > 600 - 274 + 40 && me.s < 600) return { v: Math.max(38 * MPH, me.v - 0.6) };
+    if (!me.out && me.s > 600) { me.out = true; return { target: -1, look: 'left' }; } } });
+  assert.ok(r.faults.some(f => f.cat === 'Use of speed' && /Slowed by \d+ mph on the motorway before the slip road/.test(f.text)), cats(r).join('\n'));
+});
+
+test('cutting across to the exit at the last moment is serious, and so is crossing the hatching', () => {
+  const late = run({ v: 64 * MPH, lane: 1, exitAt: 500, seconds: 20, script: (t, me) => {
+    if (!me.a && me.s > 500 - 90) { me.a = true; return { look: 'left', signal: 'L', target: 0 }; }
+    if (me.a && !me.b && me.laneF === 0) { me.b = true; return { target: -1, look: 'left' }; } } });
+  assert.ok(late.faults.some(f => f.kind === 'S' && /Cut across to the exit at the last moment/.test(f.text)), cats(late).join('\n'));
+  assert.ok(late.faults.some(f => /still in the middle lane 300 yards before the exit/.test(f.text)), cats(late).join('\n'));
+  const gore = run({ v: 64 * MPH, exitAt: 300, seconds: 20, script: (t, me) => {
+    if (t === 1) return { look: 'left', signal: 'L' };
+    if (!me.out && me.s > 300 + 150) { me.out = true; return { target: -1, look: 'left' }; } } });
+  assert.ok(gore.faults.some(f => f.kind === 'S' && /Crossed the hatched area/.test(f.text)), cats(gore).join('\n'));
+});
+
+test('stopping on the motorway is serious, unless you are in a queue; reversing always is', () => {
+  const stop = run({ v: 30, seconds: 14, script: (t) => t === 2 ? { v: 0 } : null });
+  assert.ok(stop.faults.some(f => f.kind === 'S' && /Stopped on the motorway/.test(f.text)), cats(stop).join('\n'));
+  const queue = run({ v: 30, others: [{ lane: 0, s: 80, mph: 0 }], seconds: 14, script: (t, me, cars) => ({ v: Math.max(0, Math.min(30, (cars[0].s - me.s - 4.6 - 6) * 0.6)) }) });
+  assert.ok(!queue.faults.some(f => /Stopped on the motorway/.test(f.text)), cats(queue).join('\n'));
+  const rev = run({ v: 30, seconds: 8, script: (t) => t === 2 ? { v: 0 } : t === 3 ? { v: -2 } : null });
+  assert.ok(rev.faults.some(f => f.kind === 'S' && /Reversed on the motorway/.test(f.text)), cats(rev).join('\n'));
+});
+
+test('boxed in all the way to an exit: not being in lane is not your fault, and carrying on is right', () => {
+  // a solid line of lorries in the left-hand lane, a second apart, keeping pace with you
+  const convoy = Array.from({ length: 14 }, (_, i) => ({ lane: 0, s: -170 + i * 28, mph: 58 }));
+  const boxed = run({ v: 58 * MPH, lane: 1, exitAt: 900, others: convoy, seconds: 30 });
+  assert.ok(!boxed.faults.some(f => /300 yards before the exit/.test(f.text)), cats(boxed).join('\n'));
+  assert.equal(boxed.events.find(e => e.type === 'exit-lane').boxed, true);
+  // with a clear left-hand lane all the way, staying out is yours to own
+  const clear = run({ v: 58 * MPH, lane: 1, exitAt: 900, others: [], seconds: 30 });
+  assert.ok(clear.faults.some(f => /middle lane 300 yards before the exit/.test(f.text)), cats(clear).join('\n'));
+});

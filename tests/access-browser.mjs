@@ -27,7 +27,7 @@ for(const spec of specs){
   if(!await page.locator('#profileSheet').isVisible())await page.locator('#profBtn2').click();await page.locator('[data-billing-status]').filter({hasText:'confirmation is pending'}).waitFor();await page.locator('#profileSheet [data-close]').click();
   // A forged success redirect cannot grant access. Free course stays open.
   for(const sheet of ['mockSheet','puzzleSheet']){await page.locator(`[data-open=${sheet}]`).first().click({force:true});await page.locator('#profileSheet').waitFor({state:'visible'});assert.equal(await page.locator('#'+sheet).isVisible(),false);await page.locator('#profileSheet [data-close]').click();}
-  await page.locator('[data-open=courseSheet]').first().click();assert.equal(await page.locator('#lessonList [data-l]').count(),40);
+  await page.locator('[data-open=courseSheet]').first().click();assert.equal(await page.locator('#lessonList [data-l]').count(),42);
   for(const id of ['mirror-practice','controlled-stop','accel-decel'])assert.match(await page.locator(`[data-l="${id}"]`).innerText(),/Free/);
   for(const id of ['cockpit-drill','engine-control','automatic-drive','automatic-reverse','steering-control'])assert.equal(await page.locator(`[data-l="${id}"]`).count(),0);
   await page.locator('#courseSheet [data-close]').click();

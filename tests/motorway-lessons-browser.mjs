@@ -26,7 +26,7 @@ try {
   await installAuthFixture(page);
   await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv').hidden, {}, { timeout: 45000 }); await signedIn(page);
 
-  const { start, steps, look, signal, set, untilDone, outcome, laneClear, joinerNear, joinersIn, fasterJustBehind } = await installMwDriver(page);
+  const { start, steps, look, signal, set, untilDone, outcome, laneClear, joinerNear, joinersIn, fasterJustBehind, exitIn } = await installMwDriver(page);
   const show = (r) => r.faults.join('\n  ');
 
   // ---------- pulling straight out into busy traffic, with no look and no signal ----------
@@ -148,6 +148,57 @@ try {
     console.log('Joining beside a car:', r.faults.map(f => f.split(':').slice(0, 2).join(':')).join(' | '));
   }
 
+  // ---------- leaving the motorway (issue #9): the signs, and a careless exit ----------
+  {
+    await start('mw-exit'); await steps(10);
+    const signs = await page.evaluate(() => { const a = window.cambridgeDrive; let built = 0; a.camera.parent.traverse(o => { if (o.userData.motorwaySign) built++; });
+      const j3 = a.net.mwSigns.filter(s => s.j === 3).map(s => s.kind + ':' + s.before); return { built, j3 }; });
+    assert.equal(signs.built, 4 * 2 * 6, 'every exit on both carriageways should have six signs built in the scene');
+    for (const k of ['advance:1609', 'advance:805', 'count:274', 'count:183', 'count:91', 'exit:30']) assert.ok(signs.j3.includes(k), `junction 3 is missing its ${k} sign`);
+    await page.evaluate(() => { for (let i = 0; i < 4; i++) window.cambridgeDrive.frame(0.05); });
+    assert.equal(await page.evaluate(() => document.querySelector('#hudDist').textContent), 'J3 · Kingsmere', 'the instruction box should count down to the junction');
+    // no mirror, no signal, brakes hard on the motorway at the 300-yard marker, then takes the slip road's bend fast
+    await set({ mph: 64, gap: 2.5 }); for (let i = 0; i < 400 && (await exitIn()) > 270; i++) await steps(5);
+    await set({ mph: 25 }); for (let i = 0; i < 200 && (await exitIn()) > 0; i++) await steps(5); await set({ mph: 75, gap: null });
+    // this driver never gives way at the roundabout at the end, so finish the drive once past the bend
+    for (let i = 0; i < 400 && (await exitIn()) > -(220 + 420); i++) await steps(5);
+    await page.evaluate(() => window.cambridgeDrive.test.finish()); const r = await outcome();
+    assert.equal(r.verdict, 'Not yet', show(r));
+    for (const re of [/Signals – necessary: Left the motorway without signalling left/, /Mirrors – change direction: Left the motorway without checking the left mirror/, /Use of speed: Slowed by \d+ mph on the motorway before the slip road/, /Use of speed: Took the bend on the slip road at \d+ mph: it suits about \d+ mph/])
+      assert.ok(r.faults.some(f => re.test(f)), `${re}: ${show(r)}`);
+    console.log('Careless exit:', r.faults.map(f => f.split(': ').slice(0, 2).join(': ')).join(' | '));
+  }
+  // ---------- stopping, and reversing, on the motorway ----------
+  for (const how of ['stop', 'reverse']) {
+    await start('mw-exit'); await steps(200); await set({ mph: 0 }); await steps(200);
+    if (how === 'reverse') { await set({ reverse: true }); await steps(60); await set({ reverse: false }); }
+    const f = await page.evaluate(() => window.cambridgeDrive.test.faults.map(f => `${f.kind} ${f.text}`));
+    assert.ok(f.some(x => how === 'stop' ? /^S Stopped on the motorway/.test(x) : /^S Reversed on the motorway/.test(x)), `${how}: ${f.join(' | ')}`);
+    console.log(`${how === 'stop' ? 'Stopping' : 'Reversing'} on the motorway:`, f.find(x => /Stopped|Reversed/.test(x) && (how === 'stop' ? /Stopped/ : /Reversed/).test(x)));
+  }
+  // ---------- if you miss your exit: carrying on passes, cutting across the hatching does not ----------
+  {
+    await start('mw-missed-exit', 1); await set({ mph: 58, road: true });
+    let next = '';
+    for (let i = 0; i < 600 && !(await page.evaluate(() => window.cambridgeDrive.test.done)); i++) { await steps(10);
+      if (!next) next = await page.evaluate(() => { const t = window.cambridgeDrive.test, i = t.route.instructions.find(x => x.junction && !x.final); return i && /missed/.test(i.text) ? `J${i.junction} · ${i.to}` : ''; }); }
+    const r = await outcome();
+    assert.equal(r.verdict, 'Lesson passed', show(r) + '\n' + r.reasons.join('\n'));
+    assert.ok(r.reasons.some(l => /let the exit go and carried on: exactly right/.test(l)), r.reasons.join('\n'));
+    assert.equal(next, 'J4 · Harlow Cross', 'after the missed exit the instruction should point on to the next junction');
+    console.log('Missed exit, carried on:', r.reasons.find(l => /carried on/.test(l)), '| then:', next);
+  }
+  {
+    await start('mw-missed-exit', 1); await set({ mph: 58, road: true });
+    for (let i = 0; i < 600 && (await exitIn()) > -120; i++) await steps(5);
+    await look('left'); await signal('L'); await set({ road: false, want: 0, lane: 1 });
+    for (let i = 0; i < 400 && (await exitIn()) > -330; i++) await steps(5);
+    await page.evaluate(() => window.cambridgeDrive.test.finish()); const r = await outcome();
+    assert.equal(r.verdict, 'Not yet', show(r));
+    assert.ok(r.faults.some(f => /^S Response to road markings: Crossed the hatched area to reach the slip road/.test(f)), show(r));
+    console.log('Cutting across the hatching:', r.faults.filter(f => /^S/.test(f)).map(f => f.split(': ').slice(1).join(': ').slice(0, 60)).join(' | '));
+  }
+
   assert.deepEqual(errors, []);
-  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes.');
+  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes; exits signed, careless exits and recovery marked, a missed exit carried on safely passes.');
 } finally { await browser?.close(); server.kill(); }

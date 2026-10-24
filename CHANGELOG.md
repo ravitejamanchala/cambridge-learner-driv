@@ -2,6 +2,12 @@
 
 ## Unreleased: motorways, junction markings and pull-request previews
 
+- **Leaving the motorway, and missing your exit** (issue #9).
+  - **Exits are signed**: blue advance direction signs at 1 mile and ½ mile, countdown markers at 300, 200 and 100 yards, and the final sign at the slip road, on both carriageways of both motorway worlds.
+  - *Leaving the motorway* (two lanes, junction 3): follow the signs, mirror and signal by the 300-yard marker, keep up with the traffic until you are on the slip road, then slow for its bend and give way at the roundabout before driving on along the A301. Leaving without a mirror check or a signal, braking hard on the carriageway before the slip road, and taking the slip road's bend too fast are each marked.
+  - *If you miss your exit* (three lanes, junction 3): a solid line of lorries means there is no safe gap. Carrying on to the next junction passes; stopping on the motorway, reversing, or cutting across the hatching to reach the slip road are serious faults.
+  - **A missed exit now carries on safely in every exit lesson**: the route continues to the next junction and the instruction box says so, instead of the lesson simply stopping. Not being in lane for an exit is no longer marked when traffic gave you no chance to get there.
+  - **Slip roads curve gently now.** The bend where each slip road swept away to its roundabout was as tight as a 27 m radius (it suited about 20 mph); the roundabouts sit closer and the slip roads curve over a longer stretch, so no bend is tighter than about 135 m.
 - **Joining the motorway, and traffic joining beside you** (issue #8). Two more motorway lessons:
   - *Joining the motorway*: from the slip road at 30 mph into a left-hand lane where the first gap closes as you reach it and the middle lane is busy. Build up speed, look, signal, and fit into a gap without making anyone brake. Joining beside a car, into a gap that makes the car behind brake, far slower than the traffic, or moving straight out again are all marked; joining is judged as a lane change from the slip road, with the same mirror and signal checks.
   - *Traffic joining from a slip road*: two vehicles come down the slip road as you pass, with a car alongside you in the middle lane. You have priority. Keeping your lane and speed, easing off, or moving over once it is safe all pass, and the result says which you did; moving over into the occupied lane does not.

@@ -168,7 +168,7 @@ export function buildSigns(scene, net) {
   const lm = new T.MeshBasicMaterial({ color: 0xf2f1ea, side: T.DoubleSide }); lm.depthWrite = false;
   const lmesh = new T.Mesh(g, lm); lmesh.renderOrder = 4; lmesh.frustumCulled = false; scene.add(lmesh);
   for (const b of [B.tri, B.slow, B.gwSign, B.noEntry, B.discBack, B.triBack, B.poles, ...Object.values(B.arrows), ...Object.values(B.roundel), ...Object.values(B.speed)]) b.build(scene);
-  for (const sg of net.mwSigns || []) scene.add(motorwaySign(sg));
+  for (const sg of net.mwSigns || []) scene.add(sg.kind === 'count' ? countdownMarker(sg) : motorwaySign(sg));
 }
 
 // ---- motorway signs ----
@@ -184,22 +184,45 @@ export function motorwaySignTex({ j, to, kind = 'exit', distance = null }) {
     g.textAlign = 'left'; g.font = '700 58px Geist, ui-sans-serif, system-ui, sans-serif';
     g.fillText(to, 50, 190);
     if (distance) { g.font = '600 40px Geist, ui-sans-serif, system-ui, sans-serif'; g.fillText(distance, 50, 262); }
-    if (kind === 'exit') { // arrow pointing up and to the left: leave here
+    if (kind === 'exit' || kind === 'advance') { // arrow pointing up and to the left: the lane that leaves
       g.save(); g.translate(W - 110, H - 110); g.rotate(-Math.PI / 4); g.lineWidth = 16; g.lineCap = 'butt';
       g.beginPath(); g.moveTo(0, 60); g.lineTo(0, -30); g.stroke();
       g.beginPath(); g.moveTo(-34, -20); g.lineTo(0, -66); g.lineTo(34, -20); g.closePath(); g.fill(); g.restore();
     }
   });
 }
+// Countdown markers before an exit (diagram 824): three, two and one white bars on blue at 300, 200 and
+// 100 yards, the bars sloping down towards the carriageway's nearside.
+export function countdownTex(n) {
+  return canvasTex(128, 256, (g, W, H) => {
+    g.fillStyle = MWAY_BLUE; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#fff';
+    for (let i = 0; i < n; i++) { const y = 40 + i * 70; g.beginPath(); g.moveTo(14, y + 34); g.lineTo(W - 14, y); g.lineTo(W - 14, y + 26); g.lineTo(14, y + 60); g.closePath(); g.fill(); }
+  });
+}
+// Geometry, the grey backs and the countdown faces are shared by every motorway sign, so passing a sign
+// for the first time on a long drive adds no new geometry to the GPU (npm run test:free checks this).
+let KIT = null;
+const kit = () => KIT || (KIT = { board: new T.PlaneGeometry(6.4, 4.0), leg: new T.CylinderGeometry(0.08, 0.08, 5.3, 8).translate(0, 5.3 / 2, 0),
+  marker: new T.PlaneGeometry(0.9, 1.8), markerLeg: new T.CylinderGeometry(0.05, 0.05, 0.6, 6).translate(0, 0.3, 0),
+  grey: new T.MeshLambertMaterial({ color: 0x8a9096 }), count: {} });
+export function countdownMarker(sg) {
+  const K = kit(), grp = new T.Group(), h = 1.8, base = 0.5;
+  const face = K.count[sg.n] || (K.count[sg.n] = new T.MeshLambertMaterial({ map: countdownTex(sg.n) }));
+  const board = new T.Mesh(K.marker, face); board.position.y = base + h / 2; grp.add(board);
+  const back = new T.Mesh(K.marker, K.grey); back.position.set(0, base + h / 2, -0.02); back.rotation.y = Math.PI; grp.add(back);
+  const leg = new T.Mesh(K.markerLeg, K.grey); leg.position.z = -0.05; grp.add(leg);
+  grp.position.set(sg.x, 0, sg.z); grp.rotation.y = Math.atan2(-sg.tx, -sg.tz);
+  grp.userData.motorwaySign = sg;
+  return grp;
+}
 // a board on two legs on the verge, facing the traffic it is for
 export function motorwaySign(sg) {
-  const grp = new T.Group(), w = 6.4, h = 4.0, base = 1.5; // big enough to read at 70 mph
-  const board = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: motorwaySignTex(sg) }));
+  const K = kit(), grp = new T.Group(), w = 6.4, h = 4.0, base = 1.5; // big enough to read at 70 mph
+  const board = new T.Mesh(K.board, new T.MeshLambertMaterial({ map: motorwaySignTex(sg) }));
   board.position.y = base + h / 2; grp.add(board);
-  const back = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ color: 0x8a9096 }));
-  back.position.set(0, base + h / 2, -0.03); back.rotation.y = Math.PI; grp.add(back);
-  const legG = new T.CylinderGeometry(0.08, 0.08, base + h - 0.2, 8).translate(0, (base + h - 0.2) / 2, 0), legM = new T.MeshLambertMaterial({ color: 0x8a9096 });
-  for (const x of [-w / 2 + 0.5, w / 2 - 0.5]) { const leg = new T.Mesh(legG, legM); leg.position.set(x, 0, -0.08); grp.add(leg); }
+  const back = new T.Mesh(K.board, K.grey); back.position.set(0, base + h / 2, -0.03); back.rotation.y = Math.PI; grp.add(back);
+  for (const x of [-w / 2 + 0.5, w / 2 - 0.5]) { const leg = new T.Mesh(K.leg, K.grey); leg.position.set(x, 0, -0.08); grp.add(leg); }
   grp.position.set(sg.x, 0, sg.z); grp.rotation.y = Math.atan2(-sg.tx, -sg.tz); // the face looks back at approaching drivers
   grp.userData.motorwaySign = sg;
   return grp;
