@@ -81,7 +81,7 @@ export function buildWorld(scene, net, traffic) {
     // slip road: one lane between solid edge lines, except where it runs alongside the carriageway
     const exit = slipOut(e.a), entry = slipIn(e.b);
     ribbon(A.road, e, -(w / 2 + 0.6), w / 2 + 0.6, 0.041);
-    line(A.white, e, w / 2, exit ? 80 : 0, entry ? e.len - 80 : e.len);
+    line(A.white, e, w / 2, exit ? MW.taper : 0, entry ? e.len - MW.taper : e.len);
     line(A.white, e, -w / 2, exit ? J.decel : 0, entry ? e.len - J.accel : e.len);
   }
 

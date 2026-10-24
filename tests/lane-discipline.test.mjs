@@ -23,7 +23,7 @@ function run({ lanes = 3, v = 30, lane = 0, others = [], script = () => ({}), se
     me.s += me.v * dt;
     for (const c of cars) { if (c.mphAt) c.v = c.mphAt(t) * MPH; c.s += c.v * dt; }
     A.step({ t, dt, v: me.v, laneF: me.laneF, lanes, indicator: me.indicator, looks: me.looks,
-      others: cars.map(c => ({ id: c.id, lane: c.lane, fw: c.s - me.s, v: c.v })), exitIn: exitAt == null ? null : exitAt - me.s });
+      others: cars.map(c => ({ id: c.id, lane: c.lane, fw: c.s - me.s, v: c.v })), exitIn: exitAt == null ? null : exitAt - me.s, joining: me.laneF < -0.5 });
   }
   return { faults, events: A.events, stats: A.stats, me };
 }
@@ -144,4 +144,46 @@ test('the lane strip offers the lane you are overtaking in, and only the left la
   assert.deepEqual(A.guide(f), { lanes: 3, ok: [0, 1], here: 1 });
   assert.deepEqual(A.guide({ ...f, others: [] }), { lanes: 3, ok: [0], here: 1 });
   assert.deepEqual(A.guide({ ...f, exitIn: 800 }), { lanes: 3, ok: [0], here: 1 });
+});
+
+// ---------- joining from a slip road (issue #8): "lane -1" is the acceleration lane ----------
+const stream = (gapAt, mph = 60) => [{ lane: 0, s: gapAt - 70, mph }, { lane: 0, s: gapAt + 70, mph }, { lane: 0, s: gapAt + 140, mph }, { lane: 1, s: 30, mph: 68 }];
+
+test('joining: matching the traffic speed and taking a safe gap is not marked', () => {
+  const r = run({ v: 60 * MPH, lane: -1, others: stream(0), seconds: 20, script: (t) => MSM(t, 1, 1, 0) });
+  assert.deepEqual(cats(r), []);
+  const j = r.events.find(e => e.type === 'join');
+  assert.ok(j && j.mirror && j.blind && j.signalFor >= 1.9 && j.behindS >= 2 && j.trafficMph === 60, JSON.stringify(j));
+});
+
+test('joining into a gap that makes the car behind brake is marked; beside a car is serious', () => {
+  const tight = run({ v: 60 * MPH, lane: -1, others: [{ lane: 0, s: -26, mph: 62 }, { lane: 0, s: 60, mph: 60 }], seconds: 12, script: (t) => MSM(t, 1, 1, 0) });
+  assert.ok(tight.faults.some(f => /Joined the motorway into too small a gap/.test(f.text)), cats(tight).join('\n'));
+  const beside = run({ v: 60 * MPH, lane: -1, others: [{ lane: 0, s: 1, mph: 60 }], seconds: 12, script: (t) => MSM(t, 1, 1, 0) });
+  assert.ok(beside.faults.some(f => f.kind === 'S' && /Joined the motorway with a vehicle alongside/.test(f.text)), cats(beside).join('\n'));
+});
+
+test('joining far slower than the traffic is marked; no traffic, no speed fault', () => {
+  const slow = run({ v: 35 * MPH, lane: -1, others: [{ lane: 0, s: -140, mph: 62 }, { lane: 0, s: 90, mph: 62 }], seconds: 8, script: (t) => MSM(t, 1, 1, 0) });
+  assert.ok(slow.faults.some(f => f.cat === 'Use of speed' && /Joined at 35 mph into traffic doing about 62 mph/.test(f.text)), cats(slow).join('\n'));
+  const empty = run({ v: 35 * MPH, lane: -1, others: [], seconds: 8, script: (t) => MSM(t, 1, 1, 0) });
+  assert.deepEqual(cats(empty), []);
+});
+
+test('joining: straight out into the next lane is marked; settling in first is not', () => {
+  const out = (wait) => run({ v: 60 * MPH, lane: -1, others: stream(0), seconds: 30, script: (t, me) => {
+    if (!me.joined && me.laneF === 0) me.joined = t;
+    if (!me.joined) return MSM(t, 1, 1, 0);
+    if (!me.out && t >= me.joined + wait) me.out = t; if (me.out) return MSM(t, me.out, 1, 1);
+  } });
+  assert.ok(out(0).faults.some(f => /straight after joining/.test(f.text)), cats(out(0)).join('\n'));
+  assert.ok(!out(6).faults.some(f => /straight after joining|Swept/.test(f.text)), cats(out(6)).join('\n'));
+});
+
+test('making room for traffic joining from a slip road is not hogging', () => {
+  // in the middle lane while two vehicles come down the slip road beside you, then back left once they are in
+  const r = run({ v: 62 * MPH, lane: 1, others: [{ lane: -1, s: 40, mph: 50 }, { lane: -1, s: 90, mph: 50 }], seconds: 14 });
+  assert.deepEqual(cats(r), []);
+  const alone = run({ v: 62 * MPH, lane: 1, others: [], seconds: 14 });
+  assert.ok(alone.faults.some(f => /middle lane with nothing to overtake/.test(f.text)), 'with nobody joining, the middle lane is hogging');
 });

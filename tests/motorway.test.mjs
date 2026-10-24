@@ -3,8 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildNet, buildRoute, snapWaypoint, paved } from '../js/net.js';
-import { MW, JUNCTIONS, centreLine, circuitLength, onCarriageway, separation } from '../js/motorway.js';
+import { buildNet, buildRoute, snapWaypoint, paved, nearestWhere } from '../js/net.js';
+import { MW, JUNCTIONS, centreLine, circuitLength, onCarriageway, separation, junctionSpan } from '../js/motorway.js';
 import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from '../js/free-drive.js';
 import { buildLayout } from '../tools/layouts.mjs';
 import { MOTORWAY_LESSONS, SETUPS } from '../js/motorway-lessons.js';
@@ -74,7 +74,40 @@ test('free-drive summary: measured, and honest about speed', () => {
 
 for (const l of MOTORWAY_LESSONS) test(`${l.id}: every scripted vehicle is placed on the lesson's route`, () => {
   const net = buildNet(area(l.area)), r = buildRoute(net, l.waypoints.map(w => snapWaypoint(net, w)));
-  for (const v of SETUPS[l.setup]) { const s = l.startAt + v.at; assert.ok(s >= 1 && s <= r.len - 5, `${l.setup}: a vehicle at ${v.at} m lands at ${s} m of ${Math.round(r.len)}`); }
-  assert.ok(r.steps.slice(0, 3).every(st => st.e.way.cls === 'motorway'), 'the lesson starts on the motorway');
+  for (const v of SETUPS[l.setup].filter(v => v.at != null)) { const s = l.startAt + v.at; assert.ok(s >= 1 && s <= r.len - 5, `${l.setup}: a vehicle at ${v.at} m lands at ${s} m of ${Math.round(r.len)}`); }
+  // vehicles placed by the junction's merge point: on its slip road, or on the carriageway upstream of it
+  if (SETUPS[l.setup].some(v => v.main != null || v.slip != null)) {
+    assert.ok(l.merge, `${l.id} places traffic by a merge point but names no junction`);
+    const at = junctionSpan(JUNCTIONS.find(j => j.n === l.merge), 'A'), slip = net.edges.find(e => e.way.cls === 'motorway_link' && net.out[e.b].some(o => o.e.way.cls === 'motorway') && Math.hypot(net.nx[e.b] - onCarriageway(centreLine(), +l.area[1], 'A', at.merge).x, net.nz[e.b] - onCarriageway(centreLine(), +l.area[1], 'A', at.merge).z) < 1);
+    assert.ok(slip, 'no entry slip road at the lesson junction');
+    for (const v of SETUPS[l.setup]) {
+      if (v.slip != null) assert.ok(v.slip <= slip.len, `a vehicle ${v.slip} m up a ${Math.round(slip.len)} m slip road`);
+      if (v.main != null) assert.ok(v.main < at.merge - 200, `a vehicle ${v.main} m upstream runs past the start of the circuit`);
+    }
+  }
+  assert.ok(l.setup === 'join' ? r.steps[0].e.way.cls === 'motorway_link' && r.steps.at(-1).e.way.cls === 'motorway' : r.steps.slice(0, 3).every(st => st.e.way.cls === 'motorway'), 'the lesson starts where it says');
   if (l.exit) assert.ok(r.steps.some(st => st.e.way.cls === 'motorway_link'), 'an exit lesson leaves by the slip road');
+});
+
+// Issue #8: the slip roads' shape, the markings drawn on them and the points the AI and the assessor work
+// from all come from the same constants (MW.junction.accel / decel, MW.taper), so they cannot drift apart.
+for (const id of ['m2', 'm3']) test(`${id}: every slip road runs beside the carriageway exactly where its markings say`, () => {
+  const lanes = +id[1], net = buildNet(area(id)), J = MW.junction, cw = lanes * MW.laneW, lane0 = cw / 2 - MW.laneW / 2, off0 = cw / 2 + MW.slipW / 2;
+  const touches = (n) => net.out[n].some(o => o.e.way.cls === 'motorway');
+  let checked = 0;
+  for (const e of net.edges.filter(x => x.way.cls === 'motorway_link')) {
+    const entry = touches(e.b), exit = touches(e.a); if (!entry && !exit) continue;
+    for (let i = 0; i < e.n; i++) {
+      const d = entry ? e.len - e.cum[i] : e.cum[i]; if (d < 2) continue; // the shared node itself sits on the centre line
+      const tx = e.px[Math.min(i + 1, e.n - 1)] - e.px[Math.max(i - 1, 0)], tz = e.pz[Math.min(i + 1, e.n - 1)] - e.pz[Math.max(i - 1, 0)];
+      const near = nearestWhere(net, e.px[i], e.pz[i], x => x.way.cls === 'motorway');
+      if (!near || near.tx * tx + near.tz * tz < 0) continue; // the other carriageway is nearer: a slip sweeping away round it
+      const lat = near.lat, lim = entry ? J.accel : J.decel;
+      if (d <= MW.taper) assert.ok(lat > lane0 - 0.3 && lat < off0 + 0.3, `${e.way.name} ${entry ? 'entry' : 'exit'}: ${Math.round(d)} m from the motorway the taper is at ${lat.toFixed(2)} m`);
+      else if (d <= lim) assert.ok(Math.abs(lat - off0) < 0.3, `${e.way.name} ${entry ? 'entry' : 'exit'}: ${Math.round(d)} m out it is ${lat.toFixed(2)} m across, not beside lane 1 (${off0})`);
+      else if (d > lim + 40 && near.d < 60) assert.ok(lat > off0 + 0.5, `${e.way.name}: ${Math.round(d)} m out it is still alongside`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 200, `only ${checked} slip-road points checked`);
 });

@@ -174,6 +174,22 @@ export const laneOffset = (w) => w.oneway ? (w.w > 7.6 && !w.rb ? w.w / 4 : (w.r
 export const endNode = (st) => st.dir > 0 ? st.e.b : st.e.a;
 export const startNode = (st) => st.dir > 0 ? st.e.a : st.e.b;
 
+// nearest road to a point among the edges `ok` accepts (e.g. only the motorway, while on a slip road)
+export function nearestWhere(net, x, z, ok) {
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  let best = null, bd = 1e18;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = net.grid.get(ck(cx + i, cz + j)); if (!a) continue;
+    for (let k = 0; k < a.length; k += 2) {
+      const e = net.edges[a[k]]; if (!ok(e)) continue;
+      const s = a[k + 1], ax = e.px[s], az = e.pz[s], dx = e.px[s + 1] - ax, dz = e.pz[s + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = ax + dx * t, qz = az + dz * t, dd = (x - qx) ** 2 + (z - qz) ** 2;
+      if (dd < bd) { bd = dd; const L = Math.sqrt(L2); best = { e, way: e.way, d: Math.sqrt(dd), s: e.cum[s] + t * L, tx: dx / L, tz: dz / L, lat: (x - qx) * (dz / L) - (z - qz) * (dx / L) }; }
+    }
+  }
+  return best;
+}
 // nearest road to a point
 export function nearest(net, x, z) {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);

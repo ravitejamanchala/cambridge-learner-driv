@@ -314,6 +314,18 @@ Following distance at 70 — M100 · three lanes · traffic building. Follow the
 
 Getting into lane for your exit — M100 → J2 Ashwell. You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.
 
+### Joining the motorway
+
+![Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.](screenshots/lesson-mw-join.jpg)
+
+Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.
+
+### Traffic joining from a slip road
+
+![Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.](screenshots/lesson-mw-merging.jpg)
+
+Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.
+
 ### Parallel parking at the kerb
 
 ![Parallel parking at the kerb — Elm Road · 20 mph. Park at the kerb between two cars: pull up alongside the front one, then reverse in.](screenshots/lesson-parallel-park.jpg)

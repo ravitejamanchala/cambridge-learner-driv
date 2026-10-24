@@ -77,7 +77,7 @@ export function makeDriver(api) {
     const follow = nearMini ? 6 : 10;
     const p = api.lanePoint(t.sRoute + follow), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
     // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
-    const mw = motorwayPlan(api, st, t, pl, tr);
+    const mw = joinPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
     if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
       return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: Math.max(-1, Math.min(1, dm * 2)) }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
@@ -195,7 +195,8 @@ function motorwayPlan(api, st, t, pl, tr) {
   if (f.laneF == null) { st.mw = null; return null; }
   const R = t.route, here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), v = Math.max(pl.v, 1);
   // a new drive (or a new route) starts afresh: the driver is reused from one drive to the next
-  if (!st.mw || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: 0 };
+  // ... and settles for a few seconds before changing lane: just joined, or just started (Rule 259)
+  if (!st.mw || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: tr.clock + 6 };
   const M = st.mw;
   const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
   const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
@@ -250,6 +251,41 @@ function motorwayPlan(api, st, t, pl, tr) {
   if (exitIn != null && exitIn < 300 && here === 0 && !M.moving) indicate('L');
   const q = api.lanePoint(t.sRoute + 25), off = M.lat * 3.65;
   return { p: { x: q.x - q.tz * off, z: q.z + q.tx * off }, target: exitIn != null && exitIn < 120 && here === 0 ? Math.min(target, 22) : target };
+}
+
+// Joining from an entry slip road (Rule 259): build up to the speed of the left-hand lane, look right and
+// signal as the acceleration lane begins, and match the speed of a gap to drop into it. The slip road
+// itself runs into the left-hand lane, so following it is joining; with no safe gap, stop at the end of
+// the slip road rather than run out of it.
+function joinPlan(api, st, t, pl, tr) {
+  const nr = t.ctx, R = t.route; if (!nr || nr.way.cls !== 'motorway_link') return null;
+  const k = R.steps.findIndex(x => x.e === nr.e); if (k < 0 || R.steps[k + 1]?.e.way.cls !== 'motorway') return null;
+  const mergeIn = R.stepS[k] + nr.e.len - t.sRoute, CAR = 4.6, v = Math.max(pl.v, 1);
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr, net: api.A.net });
+  const lane0 = f.others.filter(o => o.lane === 0).sort((a, b) => a.fw - b.fw), near = lane0.filter(o => Math.abs(o.fw) < 250);
+  const flow = near.length ? near.reduce((a, o) => a + o.v, 0) / near.length : 27;
+  let target = Math.min(29, Math.max(18, flow));
+  if (mergeIn < 320) {
+    for (const view of ['right', 'blindspot']) if (!pl.observations.some(e => e.view === view && tr.clock - e.at < 3)) api.look(view);
+    if (pl.indicator !== 'R') pl.signal('R');
+  }
+  if (f.joining) {
+    const safe = lane0.every(o => { if (Math.abs(o.fw) < 7) return false;
+      if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > 1.7 && (close <= 0.3 || d / close > 6); }
+      return (o.fw - CAR) / v > 1.6 || o.v > pl.v + 1; });
+    if (!safe) {
+      const gaps = [];
+      for (let g = 0; g <= lane0.length; g++) {
+        const b = lane0[g - 1], a = lane0[g], lo = b ? b.fw + CAR + 1.9 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
+        if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? flow });
+      }
+      const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
+      if (best) { const d = at(best); target = Math.min(30.5, Math.max(4, best.v + Math.max(-5, Math.min(5, d * 0.15)) + Math.sign(d) * 0.6)); }
+      // the taper starts 80 m before the merge: never into it without a gap
+      if (mergeIn < 110) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 3 * (mergeIn - 85))));
+    }
+  }
+  return { p: api.lanePoint(t.sRoute + 25), target };
 }
 
 // ---------- results store ----------

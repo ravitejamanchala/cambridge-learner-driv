@@ -25,6 +25,7 @@ export const MW = {
   sideOffset: 260,      // how far the junction roundabout sits from its carriageway
   // diverge to merge, metres along the carriageway: exit slip, roundabout, entry slip
   junction: { decel: 220, out: 380, len: 1250, accel: 220 },
+  taper: 80,            // a slip road eases into or out of the left-hand lane over this length
 };
 
 // Junctions, by where they sit along the A carriageway's centre line. Each has an exit and an entry on

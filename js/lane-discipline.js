@@ -9,7 +9,7 @@
 // vehicle alongside on the left that you cannot yet move in front of, justifies it. A fault is marked
 // only for what the learner chose to do — moved without looking or signalling, pulled into a gap that
 // made someone brake, cut in, stayed out with nothing to pass, sat too close, passed on the left.
-import { laneInfo } from './net.js';
+import { laneInfo, nearestWhere } from './net.js';
 
 export const LANE = {
   start: 0.25,        // lane widths off the centre of your lane: a lane change has begun
@@ -25,6 +25,8 @@ export const LANE = {
   between: 3,         // s settled in a lane before moving on across the next (no sweeping across two)
   exitBy: 270,        // m: in the left-hand lane by the 300-yard marker for an exit (Rule 272)
   congested: 13.4,    // m/s (30 mph): below this lanes are queues, and lane rules relax (Rule 268)
+  settleJoin: 5,      // s in the left-hand lane after joining before moving out (Rule 259)
+  joinSlower: 8.9,    // m/s (20 mph): joining this much slower than the traffic is too slow (Rule 259)
   carLen: 4.6,
 };
 
@@ -38,6 +40,9 @@ const sec = (x) => `${x < 10 ? x.toFixed(1) : Math.round(x)} s`;
 // moving back now would cut in front of it. Shared with the test driver, so the two never disagree.
 export function overtaking(f, lane) {
   if (lane <= 0) return true;
+  // in the middle lane with traffic coming down a slip road beside you: making room for it is courtesy,
+  // not hogging (but nobody has to: Rule 259 puts the duty to give way on the joining traffic)
+  if (lane === 1 && f.others.some(o => o.lane === -1 && o.fw > -60 && o.fw < 250)) return true;
   return f.others.some(o => {
     if (o.lane !== lane - 1) return false;
     // a vehicle less than two seconds behind on that side: waiting for it to drop back is careful, not hogging
@@ -47,8 +52,11 @@ export function overtaking(f, lane) {
   });
 }
 
-// Frame: { t, dt, v, laneF, lanes, indicator, looks: [{view, at}], others: [{id, lane, fw, v}], exitIn }
-//   laneF: continuous lane position, 0 = the centre of the left-hand lane, 1 the next, …; null off the motorway
+// Frame: { t, dt, v, laneF, lanes, indicator, looks: [{view, at}], others: [{id, lane, fw, v}], exitIn, joining }
+//   laneF: continuous lane position, 0 = the centre of the left-hand lane, 1 the next, …; null off the motorway.
+//     On an entry slip road it is measured from the carriageway being joined, so the acceleration lane is
+//     about -1 and joining is a move from "lane -1" into the left-hand lane, judged like any lane change.
+//   joining: on an entry slip road, alongside the carriageway
 //   others: vehicles on this carriageway; fw = metres ahead of you along the road (negative behind)
 //   exitIn: metres to where your exit leaves (null if there is none)
 // fault(kind, cat, text, key) is the examiner's own.
@@ -86,7 +94,7 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
       if (here > 0) mark('D', 'Positioning – lane discipline', `Was still in the ${laneName(here, f.lanes)} lane ${Math.round(LANE.exitBy / 0.9144 / 10) * 10} yards before the exit: move left in good time (Rule 272)`, 'mwexit');
     }
     if (f.laneF == null) { st.lane = null; st.move = null; return; }
-    if (st.lane == null) st.lane = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF)));
+    if (st.lane == null) st.lane = Math.max(f.joining ? -1 : 0, Math.min(f.lanes - 1, Math.round(f.laneF)));
     out.stats.lanesTime[st.lane] = (out.stats.lanesTime[st.lane] || 0) + dt;
     const off = f.laneF - st.lane;
 
@@ -94,11 +102,15 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
     if (!st.move && Math.abs(off) > LANE.start) {
       const dir = Math.sign(off), to = st.lane + dir;
       if (to >= 0 && to < f.lanes) {
-        const want = dir > 0 ? 'R' : 'L', signalled = st.indOn === want, lk = looked(f, dir);
-        st.move = { dir, from: st.lane, to, t0: t, mph: f.v * MPH, signalFor: signalled ? t - st.indSince : 0, ...lk, judged: false, sweep: dir === st.lastDir && t - st.lastDone < LANE.between };
-        if (!lk.mirror) mark('D', 'Mirrors – change direction', `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane without checking the ${side(dir)} mirror first`, 'mwmir');
-        if (!signalled) mark('D', 'Signals – necessary', `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane without signalling`, 'mwsig');
+        const want = dir > 0 ? 'R' : 'L', signalled = st.indOn === want, lk = looked(f, dir), join = st.lane < 0;
+        const afterJoin = !join && dir > 0 && st.lastFrom === -1 && t - st.lastDone < LANE.settleJoin;
+        st.move = { dir, from: st.lane, to, t0: t, mph: f.v * MPH, signalFor: signalled ? t - st.indSince : 0, ...lk, judged: false, join,
+          sweep: !afterJoin && dir === st.lastDir && t - st.lastDone < LANE.between };
+        const what = join ? 'Joined the motorway' : `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane`;
+        if (!lk.mirror) mark('D', 'Mirrors – change direction', `${what} without checking the ${side(dir)} mirror first`, 'mwmir');
+        if (!signalled) mark('D', 'Signals – necessary', `${what} without signalling${join ? ' right' : ''}`, 'mwsig');
         if (st.move.sweep) mark('D', 'Positioning – lane discipline', `Swept across two lanes in one go: settle in each lane, then check and signal again`, 'mwsweep');
+        if (afterJoin) mark('D', 'Positioning – lane discipline', `Moved out of the left-hand lane straight after joining: settle into the traffic first (Rule 259)`, 'mwjoinout');
       }
     }
     if (st.move) {
@@ -109,20 +121,27 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
         const g = gaps(f, m.to);
         m.behind = g.behind ? { d: -g.behind.fw - LANE.carLen, v: g.behind.v } : null;
         m.ahead = g.ahead ? { d: g.ahead.fw - LANE.carLen, v: g.ahead.v } : null;
-        if (g.alongside) mark('S', 'Mirrors – change direction', `Moved ${side(m.dir)} into a lane with a vehicle alongside you`, 'mwside');
+        if (g.alongside) mark('S', 'Mirrors – change direction', m.join ? 'Joined the motorway with a vehicle alongside you: traffic already on the motorway has priority (Rule 259)' : `Moved ${side(m.dir)} into a lane with a vehicle alongside you`, 'mwside');
         else if (m.behind) {
           const b = m.behind, behindS = b.d / Math.max(b.v, 1), close = b.v - f.v, ttc = close > 0.3 ? b.d / close : Infinity;
           m.behindS = behindS;
           if (m.dir < 0 && behindS < 1) mark(behindS < 0.5 ? 'S' : 'D', 'Positioning – lane discipline', `Cut in after overtaking: the vehicle you passed was only ${sec(behindS)} behind when you moved back (Rule 163)`, 'mwcut');
           // it would have to brake for you (Rule 133: never force anyone to change speed or course)
-          else if (ttc < 4 || behindS < 1 || (behindS < 1.5 && close > 0.5)) mark(ttc < 1.5 || behindS < 0.5 ? 'S' : 'D', 'Mirrors – change direction', `Moved ${side(m.dir)} into too small a gap: a vehicle ${Math.round(b.d)} m behind${close > 0.3 ? ` was closing at ${Math.round(close * MPH)} mph faster than you` : ` was only ${sec(behindS)} away`}`, 'mwgap');
+          else if (ttc < 4 || behindS < 1 || (behindS < 1.5 && close > 0.5)) mark(ttc < 1.5 || behindS < 0.5 ? 'S' : 'D', 'Mirrors – change direction', `${m.join ? 'Joined the motorway' : `Moved ${side(m.dir)}`} into too small a gap: a vehicle ${Math.round(b.d)} m behind${close > 0.3 ? ` was closing at ${Math.round(close * MPH)} mph faster than you` : ` was only ${sec(behindS)} away`}`, 'mwgap');
         }
-        if (m.ahead && f.v > 8 && m.ahead.d / f.v < LANE.tailgate) mark('D', 'Following distance', `Moved into the lane only ${sec(m.ahead.d / f.v)} behind the vehicle ahead`, 'mwgapA');
+        if (m.ahead && f.v > 8 && m.ahead.d / f.v < LANE.tailgate) mark('D', 'Following distance', `${m.join ? 'Joined' : 'Moved into the lane'} only ${sec(m.ahead.d / f.v)} behind the vehicle ahead`, 'mwgapA');
+        // joining: match the speed of the traffic in the left-hand lane (Rule 259)
+        if (m.join) {
+          const near = inLane(f, 0).filter(o => o.fw > -150 && o.fw < 100);
+          m.trafficMph = near.length ? Math.round(near.reduce((a, o) => a + o.v, 0) / near.length * MPH) : null;
+          if (near.length && f.v < near.reduce((a, o) => a + o.v, 0) / near.length - LANE.joinSlower)
+            mark('D', 'Use of speed', `Joined at ${Math.round(f.v * MPH)} mph into traffic doing about ${m.trafficMph} mph: build up your speed on the slip road (Rule 259)`, 'mwjoinslow');
+        }
       }
       if (Math.abs(f.laneF - m.to) < LANE.settle) {
-        out.events.push({ type: 'lane', t, from: m.from, to: m.to, lanes: f.lanes, mph: Math.round(m.mph), signalFor: +m.signalFor.toFixed(1), mirror: m.mirror, blind: m.blind, interior: m.interior,
-          behindS: m.behindS != null ? +m.behindS.toFixed(1) : null, aheadS: m.ahead && f.v > 1 ? +(m.ahead.d / f.v).toFixed(1) : null });
-        st.lane = m.to; st.lastDone = t; st.lastDir = m.dir; st.move = null;
+        out.events.push({ type: m.join ? 'join' : 'lane', t, from: m.from, to: m.to, lanes: f.lanes, mph: Math.round(m.join ? f.v * MPH : m.mph), signalFor: +m.signalFor.toFixed(1), mirror: m.mirror, blind: m.blind, interior: m.interior,
+          behindS: m.behindS != null ? +m.behindS.toFixed(1) : null, aheadS: m.ahead && f.v > 1 ? +(m.ahead.d / f.v).toFixed(1) : null, trafficMph: m.trafficMph ?? null });
+        st.lane = m.to; st.lastDone = t; st.lastDir = m.dir; st.lastFrom = m.from; st.move = null;
         if (m.dir < 0 || st.lane !== st.hogLane) { st.hog = 0; st.hogFlag = false; }
       } else if (Math.abs(f.laneF - m.from) < LANE.settle * 0.6) st.move = null; // thought better of it
     }
@@ -156,7 +175,7 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
     // right moves at a similar speed is allowed, so only a clear difference (over 5 mph) is overtaking ----
     for (const o of f.others) {
       const was = st.seen.get(o.id); st.seen.set(o.id, { fw: o.fw, lane: o.lane, t });
-      if (!was || t - was.t > 0.5 || st.move) continue;
+      if (!was || t - was.t > 0.5 || st.move || st.lane < 0) continue; // passing on a slip road before joining is not overtaking
       if (was.fw > 0 && o.fw <= 0 && o.lane > st.lane && o.lane === was.lane && f.v > LANE.congested && f.v > o.v + 2.2)
         mark('D', 'Positioning – lane discipline', `Overtook a vehicle on its left: overtake on the right, or stay behind (Rule 268)`, 'mwunder');
     }
@@ -167,7 +186,7 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
   // the lane you are in while overtaking justifies it; only the left-hand lane once an exit is close.
   function guide(f) {
     if (f.laneF == null) return null;
-    const here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), ok = [0];
+    const here = Math.max(-1, Math.min(f.lanes - 1, Math.round(f.laneF))), ok = [0];
     if (f.exitIn == null || f.exitIn > 1600) for (let l = 1; l <= here; l++) if (overtaking(f, l)) ok.push(l);
     return { lanes: f.lanes, ok: [...new Set(ok)], here };
   }
@@ -176,16 +195,26 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
 
 // A frame from the live simulation. Only vehicles on the same carriageway, going the same way, within
 // 300 m count.
-export function senseMotorway({ t, dt, player, test, traffic, exitIn = null }) {
-  const nr = test.ctx, on = nr && nr.way.cls === 'motorway';
+export function senseMotorway({ t, dt, player, test, traffic, net = null, exitIn = null }) {
+  let nr = test.ctx, on = nr && nr.way.cls === 'motorway', joining = false, mergeIn = null;
+  // on an entry slip road alongside the carriageway: measure from the carriageway being joined
+  if (!on && net && nr && nr.way.cls === 'motorway_link' && net.out[nr.e.b]?.some(o => o.e.way.cls === 'motorway')) {
+    mergeIn = nr.e.len - nr.s;
+    const fx = -Math.sin(player.th), fz = -Math.cos(player.th);
+    const m = nearestWhere(net, player.x, player.z, e => e.way.cls === 'motorway');
+    if (m && m.d < m.way.w / 2 + 7 && m.tx * fx + m.tz * fz > 0.9) { nr = m; on = true; joining = true; }
+  }
   let laneF = null, lanes = 0;
   if (on) { const L = laneInfo(nr.e, 1); lanes = L.n; laneF = (L.outer - nr.lat) / L.laneW - 0.5; }
   const fx = -Math.sin(player.th), fz = -Math.cos(player.th), others = [];
+  // vehicles on an entry slip road coming up to the merge count too, as "lane -1"
+  const joiningCar = (c) => net && c.e.way.cls === 'motorway_link' && c.e.len - c.s < 500 && net.out[c.e.b]?.some(o => o.e.way.cls === 'motorway');
   if (on) traffic.cars.forEach((c, id) => {
-    if (!c.alive || !c.e || c.e.way.cls !== 'motorway' || Math.cos(c.th - player.th) < 0.7) return;
+    if (!c.alive || !c.e || Math.cos(c.th - player.th) < 0.7) return;
+    const slip = c.e.way.cls !== 'motorway'; if (slip && !joiningCar(c)) return;
     const dx = c.x - player.x, dz = c.z - player.z, fw = dx * fx + dz * fz;
-    if (Math.abs(fw) > 300 || Math.abs(dx * fz - dz * fx) > lanes * 3.65 + 2) return;
-    others.push({ id, lane: c.lane, fw, v: c.v });
+    if (Math.abs(fw) > 300 || Math.abs(dx * fz - dz * fx) > lanes * 3.65 + (slip ? 12 : 2)) return;
+    others.push({ id, lane: slip ? -1 : c.lane, fw, v: c.v });
   });
-  return { t, dt, v: Math.max(0, player.v), laneF, lanes, indicator: player.indicator || null, looks: player.observations || [], others, exitIn };
+  return { t, dt, v: Math.max(0, player.v), laneF, lanes, indicator: player.indicator || null, looks: player.observations || [], others, exitIn, joining, mergeIn };
 }

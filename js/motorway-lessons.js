@@ -1,5 +1,5 @@
-// Motorway lessons (issue #7): keeping left, overtaking into a safe gap, following distance at speed,
-// and getting across in good time for an exit. They run on the motorway worlds (js/motorway.js) with
+// Motorway lessons (issues #7 and #8): keeping left, overtaking into a safe gap, following distance at
+// speed, getting across in good time for an exit, joining from a slip road, and traffic joining beside you. They run on the motorway worlds (js/motorway.js) with
 // background traffic switched off and every vehicle that matters placed by the lesson, so a drive is
 // the same every time and the assessment (js/lane-discipline.js) judges the same situation.
 import { MW, JUNCTIONS, centreLine, onCarriageway, junctionSpan } from './motorway.js';
@@ -15,11 +15,18 @@ function localRoad(lanes, n) {
   return { x: +p.x.toFixed(1), z: +p.z.toFixed(1), road: `A${n}01 to ${j.to}` };
 }
 export const exitDiverge = (n) => junctionSpan(JUNCTIONS.find(q => q.n === n), 'A').diverge;
+// where a junction's entry slip leaves its roundabout on the A side: a joining lesson starts here
+function entrySlip(lanes, n) {
+  const sp = junctionSpan(JUNCTIONS.find(q => q.n === n), 'A');
+  const p = onCarriageway(centreLine(), lanes, 'A', sp.diverge + MW.junction.out + 2 * MW.ring, MW.sideOffset);
+  return { x: +p.x.toFixed(1), z: +p.z.toFixed(1), road: `J${n} slip road` };
+}
 
 const KEEP = { n: 'Rule 264', t: 'Keep in the left lane unless overtaking. If you are overtaking a number of slow-moving vehicles, you should return to the left lane as soon as you are safely past.' };
 const OVERTAKE = { n: 'Rule 267', t: 'Check your mirrors, take time to judge the speeds correctly, and make sure the lane you will be joining is sufficiently clear ahead and behind. Take a quick sideways glance into the blind spot. Signal in plenty of time, then move out, and do not cut in on the vehicle you have overtaken.' };
 const FOLLOW = { n: 'Rule 126', t: 'Allow at least a two-second gap between you and the vehicle in front on roads carrying faster-moving traffic. The gap should be at least doubled on wet roads.' };
 const LEAVE = { n: 'Rule 272', t: 'Watch for the signs letting you know you are getting near your exit, move into the left-hand lane well before reaching it, signal left in good time and reduce speed on the slip road as necessary.' };
+const JOIN = { n: 'Rule 259', t: 'When you join the motorway you should give priority to traffic already on the motorway, check the traffic and match your speed to fit safely into the traffic flow in the left-hand lane, not cross solid white lines that separate lanes or use the hard shoulder, and remain in the left-hand lane long enough to adjust to the speed of traffic before considering overtaking.' };
 const FOCUS = ['Positioning – lane discipline', 'Mirrors – change direction', 'Signals – necessary', 'Following distance'];
 // background traffic off: every vehicle that matters is placed by the lesson, so each run is the same
 const SCRIPTED = [{ id: 'scripted', title: 'The lesson\'s own traffic', trafficDensity: 'none' }];
@@ -45,12 +52,23 @@ export const MOTORWAY_LESSONS = [
     steps: ['Start moving left early: there is traffic in both lanes', 'One lane at a time: settle, then mirrors and signal again', 'In the left-hand lane by the 300-yard marker, then follow the slip road'],
     rule: LEAVE, waypoints: [M(3, 4000), localRoad(3, 2)], scenario: 'motorway', setup: 'exit-prep', exit: 2,
     startAt: 320, startLane: 2, startMph: 64, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
+  { id: 'mw-join', unit: 'motorway', area: 'm3', title: 'Joining the motorway', road: 'J1 slip road → M100',
+    goal: 'Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.',
+    steps: ['Look right early: mirror, then over your shoulder', 'Signal right and match the speed of the left-hand lane', 'Fit in without forcing anyone to brake, then stay left while you settle'],
+    rule: JOIN, waypoints: [entrySlip(3, 1), M(3, 5200)], scenario: 'motorway', setup: 'join', merge: 1,
+    startAt: 40, startLane: 0, startMph: 30, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: [...FOCUS, 'Use of speed'], maxD: 2 },
+  { id: 'mw-merging', unit: 'motorway', area: 'm3', title: 'Traffic joining from a slip road', road: 'M100 · junction 2 · three lanes',
+    goal: 'Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.',
+    steps: ['Spot the traffic on the slip road early', 'Check your mirrors before you decide: the middle lane may be busy', 'Keep your lane, ease off, or move over only into a safe gap'],
+    rule: JOIN, waypoints: [M(3, 6400), M(3, 9200)], scenario: 'motorway', setup: 'merging', merge: 2,
+    startAt: 260, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
 ];
 
 const MPH = 0.44704;
 // Scripted traffic, in route metres ahead of the learner's start (negative is behind; each lesson's
-// startAt leaves room on its route for the furthest back). `role` names the vehicles the lesson's own
-// result is about.
+// startAt leaves room on its route for the furthest back). `main` places a vehicle that many metres
+// upstream of the lesson junction's merge point on the carriageway, `slip` that many metres before the
+// merge on its entry slip road. `role` names the vehicles the lesson's own result is about.
 export const SETUPS = {
   'keep-left': [{ at: 260, lane: 0, mph: 50, role: 'slow' }, { at: 650, lane: 0, mph: 53, role: 'slow' }, { at: -150, lane: 1, mph: 69 }, { at: -420, lane: 2, mph: 70 }],
   'busy-lane': [{ at: 170, lane: 0, mph: 48, role: 'slow' },
@@ -61,11 +79,19 @@ export const SETUPS = {
     { at: 60, lane: 2, mph: 66, wave: 1 }, { at: -60, lane: 2, mph: 66, wave: 1 }],
   'exit-prep': [{ at: 25, lane: 1, mph: 62 }, { at: -110, lane: 1, mph: 62 }, { at: 200, lane: 1, mph: 61 }, { at: -280, lane: 1, mph: 64 },
     { at: 40, lane: 0, mph: 56 }, { at: 260, lane: 0, mph: 56 }, { at: -120, lane: 0, mph: 57 }, { at: 520, lane: 0, mph: 55 }],
+  // the first gap in the left-hand lane closes just as you reach it; the middle lane is busy too, so
+  // nobody on the motorway could move over for you even if they wanted to
+  join: [{ main: 905, lane: 0, mph: 60 }, { main: 950, lane: 0, mph: 60 }, { main: 1130, lane: 0, mph: 59 }, { main: 700, lane: 0, mph: 61 }, { main: 1330, lane: 0, mph: 60 },
+    { main: 850, lane: 1, mph: 66 }, { main: 980, lane: 1, mph: 66 }, { main: 1040, lane: 1, mph: 66 }, { main: 1200, lane: 2, mph: 70 }],
+  // two vehicles on the slip road timed to arrive as you do, and a car alongside you in the middle lane
+  // that draws ahead within ten seconds or so, so moving over becomes possible (but is never required)
+  merging: [{ slip: 750, mph: 48, role: 'joiner' }, { slip: 800, mph: 48, role: 'joiner' }, { at: 120, lane: 0, mph: 60 },
+    { at: 0, lane: 1, mph: 66 }, { at: -250, lane: 1, mph: 68 }, { at: -120, lane: 2, mph: 70 }],
 };
 // the traffic wave in the following lesson: speed as a share of where each vehicle started, by time
 const wave = (t) => t < 20 ? 1 : t < 40 ? 1 - (t - 20) / 20 * 0.3 : t < 70 ? 0.7 : t < 90 ? 0.7 + (t - 70) / 20 * 0.35 : 1.05;
 
-export function createMotorwayScenario(lesson, { traffic, test, player }) {
+export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
   const events = [], placed = [];
   const A = createLaneAssessor({ fault: (kind, cat, text, key) => test.fault(kind, cat, text, key, 30) });
   const route = () => test.route;
@@ -80,7 +106,24 @@ export function createMotorwayScenario(lesson, { traffic, test, player }) {
     R0.instructions.sort((a, b) => (a.final ? 1 : 0) - (b.final ? 1 : 0) || a.s - b.s);
   }
 
+  // the lesson junction's merge point: where its entry slip road meets the carriageway
+  const mergeNode = lesson.merge ? (() => { const j = JUNCTIONS.find(q => q.n === lesson.merge), at = junctionSpan(j, 'A').merge, p = onCarriageway(centreLine(), net.motorway.lanes, 'A', at);
+    let best = -1, bd = Infinity; for (const e of net.edges) if (e.way.cls === 'motorway_link') { const d = Math.hypot(net.nx[e.b] - p.x, net.nz[e.b] - p.z); if (d < bd) { bd = d; best = e.b; } } return best; })() : null;
+  const slipInto = () => net.edges.find(e => e.way.cls === 'motorway_link' && e.b === mergeNode);
+  // a spot on the carriageway `before` metres upstream of the merge (walking back along it)
+  function upstream(before) {
+    let v = mergeNode, d = before;
+    for (let i = 0; i < 20; i++) { const e = net.edges.find(x => x.way.cls === 'motorway' && x.b === v); if (!e) return null; if (d <= e.len) return { e, s: e.len - d }; d -= e.len; v = e.a; }
+    return null;
+  }
+  function placeAt(e, s, spec) {
+    const free = traffic.cars.find(c => !placed.some(p => p.car === c)); if (!free) return;
+    traffic.placeCar(free, e, 1, Math.max(0.5, Math.min(e.len - 1, s)), spec.mph * MPH, spec.mph / 70, null, spec.lane || 0, 'motorway');
+    free.pinned = 1e9; placed.push({ car: free, spec, passed: false });
+  }
   function place(spec) {
+    if (spec.main != null) { const u = upstream(spec.main); if (u) placeAt(u.e, u.s, spec); return; }
+    if (spec.slip != null) { const e = slipInto(); if (e && spec.slip <= e.len) placeAt(e, e.len - spec.slip, spec); return; }
     const R = route(), s = test.sRoute + spec.at; let k = 0;
     if (s < 1 || s > R.len - 5) return; // off the route: tests/motorway.test.mjs checks no lesson does this
     while (k < R.steps.length - 1 && R.stepS[k + 1] <= s) k++;
@@ -102,9 +145,22 @@ export function createMotorwayScenario(lesson, { traffic, test, player }) {
     }
     const nr = test.ctx;
     if (exitS != null && nr && nr.way.cls === 'motorway_link' && test.sRoute > exitS) tookExit = true;
-    const f = senseMotorway({ t: clock, dt, player, test, traffic, exitIn: exitS != null && !tookExit ? exitS - test.sRoute : null });
+    const f = senseMotorway({ t: clock, dt, player, test, traffic, net, exitIn: exitS != null && !tookExit ? exitS - test.sRoute : null });
     A.step(f);
     test.laneGuide = A.guide(f);
+    // traffic joining beside you: when each vehicle on the slip road reaches the motorway, is it ahead of
+    // you or behind, and what did you do as it came alongside (kept your lane and speed, eased off, moved over)?
+    if (lesson.setup === 'merging') {
+      const fx = -Math.sin(player.th), fz = -Math.cos(player.th);
+      for (const p of placed) {
+        if (p.spec.role !== 'joiner' || p.joined || !p.car.alive) continue;
+        const fw = (p.car.x - player.x) * fx + (p.car.z - player.z) * fz;
+        if (!p.near && p.car.e.way.cls === 'motorway_link' && p.car.e.len - p.car.s < MW.junction.accel) { p.near = { at: clock, mph: player.v / MPH, lane: Math.round(f.laneF ?? 0) }; p.minMph = player.v / MPH; }
+        if (p.near) p.minMph = Math.min(p.minMph, player.v / MPH);
+        if (p.car.e.way.cls === 'motorway') { p.joined = { at: clock, ahead: fw > 0, waited: Math.round(clock - (p.near?.at ?? clock)) }; p.response = Math.round(f.laneF ?? 0) > 0 || (p.near?.lane ?? 0) > 0 ? 'moved' : p.near && p.near.mph - p.minMph > 5 ? 'eased' : 'kept';
+          events.push({ type: 'joined-beside', ahead: fw > 0, response: p.response, fromMph: Math.round(p.near?.mph ?? 0), toMph: Math.round(p.minMph ?? 0) }); }
+      }
+    }
     // the following lesson's instrument: your gap to the car ahead, in seconds, where you look for it
     if (lesson.setup === 'following') {
       const here = f.laneF == null ? -1 : Math.round(f.laneF), ahead = f.others.filter(o => o.lane === here && o.fw > 4.6 && o.fw < 200).sort((a, b) => a.fw - b.fw)[0];
@@ -131,6 +187,16 @@ export function createMotorwayScenario(lesson, { traffic, test, player }) {
       const share = Math.round(100 * (1 - st.under2 / st.measured));
       if (st.under2 > 6) return { ok: false, why: `Under two seconds behind the car ahead for ${Math.round(st.under2)} s of ${Math.round(st.measured)} s (closest ${st.minGap.toFixed(1)} s). Ease off earlier as the traffic slows.` };
       return { ok: true, why: `At least two seconds behind for ${share}% of ${Math.round(st.measured)} s of following; the closest you came was ${st.minGap.toFixed(1)} s.` };
+    }
+    if (lesson.setup === 'join') {
+      const j = A.events.find(e => e.type === 'join');
+      if (!j) return { ok: false, why: 'You did not join the motorway. Build up your speed on the slip road and look for a gap in the left-hand lane.' };
+      return { ok: true, why: `Joined at ${j.mph} mph${j.trafficMph ? ` into traffic doing about ${j.trafficMph} mph` : ''}${j.behindS != null ? `, ${j.behindS.toFixed(1)} s ahead of the vehicle behind` : ''}.` };
+    }
+    if (lesson.setup === 'merging') {
+      const said = { kept: 'you kept your lane and speed', eased: 'you eased off', moved: 'you moved over' };
+      const lines = events.filter(e => e.type === 'joined-beside').map(e => `one joined ${e.ahead ? 'ahead of' : 'behind'} you as ${said[e.response]}${e.response === 'eased' ? ` from ${e.fromMph} to ${e.toMph} mph` : ''}`);
+      return { ok: true, why: lines.length ? `Traffic joined from the slip road: ${lines.join('; ')}. Any of those is right when it is safe.` : '' };
     }
     if (lesson.setup === 'exit-prep') {
       if (missed) return { ok: false, why: 'You carried on past the exit. Start moving left earlier, one lane at a time.' };

@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { installAuthFixture, signedIn } from '../tests/auth-fixture.mjs';
+import { installMwDriver } from '../tests/mw-driver.mjs';
 
 const require = createRequire(import.meta.url), three = path.dirname(require.resolve('three/package.json'));
 const FPS = 20, DT = 1 / FPS, VIEW = { width: 960, height: 540 };
@@ -44,17 +45,6 @@ const installBot = (page, lesson) => page.addScriptTag({ type: 'module', content
     scenarioStatus: () => null, scenarioPhase: () => null, estopBanner: () => false, operate: () => {}, gear: () => {}, lanePoint: (s) => a.lanePoint(s),
     look: (view = 'all-round') => { a.player.lookAt = a.traffic.clock; a.player.observations.push({ view, at: a.traffic.clock, x: a.player.x, z: a.player.z }); } });
   a.addInput(() => drive()); window.__botReady = true;` }).then(() => page.waitForFunction(() => window.__botReady));
-// The browser check's scriptable driver (tests/motorway-lessons-browser.mjs): the route's line offset by
-// window.__mw.lane lanes, moving across at half a lane a second towards .want, at .mph. It looks and
-// signals only when told to, which is how the careless drives are made.
-const installScripted = (page) => page.evaluate(() => {
-  const a = window.cambridgeDrive, p = a.player; window.__mw = { lane: 0, want: 0, mph: 60 };
-  a.addInput(() => { const M = window.__mw, t = a.test; if (!t.running) return null;
-    M.lane += Math.sign(M.want - M.lane) * Math.min(Math.abs(M.want - M.lane), 0.025);
-    const q = a.lanePoint(Math.min(t.route.len, t.sRoute + 25)), off = M.lane * 3.65, x = q.x - q.tz * off, z = q.z + q.tx * off, want = M.mph * 0.44704;
-    let ang = Math.atan2(-(x - p.x), -(z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-    return { throttle: p.v < want - 0.3 ? 1 : 0, brake: p.v > want + 0.6 ? Math.min(1, (p.v - want) / 4) : 0, steer: Math.max(-1, Math.min(1, ang * 2)) }; });
-});
 // run the simulation without drawing until the predicate (a function source run in the page) holds
 const ffUntil = (page, pred, maxSeconds = 600) => page.evaluate(([src, max]) => { const f = new Function('a', 'return (' + src + ')(a)'), a = window.cambridgeDrive;
   for (let i = 0; i < max * 20; i += 10) { if (f(a)) return true; a.step(10); } return false; }, [pred.toString(), maxSeconds]);
@@ -159,6 +149,39 @@ GROUPS.lanes = {
       async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await ffUntil(p, 'a => a.test.done', 400); } },
   ],
 };
+GROUPS.joining = {
+  dir: 'docs/evidence/8-motorway-joining',
+  title: 'Joining the motorway, and traffic joining beside you (issue #8)',
+  driverNote: 'The careful join uses the Bot lab\'s reference driver (`js/bots.js`); the other clips use the scriptable driver that `npm run test:motorway` drives these lessons with (`tests/mw-driver.mjs`), making the same three safe choices and the one unsafe one the checks make.',
+  clips: [
+    { name: '01-joining-the-motorway', driver: 'bot', lesson: { id: 'mw-join', scenario: 'motorway' }, seconds: 48,
+      caption: 'Joining from the slip road (Rule 259). The driver builds up speed, looks right in the mirror and over its shoulder, signals, and matches the speed of a gap in the left-hand lane to drop into it. Nobody on the motorway brakes or moves over: traffic already on the motorway has priority.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-join'); await camera(p, 0); } },
+    { name: '02-traffic-joining-keep-your-lane', driver: 'scripted', seconds: 40,
+      caption: 'Traffic joining beside you, answer one: keep your lane and your speed. The two vehicles on the slip road give way, as Rule 259 says they must, and fit in behind. The lesson passes.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-merging'); await camera(p, 0); await ctx.d.set({ mph: 60 }); await ctx.d.steps(10); } },
+    { name: '03-traffic-joining-ease-off', driver: 'scripted', seconds: 42,
+      caption: 'Answer two: ease off a little as they arrive, to make room, then back up to speed. Also passes.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-merging'); await camera(p, 0); await ctx.d.set({ mph: 60 }); await ctx.d.steps(10); },
+      script: (p, ctx) => async (t) => { if (!ctx.eased && await ctx.d.joinerNear()) { ctx.eased = t; await ctx.d.set({ mph: 47 }); } if (ctx.eased && !ctx.back && t > ctx.eased + 9) { ctx.back = true; await ctx.d.set({ mph: 60 }); } } },
+    { name: '04-traffic-joining-move-over', driver: 'scripted', seconds: 50,
+      caption: 'Answer three: once the car alongside in the middle lane has drawn ahead, mirror, shoulder and signal, move over to leave the left-hand lane free, then back left the same way once the joiners are in and two seconds behind. Also passes; being in the middle lane while traffic comes down the slip road is courtesy, not hogging.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-merging'); await camera(p, 0); await ctx.d.set({ mph: 60 }); await ctx.d.steps(10); },
+      script: (p, ctx) => async (t) => { const d = ctx.d;
+        if (!ctx.out && await d.laneClear(1, 60, 30)) { ctx.out = t; await d.look('right'); await d.look('blindspot'); await d.signal('R'); }
+        if (ctx.out && !ctx.over && t > ctx.out + 2) { ctx.over = t; await d.set({ want: 1 }); }
+        if (ctx.over && !ctx.cancel && t > ctx.over + 3.5) { ctx.cancel = true; await d.signal('R'); }
+        if (ctx.cancel && !ctx.back && await d.joinersIn() && await d.laneClear(0, 50, 80)) { ctx.back = t; await d.look('left'); await d.look('left-blindspot'); await d.signal('L'); }
+        if (ctx.back && !ctx.left && t > ctx.back + 2) { ctx.left = t; await d.set({ want: 0 }); }
+        if (ctx.left && !ctx.done && t > ctx.left + 3.5) { ctx.done = true; await d.signal('L'); } } },
+    { name: '05-joining-beside-a-car-and-what-it-is-marked-for', driver: 'scripted', seconds: 34,
+      caption: 'The unsafe join: matching speed with a car in the left-hand lane and running down the slip road into it. Marked as a serious fault (a vehicle alongside), with the result naming it.',
+      async setup(p, ctx) { await startDrive(p, 'lesson', 'mw-join'); await camera(p, 0); await ctx.d.set({ mph: 60, shadow: true }); await ctx.d.steps(10); await ctx.d.look('right'); await ctx.d.look('blindspot'); await ctx.d.signal('R');
+        await ffUntil(p, 'a => a.test.ctx && a.test.ctx.way.cls === "motorway_link" && a.test.ctx.e.len - a.test.ctx.s < 300', 120); },
+      script: (p) => { const end = once(() => p.evaluate(() => { const a = window.cambridgeDrive; for (let i = 0; i < 4000 && !a.test.done; i++) a.step(1); }));
+        return async t => { await at(t, 24, end); }; } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
@@ -180,8 +203,10 @@ try {
     await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv')?.hidden, {}, { timeout: 45000 }); await signedIn(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' });
     await page.waitForTimeout(5000); // let the car models arrive, so nothing on the road is still a box
-    if (c.driver === 'bot') await installBot(page, c.lesson); else if (c.driver === 'scripted') await installScripted(page); else await installDriver(page);
+    // the scripted driver is the one tests/motorway-lessons-browser.mjs uses (tests/mw-driver.mjs), so a
+    // clip shows exactly the drive the check makes
     const ctx = {};
+    if (c.driver === 'bot') await installBot(page, c.lesson); else if (c.driver === 'scripted') ctx.d = await installMwDriver(page); else await installDriver(page);
     await c.setup(page, ctx);
     made.push({ ...c, ...(await clip(page, group.dir, c.name, c.seconds, c.script?.(page, ctx), c.speed || 1)) });
     if (errors.length) throw new Error(`${c.name}: ${errors.join('; ')}`);

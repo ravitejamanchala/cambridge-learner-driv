@@ -3,7 +3,8 @@
 import { TRAFFIC } from './config.js';
 import { safeTrafficSpawn } from './traffic-spawn.js';
 import { seededRandom } from './random.js';
-import { along, endNode, posAt, laneCentre, laneInfo, cycleLeft, laneArrows, manoeuvre } from './net.js';
+import { along, endNode, posAt, laneCentre, laneInfo, cycleLeft, laneArrows, manoeuvre, nearestWhere } from './net.js';
+import { MW } from './motorway.js';
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -227,6 +228,36 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     }
     return vmax;
   }
+  // Joining a motorway (Rule 259): traffic already on the motorway has priority, the learner included.
+  // A joining vehicle looks for a gap in lane 1 alongside the acceleration lane: it fits in only if
+  // whoever would be behind it has at least 1.5 s (and is not closing to within 4 s), and whoever would be
+  // ahead is clear. Otherwise it drops back behind them, and if it runs out of slip road it stops at the
+  // end rather than forcing its way in. Nobody on the motorway is expected to brake or move over for it.
+  const MERGE_ZONE = MW.junction.accel + 20, TAPER = MW.taper; // the acceleration lane, as drawn (world.js) and assessed
+  function mergeYield(a, rem, vmax) {
+    const fx = -Math.sin(a.th), fz = -Math.cos(a.th);
+    let blocked = null;
+    for (const o of player ? all.concat([player]) : all) {
+      if (o === a || o.alive === false || o.kind === 'bike') continue;
+      if (Math.cos((o.th || 0) - a.th) < 0.9) continue;
+      const dx = o.x - a.x, dz = o.z - a.z, right = -dx * fz + dz * fx, fw = dx * fx + dz * fz;
+      if (right < -3 || right > 7) continue; // not beside this slip road at all
+      // only what is already in the left-hand lane of the carriageway counts: other traffic still on the
+      // slip road is queuing with us, not traffic we give way to
+      if (o.isPlayer) { const m = nearestWhere(net, o.x, o.z, e => e.way.cls === 'motorway'); if (!m || m.d > m.way.w / 2 + 0.5 || m.lat < m.way.w / 2 - MW.laneW - 0.5) continue; }
+      else if (!o.e || o.e.way.cls !== 'motorway' || o.lane !== 0) continue;
+      const ov = Math.abs(o.v);
+      const clear = fw < 0 ? -fw - 4.6 >= Math.max(ov * 1.5, 8) && (ov - a.v <= 0.3 || (-fw - 4.6) / (ov - a.v) >= 4) : fw - 4.6 >= Math.max(a.v * 0.8, 6) || ov > a.v + 2;
+      if (!clear && (!blocked || Math.abs(fw) < Math.abs(blocked.fw))) blocked = { fw, v: ov };
+    }
+    a.merging = !!blocked;
+    // The last TAPER metres of the slip run into the left-hand lane itself, so stopping there is stopping
+    // in the lane: a vehicle already in the taper has committed and carries on; one before it waits at
+    // the end of the acceleration lane for a gap.
+    if (!blocked || rem <= TAPER) return vmax;
+    // behind or beside us: let it go by; just ahead: drop in behind it
+    return Math.min(vmax, Math.max(0, blocked.v - (blocked.fw < 2 ? 3 : 1)), brakeTo(0, rem - TAPER - 5));
+  }
   function updateAgent(a, dt) {
     const w = a.e.way, bike = a.kind === 'bike', blue = !!a.emergency;
     // A vehicle on a shout drives hard: well above the limit, through corners faster, and it gives way
@@ -239,7 +270,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
       const corner = bike ? 3.5 : blue ? 8 : 4.5;
       if (miniNodes.has(endNode(a))) vmax = Math.min(vmax, brakeTo(corner, rem - 3));
-      if (ang > 0.5 && !w.rb) vmax = Math.min(vmax, brakeTo(corner, rem - 6));
+      // (where a slip road meets the motorway the edges join at a node on the carriageway's centre line,
+      // which reads as a sharp corner; the roads themselves are smooth, so there is nothing to slow for)
+      const slipJoin = /^motorway/.test(w.cls) && /^motorway/.test(a.next.e.way.cls) && w.cls !== a.next.e.way.cls;
+      if (ang > 0.5 && !w.rb && !slipJoin) vmax = Math.min(vmax, brakeTo(corner, rem - 6));
       // minor-road give-way and mini-roundabouts: let the learner go first (the ghost timer breaks a stand-off)
       if (!blue && rem < 24 && (giveKey.has(a.e.id + ':' + a.dir) || miniNodes.has(endNode(a))) && learnerApproaching(endNode(a))) vmax = Math.min(vmax, brakeTo(0, rem - 9));
       if (!blue && a.next.e.way.rb && !w.rb && rem < 22 && !sigEntry(a.e, a.dir) && ringBusy(endNode(a), a)) vmax = Math.min(vmax, brakeTo(0, rem - 9)); // lights decide at signalled entries
@@ -247,6 +281,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       vmax = stopAhead(a, a.next.e, a.next.dir, rem, vmax);
     } else vmax = Math.min(vmax, brakeTo(0, rem - 2));
     vmax = stopAhead(a, a.e, a.dir, -1, vmax);
+    if (!bike && !blue && w.cls === 'motorway_link' && a.next && a.next.e.way.cls === 'motorway' && rem < MERGE_ZONE) vmax = mergeYield(a, rem, vmax);
     const fx = -Math.sin(a.th), fz = -Math.cos(a.th);
     const others = player ? all.concat([player]) : all;
     // look further ahead at speed so fast traffic can stop behind a slower learner
@@ -256,7 +291,12 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (a.ghost > 0 && !o.isPlayer) continue;
       if(!o.isPlayer&&Math.cos((o.th||0)-a.th)<.7&&Math.hypot(o.x-a.x,o.z-a.z)>4.5)continue;
       const rx = o.x - a.x, rz = o.z - a.z, fwd = rx * fx + rz * fz; if (fwd <= 0 || fwd > look) continue;
-      const lat = Math.abs(rx * fz - rz * fx), oBike = o.kind === 'bike';
+      // on a motorway, sideways offset across the road between the two, not across this vehicle's own
+      // heading: round a long bend a vehicle in the next lane 80 m ahead would otherwise seem to be in this
+      // lane. (Only there: at a roundabout a car waiting to enter can face the same way as one on the ring.)
+      let lx = fx, lz = fz;
+      if (w.cls === 'motorway' && Math.cos((o.th || 0) - a.th) > 0.9) { lx += -Math.sin(o.th); lz += -Math.cos(o.th); const L = Math.hypot(lx, lz) || 1; lx /= L; lz /= L; }
+      const lat = Math.abs(rx * lz - rz * lx), oBike = o.kind === 'bike';
       const oncoming = Math.cos((o.th || 0) - a.th) < -0.5; // passing in the other lane, not in our way
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
       if (oncoming) width = Math.min(width, 1.4);
@@ -286,7 +326,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       const pfx = -Math.sin(player.th), pfz = -Math.cos(player.th), pv = player.v;
       const rx0 = player.x - a.x, rz0 = player.z - a.z, ahead = rx0 * fx + rz0 * fz, side = Math.abs(rx0 * fz - rz0 * fx), cosH = pfx * fx + pfz * fz;
       const passing = cosH < -0.7 && side > 2; // oncoming in the other lane
-      if (!passing && ahead > -2) for (const T of [0.5, 1, 1.5, 2]) {
+      // alongside in the next lane, going the same way and not moving across: straight-line projections
+      // round a long motorway bend make parallel lanes look as if they meet, so this is not a conflict
+      const parallel = cosH > 0.97 && side > 2.6 && Math.abs(Math.sin(player.th - a.th) * pv) < 0.8;
+      if (!passing && !parallel && ahead > -2) for (const T of [0.5, 1, 1.5, 2]) {
         const ax = a.x + fx * a.v * T, az = a.z + fz * a.v * T, px = player.x + pfx * pv * T, pz = player.z + pfz * pv * T;
         if (Math.hypot(ax - px, az - pz) < (bike ? 2.3 : 3.3)) { vmax = Math.min(vmax, brakeTo(0, Math.max(0, a.v * T - (bike ? 2.5 : 4)), 6)); break; }
       }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {VISIBLE_LESSONS,HIDDEN_LESSON_IDS} from '../js/course-menu.js';
 import {hasFullAccess,setAccess,needsLogin,setAuthConfigured,setSignedIn,canAccessPlan} from '../js/access.js';
 test('selected starter drills are hidden from the course menu',()=>{
- assert.equal(HIDDEN_LESSON_IDS.size,5);assert.equal(VISIBLE_LESSONS.length,38);
+ assert.equal(HIDDEN_LESSON_IDS.size,5);assert.equal(VISIBLE_LESSONS.length,40);
  assert.ok(VISIBLE_LESSONS.every(l=>!HIDDEN_LESSON_IDS.has(l.id)));
 });
 test('client starts locked and accepts only explicit verified access',()=>{

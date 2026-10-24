@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { installAuthFixture, signedIn } from './auth-fixture.mjs';
+import { installMwDriver } from './mw-driver.mjs';
 
 const require = createRequire(import.meta.url), three = path.dirname(require.resolve('three/package.json'));
 const root = path.resolve(process.env.TEST_SITE || '.'), port = 8783, url = `http://127.0.0.1:${port}`;
@@ -25,46 +26,14 @@ try {
   await installAuthFixture(page);
   await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv').hidden, {}, { timeout: 45000 }); await signedIn(page);
 
-  // A scriptable driver: holds the route's line offset by window.__mw.lane lanes to the right (moving
-  // across at half a lane a second towards .want), at .mph, or .gap seconds behind the car ahead in its
-  // lane. Looks and signals only when told to.
-  await page.evaluate(() => {
-    const a = window.cambridgeDrive, p = a.player;
-    window.__mw = { lane: 0, want: 0, mph: 68, gap: null, road: false };
-    a.addInput(() => {
-      const M = window.__mw, t = a.test; if (!t.running) return null;
-      M.lane += Math.sign(M.want - M.lane) * Math.min(Math.abs(M.want - M.lane), 0.025);
-      let q = a.lanePoint(Math.min(t.route.len, t.sRoute + 25)), off = M.lane * 3.65;
-      // .road: follow the motorway itself, whatever the route does (to carry on past an exit)
-      const nr = t.ctx;
-      if (M.road && nr && nr.way.cls === 'motorway') { const e = nr.e, s2 = Math.min(e.len - 0.1, nr.s + 25); let i = 0; while (i < e.n - 2 && e.cum[i + 1] < s2) i++;
-        const L = e.cum[i + 1] - e.cum[i] || 1, u = (s2 - e.cum[i]) / L, tx = (e.px[i + 1] - e.px[i]) / L, tz = (e.pz[i + 1] - e.pz[i]) / L, lat = e.way.w / 2 - 3.65 * 0.5;
-        q = { x: e.px[i] + tx * u * L + tz * lat, z: e.pz[i] + tz * u * L - tx * lat, tx, tz }; }
-      const x = q.x - q.tz * off, z = q.z + q.tx * off;
-      let want = M.mph * 0.44704; const fx = -Math.sin(p.th), fz = -Math.cos(p.th);
-      if (M.gap != null) for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
-        if (f > 0 && f < 150 && Math.abs(dx * fz - dz * fx) < 1.8) want = Math.min(want, c.v + ((f - 4.6) - M.gap * p.v) * 0.4); }
-      let ang = Math.atan2(-(x - p.x), -(z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-      return { throttle: p.v < want - 0.3 ? 1 : 0, brake: p.v > want + 0.6 ? Math.min(1, (p.v - want) / 4) : 0, steer: Math.max(-1, Math.min(1, ang * 2)) };
-    });
-  });
-  const start = (id, lane = 0) => page.evaluate(async ([id, lane]) => { const a = window.cambridgeDrive; a.manual(true); await a.pick('lesson', id, true); a.manual(true);
-    Object.assign(window.__mw, { lane, want: lane, mph: 68, gap: null, road: false }); }, [id, lane]);
-  const steps = (n) => page.evaluate(k => window.cambridgeDrive.step(k), n);
-  const look = (view) => page.evaluate(v => { const a = window.cambridgeDrive; a.player.observations.push({ view: v, at: a.traffic.clock }); }, view);
-  const signal = (d) => page.evaluate(d => { const p = window.cambridgeDrive.player; if (p.indicator !== d) p.signal(d); }, d);
-  const set = (o) => page.evaluate(o => Object.assign(window.__mw, o), o);
-  const untilDone = async () => { for (let i = 0; i < 60; i++) { if (await page.evaluate(() => window.cambridgeDrive.test.done)) return; await steps(200); } throw new Error('the lesson never finished'); };
-  const outcome = () => page.evaluate(() => ({ verdict: document.querySelector('#verdict').textContent, reasons: [...document.querySelectorAll('#rReasons li')].map(l => l.textContent),
-    detail: [...document.querySelectorAll('#runDetailList li')].map(l => l.textContent), faults: window.cambridgeDrive.test.faults.map(f => `${f.kind} ${f.cat}: ${f.text}`).reverse() }));
+  const { start, steps, look, signal, set, untilDone, outcome, laneClear, joinerNear, joinersIn, fasterJustBehind } = await installMwDriver(page);
   const show = (r) => r.faults.join('\n  ');
 
   // ---------- pulling straight out into busy traffic, with no look and no signal ----------
   const rushed = async () => {
     // the moment the first of the faster cars is just behind on the right: straight out, no look, no signal
     await start('mw-busy-lane'); await set({ mph: 55 });
-    for (let i = 0; i < 200 && !(await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player, fx = -Math.sin(p.th), fz = -Math.cos(p.th);
-      return a.traffic.cars.some(c => c.alive && c.lane === 1 && (c.x - p.x) * fx + (c.z - p.z) * fz > -18 && (c.x - p.x) * fx + (c.z - p.z) * fz < -8); })); i++) await steps(2);
+    for (let i = 0; i < 200 && !(await fasterJustBehind()); i++) await steps(2);
     await set({ want: 1, mph: 60 }); await steps(400);
     await set({ want: 0 }); await untilDone(); return outcome();
   };
@@ -128,6 +97,57 @@ try {
     console.log('Missed exit:', r.reasons.find(l => /past the exit/.test(l)));
   }
 
+  // ---------- traffic joining beside you (issue #8): every safe response passes ----------
+  const responses = {};
+  for (const how of ['kept', 'eased', 'moved']) {
+    await start('mw-merging'); await set({ mph: 60 }); await steps(10); // the lesson places its traffic on the first step
+    if (how === 'eased') { for (let i = 0; i < 300 && !(await joinerNear()); i++) await steps(5); await set({ mph: 47 }); await steps(20 * 9); await set({ mph: 60 }); }
+    if (how === 'moved') {
+      // wait for the car alongside in the middle lane to get clear, then mirror, shoulder, signal, over
+      for (let i = 0; i < 400 && !(await laneClear(1, 60, 30)); i++) await steps(5);
+      await look('right'); await look('blindspot'); await signal('R'); await steps(40); await set({ want: 1 }); await steps(70); await signal('R');
+      // once the joiners are in and the left-hand lane is clear around you, back left the same way
+      for (let i = 0; i < 600 && !((await joinersIn()) && (await laneClear(0, 50, 80))); i++) await steps(5); // two seconds and more behind
+      await look('left'); await look('left-blindspot'); await signal('L'); await steps(40); await set({ want: 0 }); await steps(70); await signal('L');
+    }
+    await untilDone(); const r = await outcome();
+    assert.equal(r.verdict, 'Lesson passed', `${how}: ${show(r)}\n${r.reasons.join('\n')}`);
+    assert.ok(!r.faults.length, `${how}: ${show(r)}`);
+    responses[how] = r.reasons.find(l => /Traffic joined from the slip road/.test(l)) || '';
+    assert.ok(responses[how], `${how}: nobody joined: ${r.reasons.join(' | ')}`);
+    if (how !== 'kept') assert.match(responses[how], how === 'eased' ? /you eased off/ : /you moved over/);
+    else assert.match(responses[how], /you kept your lane and speed/);
+    assert.equal(await page.evaluate(() => window.cambridgeDrive.test.hits.length), 0, `${how}: a joining vehicle ran into you`);
+  }
+  console.log('Joining beside you, three safe answers all pass:\n ', Object.entries(responses).map(([k, v]) => `${k}: ${v}`).join('\n  '));
+  // moving over into the occupied middle lane "to let them in" is not cooperation, it is a conflict
+  {
+    await start('mw-merging'); await set({ mph: 60 }); await steps(20);
+    await look('right'); await look('blindspot'); await signal('R'); await steps(30); await set({ want: 1 }); await steps(200);
+    await set({ want: 0 }); await untilDone(); const r = await outcome();
+    assert.equal(r.verdict, 'Not yet', show(r));
+    // the car in the middle lane is either still alongside or just ahead as you cross the line
+    assert.ok(r.faults.some(f => /Moved right into a lane with a vehicle alongside you|Moved into the lane only [\d.]+ s behind the vehicle ahead|Moved right into too small a gap/.test(f)), show(r));
+    console.log('Moving over into an occupied lane:', r.faults.map(f => f.split(':')[0]).join(', '));
+  }
+  // ---------- joining from the slip road: blind, without a look or a signal ----------
+  {
+    await start('mw-join'); await set({ mph: 62 }); await untilDone(); const r = await outcome();
+    assert.equal(r.verdict, 'Not yet', show(r));
+    assert.ok(r.faults.some(f => /Mirrors – change direction: Joined the motorway without checking the right mirror first/.test(f)), show(r));
+    assert.ok(r.faults.some(f => /Signals – necessary: Joined the motorway without signalling right/.test(f)), show(r));
+    assert.ok(r.detail.some(l => /^Joined the motorway at \d+ mph/.test(l)), r.detail.join('\n'));
+    console.log('Joining blind:', r.faults.map(f => f.split(':')[0]).join(', '));
+  }
+  // ---------- joining right beside a car in the left-hand lane: an unsafe gap, detected ----------
+  {
+    await start('mw-join'); await set({ mph: 60, shadow: true }); await steps(10);
+    await look('right'); await look('blindspot'); await signal('R'); await untilDone(); const r = await outcome();
+    assert.equal(r.verdict, 'Not yet', show(r));
+    assert.ok(r.faults.some(f => /^S Mirrors – change direction: Joined the motorway with a vehicle alongside you|Joined the motorway into too small a gap/.test(f)), show(r));
+    console.log('Joining beside a car:', r.faults.map(f => f.split(':').slice(0, 2).join(':')).join(' | '));
+  }
+
   assert.deepEqual(errors, []);
-  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes.');
+  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes.');
 } finally { await browser?.close(); server.kill(); }
