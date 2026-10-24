@@ -313,6 +313,10 @@ const bearing = (cx, cz, x, z) => ((Math.atan2(x - cx, -(z - cz)) * 180 / Math.P
 function motorway(lanes) {
   const B = new Builder('m' + lanes), line = centreLine(), total = circuitLength(), J = MW.junction;
   const cw = carriagewayWidth(lanes), off0 = cw / 2 + MW.slipW / 2; // a slip lane runs alongside lane 1
+  // The slips share a node with the carriageway, which sits on its centre line, but they leave from and
+  // join the left-hand lane: only the node itself is on the centre line, so nothing swings across the
+  // carriageway towards it (routes and traffic blend round the node).
+  const lane0 = cw / 2 - MW.laneW / 2;
   const main = { name: 'M100', cls: 'motorway', mph: 70, w: cw, lanes, oneway: 1, hs: MW.shoulder };
   const slip = { cls: 'motorway_link', mph: 70, w: MW.slipW, lanes: 1, oneway: 1 };
   B.motorway = { lanes, length: Math.round(total), junctions: [] };
@@ -348,19 +352,19 @@ function motorway(lanes) {
       // exit: ease out alongside lane 1, run as a deceleration lane, then sweep away to the roundabout
       const ex = [];
       for (let d = 0; d < J.out; d += 10) {
-        const lat = d < 80 ? off0 * smooth(d / 80) : d < J.decel ? off0 : off0 + (sideOff - off0) * smooth((d - J.decel) / (J.out - J.decel));
+        const lat = d < 80 ? lane0 + (off0 - lane0) * smooth(d / 80) : d < J.decel ? off0 : off0 + (sideOff - off0) * smooth((d - J.decel) / (J.out - J.decel));
         ex.push(at(d, lat));
       }
-      ex[0] = at(0, 0); ex.push(R(bUp));
+      ex[0] = at(0, 0); ex.splice(1, 0, at(1.5, lane0)); ex.push(R(bUp));
       const exitE = B.edge({ ...slip, name }, ex);
       // entry: from the roundabout back down to an acceleration lane beside lane 1, then into it
       const en = [R(bDown)], startD = J.out + 2 * r;
       for (let d = startD + 10; d < J.len; d += 10) {
         const lat = d < J.len - J.accel ? off0 + (sideOff - off0) * (1 - smooth((d - startD) / (J.len - J.accel - startD)))
-          : d < J.len - 80 ? off0 : off0 * (1 - smooth((d - (J.len - 80)) / 80));
+          : d < J.len - 80 ? off0 : lane0 + (off0 - lane0) * (1 - smooth((d - (J.len - 80)) / 80));
         en.push(at(d, lat));
       }
-      const merge = onCarriageway(line, lanes, side, sp.merge); en.push([merge.x, merge.z]);
+      const merge = onCarriageway(line, lanes, side, sp.merge); en.push(at(J.len - 1.5, lane0), [merge.x, merge.z]);
       B.edge({ ...slip, name }, en);
       // the local road the junction serves: national speed limit, out to where the map ends
       const far = at(J.out + r, sideOff + 640);

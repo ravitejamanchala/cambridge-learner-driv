@@ -7,6 +7,7 @@ import { BASIC_LESSONS } from './basic-lessons.js';
 import { createControlScenario } from './control-scenarios.js';
 import { createBasicScenario } from './basic-scenarios.js';
 import { createEmergencyEvent } from './emergency.js';
+import { MOTORWAY_LESSONS, createMotorwayScenario } from './motorway-lessons.js';
 // The learner course: units of short lessons on practice layouts built to teach one thing each
 // (tools/layouts.mjs). Each has a goal, a Highway Code rule, an optional scripted event, and its own pass check.
 // `area` names the practice layout; waypoints are x/z metres on it, snapped to the nearest junction on the named road.
@@ -18,6 +19,7 @@ export const UNITS = [
   { id: 'roundabouts', title: 'Roundabouts' },
   { id: 'sharing', title: 'Sharing the road' },
   { id: 'faster', title: 'Faster roads' },
+  { id: 'motorway', title: 'Motorways' },
   { id: 'parking', title: 'Manoeuvres and parking' },
   { id: 'theory', title: 'Theory and show me, tell me' }
 ];
@@ -160,7 +162,7 @@ export const LESSONS = [
     waypoints: [pt(-700, 0, 'Babraham Road'), pt(3300, 0, 'Babraham Road')], focus: ['Use of speed', 'Positioning'], maxD: 2 }
 ];
 LESSONS.unshift(...BASIC_LESSONS);
-LESSONS.push(...PARKING_LESSONS, ...QUIZZES);
+LESSONS.push(...MOTORWAY_LESSONS, ...PARKING_LESSONS, ...QUIZZES);
 for (let i = 0; i < LESSONS.length; i++) LESSONS[i] = enrichLesson(LESSONS[i]); // theory modules: quizzes, no driving (see quiz.js)
 
 // ---------- scripted events ----------
@@ -175,6 +177,7 @@ export function createScenario(lesson, deps) {
   const { net, traffic, test, player, ui } = deps;
   // blue light vehicle: the same event the mock tests use, triggered earlier on a short lesson route
   if (lesson.scenario === 'blue-light') return createEmergencyEvent({ ...deps, trigger: 60 });
+  if (lesson.scenario === 'motorway') return createMotorwayScenario(lesson, deps);
   const S = { ok: true, notes: [], update() {}, stop() {} };
   const route = () => test.route;
   // first feature on the route (stop line or zebra), with its distance along the route

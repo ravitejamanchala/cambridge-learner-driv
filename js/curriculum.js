@@ -3,7 +3,7 @@ import { lessonLocation } from './locations.js';
 export function enrichLesson(lesson) {
   const mode = lesson.questions ? 'theory' : 'practical';
   const location = mode === 'practical' ? lessonLocation(lesson) : null;
-  return { ...(location ? { area: location.areaId, waypoints: location.waypoints, startingLocation: location.waypoints[0] } : {}), difficulty: ['roundabouts', 'faster'].includes(lesson.unit) ? 'intermediate' : 'beginner', prerequisites: [], objectives: lesson.steps.slice(),
+  return { ...(location ? { area: location.areaId, waypoints: location.waypoints, startingLocation: location.waypoints[0] } : {}), difficulty: ['roundabouts', 'faster', 'motorway'].includes(lesson.unit) ? 'intermediate' : 'beginner', prerequisites: [], objectives: lesson.steps.slice(),
     description: lesson.goal, mode, vehicle: { transmission: 'simplified' },
     assessmentRules: { focus: lesson.focus || [], maxDrivingFaults: lesson.maxD ?? 2 },
     completionCriteria: { type: mode === 'theory' ? 'quiz' : 'route-and-assessment' }, ...lesson };

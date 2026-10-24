@@ -5,7 +5,7 @@ import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
 import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
-import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved } from './net.js';
+import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
 import { createTraffic } from './traffic.js';
@@ -119,11 +119,11 @@ async function boot() {
   const learnerScope = () => hub.Profiles.scope() + ":" + hub.Profiles.current()?.id;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
-  const startS = (pl) => { if (pl.kind === 'free') return 0; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
-  const startPos = (s0 = 0) => {
+  const startS = (pl) => { if (pl.kind === 'free') return 0; if (pl.lesson?.startAt !== undefined) return pl.lesson.startAt; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startPos = (s0 = 0, lane = 0) => {
     let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
     const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
-    const p = along(st.e, ts, st.dir, laneCentre(st.e, st.dir, 0)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz));
+    const p = along(st.e, ts, st.dir, laneCentre(st.e, st.dir, lane)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz));
     return route.stepS[k] + ts;
   };
   // examiner callouts for places the route builder can't describe (e.g. a one-way gyratory)
@@ -200,8 +200,9 @@ async function boot() {
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
-    const s0 = startPos(startS(pl));
+    const s0 = startPos(startS(pl), pl.lesson?.startLane || 0);
     if (pl.kind === 'free') { player.v = 22.4; player.steer = 0; test.parked = false; } // 50 mph in lane 1, nothing to move off from
+    if (pl.lesson?.startMph) { player.v = pl.lesson.startMph * 0.44704; player.steer = 0; test.parked = false; } // a motorway lesson starts at speed, in its lane
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
@@ -683,7 +684,8 @@ async function boot() {
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
-      player.update(dt, readInput(), nr && nr.d > paved(nr.way) + (/^motorway/.test(nr.way.cls) ? 0.6 : 2.6) && !inFillet(net, player.x, player.z) ? 'off' : 'road'); // a motorway has a verge, not a footway
+      const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
+      player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);

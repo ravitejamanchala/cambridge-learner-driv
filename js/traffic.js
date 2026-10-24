@@ -88,8 +88,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   }
   function chooseNext(a) {
     if (a.path) { const i = a.path.findIndex(st => st.e === a.e && st.dir === a.dir); if (i >= 0 && a.path[i + 1]) return a.path[i + 1]; }
-    const v = endNode(a), opts = net.out[v].filter(o => o.e !== a.e && !(a.kind === 'bike' && /trunk/.test(o.e.way.cls)));
-    if (!opts.length) return a.e.way.oneway ? null : { e:a.e, dir:-a.dir };
+    const v = endNode(a), all0 = net.out[v].filter(o => o.e !== a.e && !(a.kind === 'bike' && /trunk/.test(o.e.way.cls)));
+    if (!all0.length) return a.e.way.oneway ? null : { e:a.e, dir:-a.dir };
+    // a lesson's own traffic stays on the road it was placed on (motorway lessons: never off at a junction)
+    const kept = a.keepTo ? all0.filter(o => o.e.way.cls === a.keepTo) : [], opts = kept.length ? kept : all0;
     const p = along(a.e, a.e.len - 0.5, a.dir);
     // keep to the lane arrows: a car in a "left only" lane turns left
     let use = opts;
@@ -137,7 +139,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       const dir = e.way.oneway ? 1 : (random() < 0.5 ? 1 : -1);
       const lane = a.kind === 'car' ? Math.floor(random() * laneInfo(e, dir).n) : 0;
       const s = 8 + random() * Math.max(1, e.len - 20);
-      Object.assign(a, { e, dir, s, lane, prev: null, path: null });
+      Object.assign(a, { e, dir, s, lane, prev: null, path: null, keepTo: null });
       const p = trackPoint(a);
       if (!safeTrafficSpawn(p,{x:px,z:pz,th:player?.th},first)) continue;
       if (all.some(o => o !== a && o.alive && Math.hypot(o.x - p.x, o.z - p.z) < (a.kind === 'bike' ? 10 : 18))) continue;
@@ -338,8 +340,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   }
   // put a car at a given spot heading for a junction (used by puzzles to bring traffic from the right)
   // path (optional): route steps the car should follow instead of choosing turns at random
-  function placeCar(c, e, dir, s, speed, cruise = 1, path = null) {
-    Object.assign(c, { scripted: true, e, dir, s, lane: 0, prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, emergency: false });
+  // lane (optional): which lane, 0 nearest the kerb; keepTo (optional): a road class it never leaves
+  function placeCar(c, e, dir, s, speed, cruise = 1, path = null, lane = 0, keepTo = null) {
+    Object.assign(c, { scripted: true, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };

@@ -193,6 +193,22 @@ export function nearest(net, x, z) {
   }
   return best;
 }
+// Is the point on paved road, within `margin` of some road's paved edge? Not just the nearest centre
+// line: where a slip road leaves a motorway, the slip's centre line can be nearer than the motorway's
+// while the car is plainly on the motorway.
+export function onPaved(net, x, z, margin = 0) {
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = net.grid.get(ck(cx + i, cz + j)); if (!a) continue;
+    for (let k = 0; k < a.length; k += 2) {
+      const e = net.edges[a[k]], s = a[k + 1], lim = paved(e.way) + margin;
+      const ax = e.px[s], az = e.pz[s], dx = e.px[s + 1] - ax, dz = e.pz[s + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if ((x - ax - dx * t) ** 2 + (z - az - dz * t) ** 2 < lim * lim) return true;
+    }
+  }
+  return false;
+}
 export function stopsNear(net, x, z) {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), out = [];
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = net.stopGrid.get(ck(cx + i, cz + j)); if (a) out.push(...a); }

@@ -290,6 +290,30 @@ Country road at 60 — Grantchester Lane · national limit. A narrow country lan
 
 Dual carriageway at 70 — Babraham Road · dual carriageway. Build up to a safe speed and stay in the left-hand lane. Use the right-hand lane only to overtake, then move back.
 
+### Keep left, overtake, move back
+
+![Keep left, overtake, move back — M100 · three lanes · 70 mph. Cruise in the left-hand lane. Overtake the slower vehicles you catch up with, then move back left once you are safely past, even if there is more traffic a long way ahead.](screenshots/lesson-mw-keep-left.jpg)
+
+Keep left, overtake, move back — M100 · three lanes · 70 mph. Cruise in the left-hand lane. Overtake the slower vehicles you catch up with, then move back left once you are safely past, even if there is more traffic a long way ahead.
+
+### Overtaking when the next lane is busy
+
+![Overtaking when the next lane is busy — M100 · two lanes · 70 mph. A slow lorry ahead, and faster traffic streaming past in the right-hand lane. Wait behind the lorry until there is a real gap, then overtake.](screenshots/lesson-mw-busy-lane.jpg)
+
+Overtaking when the next lane is busy — M100 · two lanes · 70 mph. A slow lorry ahead, and faster traffic streaming past in the right-hand lane. Wait behind the lorry until there is a real gap, then overtake.
+
+### Following distance at 70
+
+![Following distance at 70 — M100 · three lanes · traffic building. Follow the traffic in the left-hand lane as it slows down and speeds up again. Keep at least a two-second gap the whole way. 70 is the most you may do, not a speed to aim for.](screenshots/lesson-mw-following.jpg)
+
+Following distance at 70 — M100 · three lanes · traffic building. Follow the traffic in the left-hand lane as it slows down and speeds up again. Keep at least a two-second gap the whole way. 70 is the most you may do, not a speed to aim for.
+
+### Getting into lane for your exit
+
+![Getting into lane for your exit — M100 → J2 Ashwell. You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.](screenshots/lesson-mw-exit-prep.jpg)
+
+Getting into lane for your exit — M100 → J2 Ashwell. You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.
+
 ### Parallel parking at the kerb
 
 ![Parallel parking at the kerb — Elm Road · 20 mph. Park at the kerb between two cars: pull up alongside the front one, then reverse in.](screenshots/lesson-parallel-park.jpg)

@@ -176,6 +176,24 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   learner's record or account. Leaving at a junction is not "off route": a way back onto the circuit is
   built from wherever the car is. Ending the drive shows a summary of what was measured, and says plainly
   that nothing was added.
+- **Lane discipline is judged in context** (`js/lane-discipline.js`, issue #7). Being out of the
+  left-hand lane is not a fault in itself: overtaking something slower in the lane to your left, or
+  waiting for a vehicle less than two seconds behind on that side to drop back, justifies it. What is
+  marked is what the learner chose: a lane change with no mirror check or no signal; pulling into a gap
+  that makes someone brake (under 1.5 s and closing, or under 1 s; serious under 0.5 s); cutting in
+  (under 1 s); sweeping across two lanes without settling for 3 s; more than 10 s out with nothing to
+  pass (Rule 264); under two seconds behind for more than 5 s (Rule 126; serious under 0.8 s for 2 s);
+  passing on the left more than 5 mph faster (Rule 268, which allows keeping up with your own lane);
+  and not being in the left-hand lane 300 yards before an exit (Rule 272). The assessor is pure and fed
+  one frame at a time, so `tests/lane-discipline.test.mjs` judges scripted traces with exactly the
+  rules a live drive gets, and the Bot lab's motorway driver uses its `overtaking()` test so the
+  reference driver and the examiner can never disagree about when staying out is justified.
+- **Motorway lessons script their own traffic.** Background traffic is off (`scenarioVariants`) and
+  every vehicle that matters is placed by the lesson, so a run is the same every time; each lesson starts
+  far enough along its route for the vehicles placed behind it, which `tests/motorway.test.mjs` checks.
+- **Instruments for the motorway:** the lane strip by the instruction box shows the lanes that are right
+  for you now (amber) and the one you are in (marked underneath); the following lesson shows your gap to
+  the car ahead in seconds, because nothing else on screen can tell you that.
 - **Navigation names the next junction, not the end of the circuit.** The instruction box counts down
   to `J2 · Ashwell`; the turn beacon stays hidden, because you pass most junctions straight by.
 
@@ -218,6 +236,7 @@ npm run test:access      # needs a server on 127.0.0.1:8000
 npm run test:browser     # the course end to end: prerequisites, control lessons, saved progress
 npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
 npm run test:free        # motorway free drive: both layouts, a 14-minute drive with memory sampled
+npm run test:motorway    # motorway lessons: careless driving marked, repeatably; lane strip and gap reading
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
 npm run evidence -- <group>  # real-time videos of a feature, into docs/evidence/
 ```

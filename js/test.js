@@ -1,6 +1,6 @@
 // The examiner: follows progress along the route, re-routes when you go off it, and marks faults DVSA-style.
 import { MARKING, RULES } from './config.js';
-import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet, paved } from './net.js';
+import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet, paved, onPaved } from './net.js';
 
 const MPH = 2.23694;
 export function approachLane(nr,approach,heading) {
@@ -23,7 +23,7 @@ export function createTest(net, traffic, player) {
     t.onFault && t.onFault();
   };
   t.reset = () => {
-    t.basicStatus = null; t.alert = null; t.coach = null;
+    t.basicStatus = null; t.alert = null; t.coach = null; t.laneGuide = null;
     Object.assign(t, { lap: null, done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [] });
     for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
@@ -132,7 +132,7 @@ export function createTest(net, traffic, player) {
       if (timer('pos', v > 2 && offL < -0.5, dt) > 1.4) t.fault('D', 'Positioning – normal driving', 'Drove on the right-hand side of the road', 'pos', 8);
     } else timer('pos', false, dt);
     // kerb
-    if (nr.d > paved(way) + 0.8 && !inFillet(net, player.x, player.z)) { if (!t.flags.kerb && Math.abs(v) > 1.2) { t.flags.kerb = true; t.fault('D', 'Control – steering', 'Mounted the kerb', 'kerb', 4); } }
+    if (nr.d > paved(way) + 0.8 && !onPaved(net, player.x, player.z, 0.8) && !inFillet(net, player.x, player.z)) { if (!t.flags.kerb && Math.abs(v) > 1.2) { t.flags.kerb = true; t.fault('D', 'Control – steering', 'Mounted the kerb', 'kerb', 4); } }
     else if (nr.d < way.w / 2) t.flags.kerb = false;
     // roundabout entry
     if (way.rb && !t.onRb && v > 3.2) {

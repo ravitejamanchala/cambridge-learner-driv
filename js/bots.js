@@ -1,4 +1,5 @@
 import { createParkingDriver } from './parking-driver.js';
+import { senseMotorway, overtaking } from './lane-discipline.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -75,6 +76,10 @@ export function makeDriver(api) {
     const nearMini=net.minis.some(m=>Math.hypot(m.x-pl.x,m.z-pl.z)<18);
     const follow = nearMini ? 6 : 10;
     const p = api.lanePoint(t.sRoute + follow), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
+    // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
+    const mw = motorwayPlan(api, st, t, pl, tr);
+    if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
+      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: Math.max(-1, Math.min(1, dm * 2)) }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
     if(nearMini)target=Math.min(target,3.5);
     if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
@@ -178,6 +183,73 @@ export function makeDriver(api) {
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
     return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
   };
+}
+
+// ---------- motorway ----------
+// The reference driver for the motorway lessons: keeps left, overtakes slower traffic only into a gap
+// nobody has to brake for (mirror, shoulder, signal, then move), moves back once the vehicle passed is
+// well behind, keeps two seconds and a bit behind, never passes on the left, and gets across one lane at
+// a time for an exit, easing off to drop in behind traffic when it has to.
+function motorwayPlan(api, st, t, pl, tr) {
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr });
+  if (f.laneF == null) { st.mw = null; return null; }
+  const R = t.route, here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), v = Math.max(pl.v, 1);
+  // a new drive (or a new route) starts afresh: the driver is reused from one drive to the next
+  if (!st.mw || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: 0 };
+  const M = st.mw;
+  const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
+  const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
+  const inLane = l => f.others.filter(o => o.lane === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
+  // a gap nobody has to brake for: well clear of anything behind (more when moving back in, so as never
+  // to cut in), clear of anything alongside, and not on the tail of anything ahead
+  const safeInto = (l, back) => l >= 0 && l < f.lanes && inLane(l).every(o => {
+    if (Math.abs(o.fw) < 7) return false;
+    if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > (back ? 2.2 : 1.6) && (close <= 0.3 || d / close > 6); }
+    return (o.fw - CAR) / v > 1.6 || o.v > pl.v + 1;
+  });
+  const look = (dir) => { const vs = dir > 0 ? ['right', 'blindspot'] : ['left', 'left-blindspot'];
+    for (const view of vs) if (!pl.observations.some(e => e.view === view && tr.clock - e.at < 3)) api.look(view); };
+  const indicate = (d) => { if (pl.indicator !== d) pl.signal(d); }, cancel = () => { if (pl.indicator) pl.signal(pl.indicator); };
+  let target = cruise;
+  if (!M.moving && tr.clock > M.settle) {
+    let want = here; const lead = ahead(here), next = ahead(here + 1);
+    if (exitIn != null && exitIn < 2400) { if (here > 0) want = here - 1; }
+    // overtake only when the next lane is actually moving faster than this one
+    else if (lead && lead.v < cruise - 2 && (lead.fw - CAR) / v < 7 && here < f.lanes - 1 && (!next || next.fw > 150 || next.v > lead.v + 2)) want = here + 1;
+    else if (here > 0 && !overtaking(f, here)) want = here - 1;
+    if (want !== here && safeInto(want, want < here)) {
+      const dir = want > here ? 1 : -1; Object.assign(M, { want, from: here, moving: true, go: tr.clock + 1.8 });
+      look(dir); indicate(dir > 0 ? 'R' : 'L');
+    } else if (want < here && exitIn != null) {
+      // getting across for an exit: pick the gap in the lane you need and match its speed to drop into it
+      const cars = inLane(want), gaps = [];
+      for (let g = 0; g <= cars.length; g++) {
+        const b = cars[g - 1], a = cars[g], lo = b ? b.fw + CAR + 2.3 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
+        if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? cruise });
+      }
+      const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
+      // the gap ahead of you: speed up into it; behind you: drop back into it
+      if (best) { const d = at(best); target = Math.min(30.5, Math.max(10, best.v + Math.max(-4, Math.min(4, d * 0.12)) + Math.sign(d) * 0.6)); }
+    }
+  }
+  if (M.moving && tr.clock >= M.go) {
+    const dir = M.want > M.from ? 1 : -1;
+    if (Math.abs(M.lat - M.from) < 0.01) {
+      if (!safeInto(M.want, dir < 0)) M.go = tr.clock + 0.5; // the gap closed: wait, still signalling
+      else { look(dir); M.lat += dir * 0.025; } // mirror and shoulder again, right as the car moves
+    } else {
+      M.lat += Math.sign(M.want - M.lat) * Math.min(Math.abs(M.want - M.lat), 0.025);
+      if (M.lat === M.want) { M.moving = false; M.settle = tr.clock + 4; cancel(); }
+    }
+  }
+  // two seconds and a bit behind whatever is ahead, in this lane and in the one being moved into
+  for (const l of new Set([here, M.want])) { const o = ahead(l); if (o) target = Math.min(target, Math.max(0, o.v + ((o.fw - CAR) - 2.4 * v) * 0.25)); }
+  // never pass on the left at speed
+  for (const o of f.others) if (o.lane > here && o.fw > 0 && o.fw < 80 && o.v < pl.v && pl.v > 13.4) target = Math.min(target, o.v - 0.3);
+  // signal left for the exit once in the left-hand lane, and slow down along the slip road
+  if (exitIn != null && exitIn < 300 && here === 0 && !M.moving) indicate('L');
+  const q = api.lanePoint(t.sRoute + 25), off = M.lat * 3.65;
+  return { p: { x: q.x - q.tz * off, z: q.z + q.tx * off }, target: exitIn != null && exitIn < 120 && here === 0 ? Math.min(target, 22) : target };
 }
 
 // ---------- results store ----------

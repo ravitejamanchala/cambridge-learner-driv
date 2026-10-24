@@ -7,6 +7,7 @@ import { buildNet, buildRoute, snapWaypoint, paved } from '../js/net.js';
 import { MW, JUNCTIONS, centreLine, circuitLength, onCarriageway, separation } from '../js/motorway.js';
 import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from '../js/free-drive.js';
 import { buildLayout } from '../tools/layouts.mjs';
+import { MOTORWAY_LESSONS, SETUPS } from '../js/motorway-lessons.js';
 
 const area = (id) => JSON.parse(fs.readFileSync(`data/areas/${id}.json`, 'utf8'));
 
@@ -69,4 +70,11 @@ test('free-drive summary: measured, and honest about speed', () => {
   assert.ok(lines.some(l => /Top speed 76 mph — over the 70 limit/.test(l)), 'an over-limit drive must say so');
   assert.ok(!lines.some(l => /Never over the limit/.test(l)));
   assert.deepEqual(freeSummaryLines(createFreeStats(), 0).length, 1, 'too short a drive gets no figures');
+});
+
+for (const l of MOTORWAY_LESSONS) test(`${l.id}: every scripted vehicle is placed on the lesson's route`, () => {
+  const net = buildNet(area(l.area)), r = buildRoute(net, l.waypoints.map(w => snapWaypoint(net, w)));
+  for (const v of SETUPS[l.setup]) { const s = l.startAt + v.at; assert.ok(s >= 1 && s <= r.len - 5, `${l.setup}: a vehicle at ${v.at} m lands at ${s} m of ${Math.round(r.len)}`); }
+  assert.ok(r.steps.slice(0, 3).every(st => st.e.way.cls === 'motorway'), 'the lesson starts on the motorway');
+  if (l.exit) assert.ok(r.steps.some(st => st.e.way.cls === 'motorway_link'), 'an exit lesson leaves by the slip road');
 });
