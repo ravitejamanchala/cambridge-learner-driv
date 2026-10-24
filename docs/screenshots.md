@@ -90,6 +90,28 @@ Reversing into the space on the back arrow. One control, no gear selector.
 
 The feedback after a run: what happened, measured, stage by stage (10 lines).
 
+## Free drive on the motorway
+
+Ungraded: nothing is marked and nothing is saved.
+
+### Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down
+
+![Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down.](screenshots/free-drive-m3.jpg)
+
+Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down.
+
+### Free drive, two lanes, from the driver's seat
+
+![Free drive, two lanes, from the driver's seat.](screenshots/free-drive-m2.jpg)
+
+Free drive, two lanes, from the driver's seat.
+
+### Ending a free drive: what was measured, and a plain note that nothing was added to the record
+
+![Ending a free drive: what was measured, and a plain note that nothing was added to the record.](screenshots/free-drive-summary.jpg)
+
+Ending a free drive: what was measured, and a plain note that nothing was added to the record.
+
 ## Lessons
 
 Every practical lesson, at the start of its run.

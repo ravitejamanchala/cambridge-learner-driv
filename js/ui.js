@@ -125,7 +125,8 @@ export function createUI(net) {
     lb.classList.toggle('ask', running && t.parked && !looked); lb.classList.toggle('done', running && t.parked && looked);
     if (!running && !t.done) dtxt = 'Press start';
     // sign-first: the icon says what to do; show the distance, and words only for prompts that need them
-    const prompt = /Look round|Move off|Signal left|Finding|Pull up|Leave at/.test(short) ? short.replace('Look round (B), then move off', 'Look round · B').replace('Move off when it is safe', 'Move off').replace('Signal left now: your exit is next', 'Signal left').replace('Finding a new route', 'New route').replace('Leave at the next exit', 'Exit next').replace('Pull up on the left', 'Pull up left') : '';
+    // free drive counts down to the next motorway junction: the number and where it goes
+    const prompt = s.junction && !t.offRoute && !t.parked ? `J${s.junction} · ${s.to}` : /Look round|Move off|Signal left|Finding|Pull up|Leave at/.test(short) ? short.replace('Look round (B), then move off', 'Look round · B').replace('Move off when it is safe', 'Move off').replace('Signal left now: your exit is next', 'Signal left').replace('Finding a new route', 'New route').replace('Leave at the next exit', 'Exit next').replace('Pull up on the left', 'Pull up left') : '';
     $('hudNext').textContent = !running && !t.done ? 'Ready' : t.parked ? '' : (dtxt === 'now' || dtxt === 'on the roundabout' ? 'now' : dtxt.replace(/^in /, '').replace('follow the road', '…'));
     $('hudDist').textContent = prompt;
     $('hudNextBox').setAttribute('aria-label', s.text);

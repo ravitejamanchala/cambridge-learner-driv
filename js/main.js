@@ -5,7 +5,7 @@ import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
 import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
-import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet } from './net.js';
+import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
 import { createTraffic } from './traffic.js';
@@ -29,6 +29,8 @@ import { loadTrafficModels, loadVehicleModel } from './traffic-models.js';
 import { EMERGENCY_CAR_ID } from './cars.js';
 import { createVehicleState, createAutomaticState, createManoeuvreState, selectGear, operate } from './vehicle-state.js';
 import { buildReport, runDetail } from './reports.js';
+import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from './free-drive.js';
+import { centreLine, onCarriageway } from './motorway.js';
 
 initAuth().catch(() => {});
 
@@ -117,7 +119,7 @@ async function boot() {
   const learnerScope = () => hub.Profiles.scope() + ":" + hub.Profiles.current()?.id;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
-  const startS = (pl) => { if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startS = (pl) => { if (pl.kind === 'free') return 0; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
   const startPos = (s0 = 0) => {
     let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
     const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
@@ -133,12 +135,67 @@ async function boot() {
     }
     r.instructions.sort((a, b) => (a.final ? 1 : 0) - (b.final ? 1 : 0) || a.s - b.s);
   }
+  // ---------- free drive ----------
+  // Ungraded and endless. The route is a lap and a quarter; the examiner steps progress back a lap as
+  // the car comes round (test.js useLap), and if the learner leaves at a junction, a route back onto
+  // the circuit is built from wherever they are. What it measured is shown when they stop.
+  let freeStats = null, freeJunctions = [];
+  function startFreeDrive(pl, test) {
+    const lapRoute = buildRoute(A.net, pl.drive.lap.map(w => snapWaypoint(A.net, w)));
+    const lapAt = (r) => r.len - lapRoute.len * 1.25; // where the full lap starts on a route ending a lap and a quarter on
+    const M = A.net.motorway, line = centreLine();
+    // on the carriageway, one countdown instruction per junction passed, in place of "pull up on the left";
+    // off it (leaving at a junction, and the way back on), the route's own directions at each turn
+    const junctionsOn = (r) => {
+      const ins = r.instructions.filter(i => !i.final && i.approach && i.approach.e.way.cls !== 'motorway');
+      for (const j of (M?.junctions || []).filter(j => j.side === 'A')) {
+        const p = onCarriageway(line, M.lanes, 'A', j.diverge);
+        for (let i = 1; i < r.xs.length - 1; i++) {
+          const d = Math.hypot(r.xs[i] - p.x, r.zs[i] - p.z);
+          if (d < 25 && d <= Math.hypot(r.xs[i - 1] - p.x, r.zs[i - 1] - p.z) && d <= Math.hypot(r.xs[i + 1] - p.x, r.zs[i + 1] - p.z))
+            ins.push({ s: r.cum[i], kind: 'straight', icon: 'straight', text: `Junction ${j.n} for ${j.to}`, short: `Junction ${j.n}`, signal: null, road: 'M100', junction: j.n, to: j.to });
+        }
+      }
+      const fin = r.instructions.find(i => i.final);
+      r.instructions = ins.sort((a, b) => a.s - b.s).concat(fin ? [fin] : []);
+      return r;
+    };
+    junctionsOn(route);
+    test.useLap(route, 0, lapRoute.len);
+    test.onOffRoute = (from, along) => {
+      try {
+        const r = junctionsOn(buildRoute(A.net, [from, along, ...pl.drive.waypoints.map(w => snapWaypoint(A.net, w))]));
+        route = r; test.useLap(r, Math.max(0, lapAt(r)), lapRoute.len); test.snapProgress(); test.rerouted++; ui.renderSteps(r, 0); lastStep = -1;
+      } catch (_) { /* no way back from here yet: try again in a moment */ }
+    };
+    test.onLap = () => { if (freeStats) freeStats.laps++; };
+    freeStats = createFreeStats();
+    freeJunctions = (M?.junctions || []).filter(j => j.side === 'A').map(j => ({ ...onCarriageway(centreLine(), M.lanes, 'A', j.diverge), n: j.n, at: -1e9 }));
+  }
+  function stepFreeDrive(dt) {
+    if (!freeStats || !A.test?.running) return;
+    const nr = A.test.ctx, limit = nr ? nr.way.mph : 70;
+    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit);
+    for (const j of freeJunctions) if (A.traffic.clock - j.at > 60 && Math.hypot(j.x - player.x, j.z - player.z) < 30) { j.at = A.traffic.clock; freeStats.junctions++; }
+  }
+  // the payoff for an ungraded drive: what it measured, said plainly, and nothing written to the record
+  function showFreeSummary() {
+    if (A.test) A.test.running = false; paused = false; $('pauseSheet').hidden = true;
+    const st = freeStats || createFreeStats(), mi = st.distance / 1609.34, min = st.seconds / 60;
+    $('endTag').textContent = 'Free drive'; const v = $('verdict'); v.textContent = mi >= 0.1 ? `${mi.toFixed(1)} miles driven` : 'Drive ended'; v.className = 'verdict pass';
+    $('rD').textContent = '–'; $('rS').textContent = '–';
+    $('rNote').textContent = plan.drive.title + ' · ungraded, nothing added to your record';
+    const lines = freeSummaryLines(st, min);
+    $('rReasons').innerHTML = lines.map(l => `<li>${l}</li>`).join('');
+    $('coachingReport').textContent = ''; $('nextBtn').hidden = true; $('runDetailList').innerHTML = ''; $('againBtn').textContent = 'Drive again'; $('resultSheet').hidden = false; setMode('lobby'); document.body.classList.remove('free-drive');
+  }
+
   // load a plan (lesson, puzzle or mock route) in the current area without starting it: the car moves to the start
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
-    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
+    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
     nodes = wps.map(w => snapWaypoint(A.net, w));
-    route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.lesson.title });
+    route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
@@ -146,18 +203,22 @@ async function boot() {
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl));
+    if (pl.kind === 'free') { player.v = 22.4; player.steer = 0; test.parked = false; } // 50 mph in lane 1, nothing to move off from
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
     test.ctx = nearest(A.net,player.x,player.z);
+    test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
+    if (test.ungraded) startFreeDrive(pl, test);
     test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
-    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
-    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free' ? 0 : (pl.lesson.maxD ?? 2));
+    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    document.body.classList.toggle('free-drive', pl.kind === 'free'); $('quitBtn').textContent = pl.kind === 'free' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
@@ -350,7 +411,10 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; } };
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+    // memory as the renderer and the scenery see it, for the sustained-drive benchmark
+    perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
+    get freeStats() { return freeStats; } };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
@@ -369,7 +433,7 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (scenario) scenario.stop();
+    const test = A.test; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -403,6 +467,7 @@ async function boot() {
   function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
+    document.body.classList.remove('free-drive');
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
   }
@@ -413,21 +478,21 @@ async function boot() {
     loadPlan(plan);
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : createScenario(plan.lesson, deps);
+    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
     stats.distance = 0; stats.topSpeed = 0;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
   }
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume); $('resumeX').addEventListener('click', resume);
-  $('quitBtn').addEventListener('click', toLobby); $('hubBtn').addEventListener('click', toLobby);
+  $('quitBtn').addEventListener('click', () => plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
   $('nextBtn').addEventListener('click', () => { const b = $('nextBtn'); pickPlan(hub.select(b.dataset.kind, b.dataset.id), true); });
   $('againBtn').addEventListener('click', begin); $('restartBtn').addEventListener('click', begin);
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
@@ -620,9 +685,10 @@ async function boot() {
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
-      player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      player.update(dt, readInput(), nr && nr.d > paved(nr.way) + (/^motorway/.test(nr.way.cls) ? 0.6 : 2.6) && !inFillet(net, player.x, player.z) ? 'off' : 'road'); // a motorway has a verge, not a footway
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
+      if (plan?.kind === 'free') stepFreeDrive(dt);
       updateHeldLooks();
       if (test.running && plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
       test.nearZebra = net.zebras.some(z => Math.abs(z.x - player.x) < 70 && Math.abs(z.z - player.z) < 70);

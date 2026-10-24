@@ -187,6 +187,24 @@ speedometer on a phone held sideways, where the same controls take a far taller 
   material, so the colour is sampled from the texture; and the body is the part with the most
   triangles, not the biggest box, or a black roof panel wins over the body around it.
 
+## Motorways
+
+The motorway worlds (`m2`, `m3`) are a closed 24 km circuit drawn by `motorway()` in
+`tools/layouts.mjs` from the constants in `js/motorway.js`, so a drive can go on as long as the learner
+likes without the road network ever growing. Scenery chunks further than `WORLD.freeRadius` from the car
+are freed, and `npm run test:free` checks over a 14-minute drive that memory levels off.
+
+- **Markings follow the Traffic Signs Manual, chapter 5.** Lane lines over 40 mph are diagram 1005.1:
+  2 m marks with 7 m gaps, 150 mm wide. The edge line beside the hard shoulder and the broken line along
+  a deceleration or acceleration lane are close approximations of 1012.1 and 1010 — we could not reach
+  the published drawings when this was built, so treat their widths as ours, not the manual's.
+- **Free drive is ungraded.** It never marks a fault, never decides a result and never writes to the
+  learner's record or account. Leaving at a junction is not "off route": a way back onto the circuit is
+  built from wherever the car is. Ending the drive shows a summary of what was measured, and says plainly
+  that nothing was added.
+- **Navigation names the next junction, not the end of the circuit.** The instruction box counts down
+  to `J2 · Ashwell`; the turn beacon stays hidden, because you pass most junctions straight by.
+
 ## What we are aiming at
 
 `docs/development/reference/` holds screenshots of a commercial UK driving simulator, kept as the bar
@@ -225,7 +243,9 @@ npm run test:cars
 npm run test:access      # needs a server on 127.0.0.1:8000
 npm run test:browser     # the course end to end: prerequisites, control lessons, saved progress
 npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
+npm run test:free        # motorway free drive: both layouts, a 14-minute drive with memory sampled
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
+npm run evidence -- <group>  # real-time videos of a feature, into docs/evidence/
 ```
 
 Touch targets are at least 44 px on a coarse pointer, nothing overlaps, and nothing runs off the screen
@@ -233,6 +253,11 @@ at 320 px wide. `npm run test:devices` checks all three. `npm run test:drive` ch
 element does not exist at all, that no panel sits over the road during the Getting started lessons or
 while a blue-light vehicle is being dealt with at phone size, that the alert is short enough for the
 HUD, and that the HUD pieces do not overlap each other.
+
+**Every feature pull request carries video evidence.** Add a group to `GROUPS` in
+`tools/record_evidence.mjs` with one short clip per thing the issue asks for, run
+`npm run evidence -- <group>`, commit the clips and the `README.md` it writes under `docs/evidence/`, and
+link that folder from the pull request. Keep each clip under a minute: they are evidence, not a film.
 
 When the course or the interface changes, regenerate the screenshots and commit them: `docs/screenshots.md`
 is the quickest way to see what a change did to every case at once.
