@@ -39,21 +39,25 @@ const atDusk = (base, extra) => ({ ...MOTORWAY_LESSONS.find(l => l.id === base),
 // background traffic off: every vehicle that matters is placed by the lesson, so each run is the same
 const SCRIPTED = [{ id: 'scripted', title: 'The lesson\'s own traffic', trafficDensity: 'none' }];
 
+// Each lesson starts with at least 0.2 miles of straight road ahead (tests/motorway.test.mjs), a breather to
+// settle at speed before anything happens: the lessons that are not about a particular junction run on the
+// south straight, not round an end bend, and traffic joining is shown at junction 3, whose merge is on the
+// straight. The joining lessons start on the slip road's short straight, out of the bend from the roundabout.
 export const MOTORWAY_LESSONS = [
   { id: 'mw-keep-left', unit: 'motorway', area: 'm3', title: 'Keep left, overtake, move back', road: 'M100 · three lanes · 70 mph',
     goal: 'Cruise in the left-hand lane. Overtake the slower vehicles you catch up with, then move back left once you are safely past, even if there is more traffic a long way ahead.',
     steps: ['Mirrors, signal, a glance over your shoulder, then move out', 'Pull out into a gap nobody has to brake for', 'Back left when the vehicle you passed is well behind; never cut in'],
-    rule: KEEP, waypoints: [M(3, 8000), M(3, 12800)], scenario: 'motorway', setup: 'keep-left',
+    rule: KEEP, waypoints: [M(3, 12400), M(3, 17200)], scenario: 'motorway', setup: 'keep-left',
     startAt: 450, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
   { id: 'mw-busy-lane', unit: 'motorway', area: 'm2', title: 'Overtaking when the next lane is busy', road: 'M100 · two lanes · 70 mph',
     goal: 'A slow lorry ahead, and faster traffic streaming past in the right-hand lane. Wait behind the lorry until there is a real gap, then overtake.',
     steps: ['Drop back to two seconds behind the lorry while you wait', 'Judge the speed of what is coming up behind: it closes fast', 'Move out only into a gap nobody has to brake for'],
-    rule: OVERTAKE, waypoints: [M(2, 8000), M(2, 11200)], scenario: 'motorway', setup: 'busy-lane',
+    rule: OVERTAKE, waypoints: [M(2, 12400), M(2, 15600)], scenario: 'motorway', setup: 'busy-lane',
     startAt: 560, startLane: 0, startMph: 55, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
   { id: 'mw-following', unit: 'motorway', area: 'm3', title: 'Following distance at 70', road: 'M100 · three lanes · traffic building',
     goal: 'Follow the traffic in the left-hand lane as it slows down and speeds up again. Keep at least a two-second gap the whole way. 70 is the most you may do, not a speed to aim for.',
     steps: ['Count two seconds behind the car in front, every time it changes speed', 'Ease off early as the traffic slows; do not wait to brake', 'Do not dive into the next lane to keep your speed up'],
-    rule: FOLLOW, waypoints: [M(3, 8000), M(3, 12000)], scenario: 'motorway', setup: 'following',
+    rule: FOLLOW, waypoints: [M(3, 12400), M(3, 16400)], scenario: 'motorway', setup: 'following',
     startAt: 130, startLane: 0, startMph: 58, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
   { id: 'mw-exit-prep', unit: 'motorway', area: 'm3', title: 'Getting into lane for your exit', road: 'M100 → J2 Ashwell',
     goal: 'You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.',
@@ -64,12 +68,12 @@ export const MOTORWAY_LESSONS = [
     goal: 'Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.',
     steps: ['Look right early: mirror, then over your shoulder', 'Signal right and match the speed of the left-hand lane', 'Fit in without forcing anyone to brake, then stay left while you settle'],
     rule: JOIN, waypoints: [entrySlip(3, 1), M(3, 5200)], scenario: 'motorway', setup: 'join', merge: 1,
-    startAt: 40, startLane: 0, startMph: 30, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: [...FOCUS, 'Use of speed'], maxD: 2 },
-  { id: 'mw-merging', unit: 'motorway', area: 'm3', title: 'Traffic joining from a slip road', road: 'M100 · junction 2 · three lanes',
+    startAt: 140, startLane: 0, startMph: 30, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: [...FOCUS, 'Use of speed'], maxD: 2 },
+  { id: 'mw-merging', unit: 'motorway', area: 'm3', title: 'Traffic joining from a slip road', road: 'M100 · junction 3 · three lanes',
     goal: 'Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.',
     steps: ['Spot the traffic on the slip road early', 'Check your mirrors before you decide: the middle lane may be busy', 'Keep your lane, ease off, or move over only into a safe gap'],
-    rule: JOIN, waypoints: [M(3, 6400), M(3, 9200)], scenario: 'motorway', setup: 'merging', merge: 2,
-    startAt: 500, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
+    rule: JOIN, waypoints: [M(3, 14400), M(3, 17600)], scenario: 'motorway', setup: 'merging', merge: 3,
+    startAt: 684, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
   { id: 'mw-exit', unit: 'motorway', area: 'm2', title: 'Leaving the motorway', road: 'M100 → J3 Kingsmere · two lanes',
     goal: 'Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.',
     steps: ['Signs at 1 mile and ½ mile, then countdown markers at 300, 200 and 100 yards', 'Mirror and signal left by the 300-yard marker; leave where the slip road starts', 'Slow down on the slip road, not before it, and give way at the roundabout'],
@@ -110,8 +114,10 @@ export const SETUPS = {
     { at: 40, lane: 0, mph: 56 }, { at: 260, lane: 0, mph: 56 }, { at: -120, lane: 0, mph: 57 }, { at: 520, lane: 0, mph: 55 }],
   // the first gap in the left-hand lane closes just as you reach it; the middle lane is busy too, so
   // nobody on the motorway could move over for you even if they wanted to
-  join: [{ main: 905, lane: 0, mph: 60 }, { main: 950, lane: 0, mph: 60 }, { main: 1130, lane: 0, mph: 59 }, { main: 700, lane: 0, mph: 61 }, { main: 1330, lane: 0, mph: 60 },
-    { main: 850, lane: 1, mph: 66 }, { main: 980, lane: 1, mph: 66 }, { main: 1040, lane: 1, mph: 66 }, { main: 1200, lane: 2, mph: 70 }],
+  // (7 s further upstream than when the learner started at the roundabout: they now start 100 m down the
+  // slip road, out of its bend, and meet the same gaps)
+  join: [{ main: 1093, lane: 0, mph: 60 }, { main: 1138, lane: 0, mph: 60 }, { main: 1315, lane: 0, mph: 59 }, { main: 891, lane: 0, mph: 61 }, { main: 1518, lane: 0, mph: 60 },
+    { main: 1057, lane: 1, mph: 66 }, { main: 1187, lane: 1, mph: 66 }, { main: 1247, lane: 1, mph: 66 }, { main: 1419, lane: 2, mph: 70 }],
   // a slower car ahead to catch before the exit, and faster traffic in the right-hand lane
   exit: [{ at: 300, lane: 0, mph: 55 }, { at: 0, lane: 1, mph: 68 }, { at: -150, lane: 1, mph: 70 }],
   // a solid line of lorries in the left-hand lane, a second apart: there is no safe gap to the exit

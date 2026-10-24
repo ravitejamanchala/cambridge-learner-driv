@@ -85,6 +85,23 @@ test('free-drive summary: measured, and honest about speed', () => {
   assert.deepEqual(freeSummaryLines(createFreeStats(), 0).length, 1, 'too short a drive gets no figures');
 });
 
+// a breather before anything happens: at least 0.2 miles of straight road ahead of where each lesson starts,
+// so a learner set going at speed is not steering round a bend from the first second. The joining lessons
+// are the exception: their slip road is 600 m with a bend out of the roundabout and another onto the
+// carriageway, and the slip road is the lesson; they start on the short straight between the two.
+for (const l of MOTORWAY_LESSONS) test(`${l.id}: starts on straight road`, () => {
+  const net = buildNet(area(l.area)), r = buildRoute(net, l.waypoints.map(w => snapWaypoint(net, w)));
+  const at = (s) => { let k = 0; while (k < r.steps.length - 1 && r.stepS[k + 1] <= s) k++; const st = r.steps[k], u = s - r.stepS[k]; return posAt(st.e, st.dir > 0 ? u : st.e.len - u); };
+  let tightest = Infinity, where = 0;
+  const slip = l.setup === 'join';
+  for (let d = slip ? 20 : 60; d <= (slip ? 60 : 322); d += 10) {
+    const a = at(l.startAt + d - 60), b = at(l.startAt + d), c = at(l.startAt + d + 60);
+    const k = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x)), R = k > 1e-9 ? Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(c.x - b.x, c.z - b.z) * Math.hypot(a.x - c.x, a.z - c.z) / (2 * k) : Infinity;
+    if (R < tightest) { tightest = R; where = d; }
+  }
+  assert.ok(tightest > (slip ? 900 : 3000), `${l.id}: a ${Math.round(tightest)} m radius bend ${where} m after the start`);
+});
+
 for (const l of MOTORWAY_LESSONS) test(`${l.id}: every scripted vehicle is placed on the lesson's route`, () => {
   const net = buildNet(area(l.area)), r = buildRoute(net, l.waypoints.map(w => snapWaypoint(net, w)));
   for (const v of SETUPS[l.setup].filter(v => v.at != null)) { const s = l.startAt + v.at; assert.ok(s >= 1 && s <= r.len - 5, `${l.setup}: a vehicle at ${v.at} m lands at ${s} m of ${Math.round(r.len)}`); }
