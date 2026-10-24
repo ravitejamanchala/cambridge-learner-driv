@@ -298,7 +298,8 @@ body.free-drive .markboard{display:none}
 .hud-next .exitn{position:absolute;right:-5px;top:-5px;min-width:18px;height:18px;border-radius:9px;background:#fff;color:var(--ink);font:700 11px/18px var(--font-mono);text-align:center;font-style:normal;padding:0 4px}
 .hud-next strong{font:600 17px/1 var(--font-mono)}
 .hud-next span:empty{display:none}.hud-next .tx span{font:600 11px/1.2 var(--font-display);color:#ffcf8a}
-.hud-next .lanes{display:flex;gap:3px;align-items:flex-end;padding-left:2px}.hud-next .lanes i{width:9px;height:22px;border-radius:3px;background:rgba(255,255,255,.18)}.hud-next .lanes i.on{background:#ffb21a}.hud-next .lanes i.me{box-shadow:inset 0 -5px 0 #fff}#hudNextBox{transform:translateX(calc(-50% - var(--nudge,0px)))}
+.hud-next .lanes{display:flex;gap:3px;align-items:flex-end;padding-left:2px}.hud-next .lanes i{width:9px;height:22px;border-radius:3px;background:rgba(255,255,255,.18)}.hud-next .lanes i.on{background:#ffb21a}.hud-next .lanes i.me{box-shadow:inset 0 -5px 0 #fff}#lightsBtn[aria-pressed="true"]{box-shadow:0 0 0 3px #7fd3ff;color:#bfe9ff}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}#hudNextBox{transform:translateX(calc(-50% - var(--nudge,0px)))}
 #mini{width:clamp(100px,19vh,150px);height:clamp(100px,19vh,150px)}
 .tipcard,.hud-road{display:none!important}
 .markboard{padding:6px 8px;gap:6px;border-radius:14px;cursor:pointer;pointer-events:auto;align-self:flex-start;max-width:min(280px,40vw)}
@@ -496,6 +497,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="glass speedo"><div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div><div class="spd-col"><div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div><div class="target" id="hudTarget" hidden></div></div><div class="roundel" id="hudLimit">30</div></div>
       <button class="glass pausebtn lookbtn" id="lookBtn" aria-label="Interior mirror check (B)" title="Interior mirror check (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><kbd>B</kbd></button>
       <div class="lookpair"><button class="glass pausebtn lookbtn" data-look="left" aria-label="Hold to look left (Z)" title="Hold to look left (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7 5 12l5 5"/><path d="M19 12H5.5"/></svg><kbd>Z</kbd></button><button class="glass pausebtn lookbtn" data-look="right" aria-label="Hold to look right (X)" title="Hold to look right (X)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 7l5 5-5 5"/><path d="M5 12h13.5"/></svg><kbd>X</kbd></button></div>
+      <button class="glass pausebtn lookbtn" id="lightsBtn" aria-label="Dipped headlights (H)" title="Dipped headlights (H)" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 6c4 0 7 2.7 7 6s-3 6-7 6c-1.1 0-2-2.7-2-6s.9-6 2-6z"/><path d="M8 8H3M8 12H3M8 16H3"/></svg><kbd>H</kbd></button>
       <button class="glass pausebtn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
     </div>
     <div class="parkctl" id="parkControls" hidden><button id="assessParking">Park</button><p id="parkingTask" hidden role="status"></p></div>
@@ -604,6 +606,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <div class="set"><span>Route guide<small>Arrows on the road and a marker at the next turn</small></span><div class="seg" id="gdSeg"><button data-gd="1" aria-pressed="true">On</button><button data-gd="0" aria-pressed="false">Off</button></div></div>
       <div class="set"><span>Coaching<small>A line of instruction while you drive, the way an instructor would talk you through it. Off by default: the lesson card says what to do before you start.</small></span><div class="seg" id="coSeg"><button data-co="1" aria-pressed="false">On</button><button data-co="0" aria-pressed="true">Off</button></div></div>
       <div class="set"><span>Shadows<small>Turn off if it feels slow</small></span><div class="seg" id="shSeg"><button data-sh="1" aria-pressed="true">On</button><button data-sh="0" aria-pressed="false">Off</button></div></div>
+      <div class="set"><span>Graphics<small>Low power draws fewer pixels, with no shadows or light pools: for phones and older laptops. The drive is the same.</small></span><div class="seg" id="lpSeg"><button data-lp="0" aria-pressed="true">Standard</button><button data-lp="1" aria-pressed="false">Low power</button></div></div>
     </div></div></div>
 
   <div class="sheet" id="pauseSheet" hidden><div class="card" role="dialog" aria-labelledby="pauseH">

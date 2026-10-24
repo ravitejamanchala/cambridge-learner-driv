@@ -32,6 +32,10 @@ const JOIN = { n: 'Rule 259', t: 'When you join the motorway you should give pri
 const MISSED = { n: 'Rule 263', t: 'You MUST NOT reverse, cross the central reservation, or drive against the traffic flow. If you have missed your exit, or have taken the wrong route, carry on to the next exit.' };
 const FOCUS = ['Positioning – lane discipline', 'Mirrors – change direction', 'Signals – necessary', 'Following distance'];
 const EXIT_FOCUS = [...FOCUS, 'Use of speed', 'Response to road markings', 'Positioning – normal driving'];
+const LIGHTS = { n: 'Rules 113 and 115', t: 'You MUST use headlights at night, except on a road which has lit street lighting. You should also use dipped headlights in dull daytime weather to make sure you can be seen. Make sure you can stop well within the distance you can see to be clear.' };
+// the same lesson, set at dusk (issue #10): the time of day lives in the lesson data, and only lighting changes
+const atDusk = (base, extra) => ({ ...MOTORWAY_LESSONS.find(l => l.id === base), timeOfDay: 'dusk', ...extra,
+  focus: [...MOTORWAY_LESSONS.find(l => l.id === base).focus, 'Control – ancillary controls'] });
 // background traffic off: every vehicle that matters is placed by the lesson, so each run is the same
 const SCRIPTED = [{ id: 'scripted', title: 'The lesson\'s own traffic', trafficDensity: 'none' }];
 
@@ -77,6 +81,17 @@ export const MOTORWAY_LESSONS = [
     rule: MISSED, waypoints: [M(3, 13200), localRoad(3, 3)], scenario: 'motorway', setup: 'missed', exit: 3,
     startAt: 300, startLane: 1, startMph: 58, scenarioVariants: SCRIPTED, focus: EXIT_FOCUS, maxD: 2 },
 ];
+MOTORWAY_LESSONS.push(
+  atDusk('mw-join', { id: 'mw-dusk-join', title: 'Joining at dusk', road: 'J1 slip road → M100 · dusk',
+    goal: 'The light is going. Dipped headlights on before you set off, then join as you would by day: other drivers\' speed is harder to judge in the dusk, so take a bigger gap if you are unsure.',
+    steps: ['Dipped headlights on: H, or the lights button', 'Judge the gap by the headlights coming up behind, and take a bigger one if unsure', 'Match the speed of the left-hand lane and fit in without forcing anyone to brake'] }),
+  atDusk('mw-following', { id: 'mw-dusk-following', title: 'Following at dusk', road: 'M100 · three lanes · dusk',
+    goal: 'Follow the traffic as it slows and speeds up again, in the dusk. Two seconds is the least you may leave: at dusk, when you cannot see as far, leave more, and drive at a speed you could stop at within the distance you can see.',
+    steps: ['Dipped headlights on before you set off', 'Keep at least two seconds, more as it gets darker: watch the reading', 'Read the traffic by its brake lights, and ease off early'], rule: LIGHTS }),
+  atDusk('mw-exit', { id: 'mw-dusk-exit', title: 'Leaving the motorway at dusk', road: 'M100 → J3 Kingsmere · dusk',
+    goal: 'Leave at junction 3 as the light goes. The signs and the studs in the road stay bright in your headlights: use them. Mirror and signal by the 300-yard marker, keep your speed until you are on the slip road, then slow for the bend.',
+    steps: ['Dipped headlights on before you set off', 'Signs at 1 mile and ½ mile, then the countdown markers, all lit by your headlights', 'Green studs mark where the slip road leaves; red studs the left edge'] }),
+);
 
 const MPH = 0.44704;
 // Scripted traffic, in route metres ahead of the learner's start (negative is behind; each lesson's
@@ -175,6 +190,8 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     placed.push({ car: free, spec, passed: false });
   }
   const S = { notes: [], laneStats: A.stats, lane: A };
+  // at dusk: dipped headlights before moving (Rules 113 and 115), and nothing else changes
+  let darkT = 0, lightsOnAt = null, darkFlag = false, movedDark = false;
   S.update = (dt, clock) => {
     if (!test.running) return;
     if (t0 === null) { t0 = clock; for (const spec of SETUPS[lesson.setup] || []) place(spec); }
@@ -183,6 +200,11 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
       if (p.spec.wave) p.car.cruise = p.spec.mph / 70 * wave(t);
       const fx = -Math.sin(player.th), fz = -Math.cos(player.th);
       if (p.car.alive && (p.car.x - player.x) * fx + (p.car.z - player.z) * fz < -8) p.passed = true;
+    }
+    if (lesson.timeOfDay === 'dusk') {
+      if (player.headlights && lightsOnAt === null) { lightsOnAt = t; events.push({ type: 'headlights', at: Math.round(t) }); }
+      darkT = !player.headlights && player.v > 2.2 ? darkT + dt : 0; if (darkT > 0) movedDark = true;
+      if (darkT > 3 && !darkFlag) { darkFlag = true; test.fault('D', 'Control – ancillary controls', 'Drove at dusk without dipped headlights: switch them on before you set off (Rules 113 and 115)', 'mwlights', 600); }
     }
     const nr = test.ctx;
     if (exitS != null && nr && nr.way.cls === 'motorway_link' && test.sRoute > exitS) tookExit = true;
@@ -271,6 +293,10 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     }
     return null;
   };
+  // at dusk, a pass says so when the headlights were on before the car first moved
+  const judged = S.result;
+  S.result = () => { const r = judged();
+    return r && r.ok && lesson.timeOfDay === 'dusk' && lightsOnAt != null && !movedDark ? { ...r, why: `${r.why} Dipped headlights on before you moved off.`.trim() } : r; };
   Object.defineProperty(S, 'events', { get: () => events.concat(A.events) });
   return S;
 }

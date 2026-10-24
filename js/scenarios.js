@@ -12,7 +12,8 @@ export function scenariosFor(lesson) {
     { id: 'quiet', title: 'Quieter traffic', trafficDensity: 'light' }]).map(v => ({
     id: `${lesson.id}:${v.id}`, lessonId: lesson.id, title: v.title, difficulty: lesson.difficulty,
     location: { adapterId: lesson.locationAdapter || 'practice', areaId: lesson.area, locationId: v.locationId || lesson.locationId },
-    conditions: { trafficDensity: v.trafficDensity, weather: 'clear', visibility: 'day' },
+    // visibility: a variant's own, else the lesson's time of day (issue #10: dusk lessons keep it in the lesson data)
+    conditions: { trafficDensity: v.trafficDensity, weather: 'clear', visibility: v.visibility || lesson.timeOfDay || 'day' },
     objectives: lesson.objectives, events: lesson.scenario ? [lesson.scenario] : [],
     assessmentRules: lesson.assessmentRules, completionCriteria: lesson.completionCriteria
   }));
@@ -20,7 +21,7 @@ export function scenariosFor(lesson) {
 export function resolveScenario(lesson, id) {
   const variants = scenariosFor(lesson), scenario = variants.find(s => s.id === id) || (!id ? variants[0] : null);
   if (!scenario) throw new Error(`Unknown scenario for ${lesson.id}: ${id}`);
-  if (!['normal', 'light', 'none'].includes(scenario.conditions.trafficDensity) || scenario.conditions.weather !== 'clear' || scenario.conditions.visibility !== 'day') throw new Error('Unsupported scenario conditions');
+  if (!['normal', 'light', 'none'].includes(scenario.conditions.trafficDensity) || scenario.conditions.weather !== 'clear' || !['day', 'dusk'].includes(scenario.conditions.visibility)) throw new Error('Unsupported scenario conditions');
   const adapter = locationAdapters.get(scenario.location.adapterId);
   if (!adapter) throw new Error(`Unsupported location adapter: ${scenario.location.adapterId}`);
   const location = adapter.resolve(lesson, scenario);

@@ -8,6 +8,7 @@ import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
 import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
+import { attachLamps, setLamps } from './evening.js';
 import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './car.js';
 import { createGarage } from './garage.js';
@@ -67,10 +68,15 @@ async function boot() {
   // Each pooled traffic car is a wrapper group holding one body. It starts as a coloured box and is
   // swapped for a supplied model once those have loaded, so traffic never waits on the network.
   let trafficModels = [];
+  // evening drives (issue #10): every vehicle carries lamps, lit only at dusk
+  let dusk = false, lowPower = false;
+  // one spot light lights the road ahead of the learner (left out on low-power graphics, where the lamps
+  // alone show the headlights are on). Each map area gets a new scene, so it moves with the camera.
+  const headBeam = new T.SpotLight(0xfff1d6, 1.3, 75, 0.46, 0.65, 1.2); headBeam.visible = false;
   const dressCar = (slot, index) => {
     const body = trafficModels.length ? trafficModels[index % trafficModels.length].clone(true) : shadowed(makeBoxCar(slot.userData.colour, false));
     slot.userData.model = trafficModels.length ? index % trafficModels.length : -1;
-    slot.remove(...slot.children); slot.add(body);
+    slot.remove(...slot.children); slot.add(body); attachLamps(body); setLamps(body, dusk);
   };
   const makeCar = (c) => {
     let m = carPool[carI];
@@ -100,10 +106,10 @@ async function boot() {
       const d = await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
+      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
       const net = buildNet(d);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn);
+      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
@@ -210,6 +216,9 @@ async function boot() {
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
     test.ctx = nearest(A.net,player.x,player.z);
     test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
+    // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
+    test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
+    applyTimeOfDay(test.timeOfDay); setHeadlights(false);
     if (test.ungraded) startFreeDrive(pl, test);
     test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
@@ -282,6 +291,7 @@ async function boot() {
     else if (e.code === 'KeyB') look('interior');
     else if (e.code === 'KeyI') cockpitAction('engine');
     else if (e.code === 'KeyP') cockpitAction('parkingBrake');
+    else if (e.code === 'KeyH') setHeadlights(!player.headlights);
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => {
@@ -414,7 +424,7 @@ async function boot() {
   const extraInputs = [];
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
-    perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
+    perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; } };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
@@ -468,7 +478,7 @@ async function boot() {
   function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
-    document.body.classList.remove('free-drive');
+    document.body.classList.remove('free-drive'); applyTimeOfDay('day');
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
   }
@@ -513,12 +523,20 @@ async function boot() {
   sens.value = HANDLING.steerSensitivity;
   sens.addEventListener('input', () => { HANDLING.steerSensitivity = +sens.value; prefs.sens = +sens.value; savePrefs(); });
   document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.addEventListener('click', () => setCam(+b.dataset.cam, true)));
-  const setSh = (on) => { shadowsOn = on; if (A.world) A.world.setShadows(on); seg('#shSeg [data-sh]', 'sh', on ? 1 : 0); prefs.sh = on ? 1 : 0; savePrefs(); };
+  const setSh = (on) => { shadowsOn = on; if (A.world) A.world.setShadows(on && !lowPower); seg('#shSeg [data-sh]', 'sh', on ? 1 : 0); prefs.sh = on ? 1 : 0; savePrefs(); };
   document.querySelectorAll('#shSeg [data-sh]').forEach(b => b.addEventListener('click', () => setSh(b.dataset.sh === '1')));
   const setMi = (on) => { mirrors.enabled = on; document.body.classList.toggle('no-mirrors', !on); seg('#miSeg [data-mi]', 'mi', on ? 1 : 0); prefs.mi = on ? 1 : 0; savePrefs(); layoutSoon(); };
   document.querySelectorAll('#miSeg [data-mi]').forEach(b => b.addEventListener('click', () => setMi(b.dataset.mi === '1')));
   // Coaching: a running line of instruction for learners who want one. Off by default, because the
   // lesson card has already said what to do and the view is what matters while driving.
+  // Low-power graphics: fewer pixels, no shadows, no light pools or headlight beam. For phones and
+  // older laptops; the drive and the assessment are exactly the same.
+  const setLp = (on) => {
+    lowPower = on; renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
+    if (A.world) { A.world.setShadows(on ? false : shadowsOn); A.world.setTimeOfDay(dusk ? 'dusk' : 'day', { lowPower }); }
+    seg('#lpSeg [data-lp]', 'lp', on ? 1 : 0); prefs.lp = on ? 1 : 0; savePrefs(); resize();
+  };
+  document.querySelectorAll('#lpSeg [data-lp]').forEach(b => b.addEventListener('click', () => setLp(b.dataset.lp === '1')));
   const setCo = (on) => { coaching = on; seg('#coSeg [data-co]', 'co', on ? 1 : 0); prefs.co = on ? 1 : 0; savePrefs(); if (A.test) A.test.coach = null; };
   document.querySelectorAll('#coSeg [data-co]').forEach(b => b.addEventListener('click', () => setCo(b.dataset.co === '1')));
   const setGd = (on) => { guide.enabled = on; seg('#gdSeg [data-gd]', 'gd', on ? 1 : 0); prefs.gd = on ? 1 : 0; savePrefs(); };
@@ -593,8 +611,18 @@ async function boot() {
     mirrors.mount(cockpit, seat.x);
     camInit = false;
   }
-  player.onModel = fitCockpit;
-  if (player.model) fitCockpit(player.model);
+  player.onModel = (m) => { fitCockpit(m); if (!m.getObjectByName('lamps')) attachLamps(m); };
+  if (player.model) player.onModel(player.model);
+  if (!player.mesh.getObjectByName('lamps')) attachLamps(player.mesh);
+  // the learner's dipped headlights: H, or the lights button, which only shows at dusk
+  const setHeadlights = (on) => { player.headlights = on; $('lightsBtn').setAttribute('aria-pressed', on ? 'true' : 'false'); };
+  $('lightsBtn').addEventListener('click', () => setHeadlights(!player.headlights));
+  function applyTimeOfDay(tod) {
+    dusk = tod === 'dusk'; document.body.classList.toggle('dusk', dusk);
+    if (A.world) A.world.setTimeOfDay(tod, { lowPower });
+    for (const slot of carPool) setLamps(slot.children[0], dusk);
+    $('lightsBtn').hidden = !dusk;
+  }
 
   // ---------- overhead view: drag to pan, wheel or pinch to zoom ----------
   const ov = { px: 0, pz: 0, h: 95 };
@@ -676,7 +704,7 @@ async function boot() {
     const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(plan?.lesson?.manoeuvre ? 2 : p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
   }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1);
+  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
   function sim(dt) {
@@ -717,6 +745,10 @@ async function boot() {
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
+    // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
+    setLamps(player.mesh, dusk, !!player.headlights);
+    headBeam.visible = dusk && !!player.headlights && !lowPower;
+    if (headBeam.visible) { const fx = -Math.sin(player.th), fz = -Math.cos(player.th); headBeam.position.set(player.x + fx * 2, 0.8, player.z + fz * 2); headBeam.target.position.set(player.x + fx * 32, 0, player.z + fz * 32); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
     guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive && !plan?.lesson?.manoeuvre;
     if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }

@@ -150,7 +150,7 @@ function bodyColour(material, fallback = 0x1d6a46) {
 }
 
 export function createPlayer(scene) {
-  const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, mesh: makeBoxCar(0x1a7c52, true) };
+  const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, headlights: false, mesh: makeBoxCar(0x1a7c52, true) };
   p.operation = createVehicleState(); p.observations = [];
   scene.add(p.mesh);
   p.setModel = (m) => { const par = p.mesh.parent || scene; par.remove(p.mesh); p.mesh = m; par.add(m); p.model = m; p.onModel?.(m); };

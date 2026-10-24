@@ -2,6 +2,15 @@
 
 ## Unreleased: motorways, junction markings and pull-request previews
 
+- **Evening motorway driving** (issue #10).
+  - **Three lessons at dusk**: *Joining at dusk*, *Following at dusk* and *Leaving the motorway at dusk*, the same motorway lessons set as the light goes, with the time of day saved in the lesson data. A **Motorway at dusk** free drive too.
+  - **What changes is only what you see**: a dusk sky, lamps on every vehicle (tail lights always, headlights on), road studs in their proper colours, lit columns at each junction, and signs that glow in the headlights. The road, the traffic and every rule are the same as by day: the same careless drive is given the same faults at dusk, and the Bot lab's careful drives come out the same.
+  - **Headlights**: switch dipped headlights on with **H** or the lights button, which only appears at dusk. Driving off without them is marked once, as a driving fault under ancillary controls (Rules 113 and 115).
+  - **Fair at dusk**: the fog never closes in nearer than 600 m and every vehicle shows its lamps, so nothing the examiner marks is hidden by the lighting.
+  - **Low-power graphics** (Settings → Graphics): no shadows, no headlight beam or light pools on the road, and a lower pixel ratio, with the lamps kept. Menus honour reduced motion.
+  - **Fixed along the way:** the headlight beam was left behind in the previous scene whenever a new map area loaded, so it never lit the road.
+  - **Cheap enough to draw.** The first measurement put a dusk frame at 2.6× the cost of a day one: every road stud on the 24 km circuit was drawn every frame, 100,000 of the 140,000 triangles in view. Studs are now drawn only within 800 m of the car (about 500 of them), and a dusk frame costs about 1.35× a day one; on low-power graphics it costs less than day.
+  - Evidence: clips, day-and-dusk stills from the same spot and frame times in [docs/evidence/10-evening-motorway](docs/evidence/10-evening-motorway/README.md). The frame times are from the headless software renderer, so they compare day, dusk and low power with each other; measuring on real phones and laptops is still to do.
 - **Leaving the motorway, and missing your exit** (issue #9).
   - **Exits are signed**: blue advance direction signs at 1 mile and ½ mile, countdown markers at 300, 200 and 100 yards, and the final sign at the slip road, on both carriageways of both motorway worlds.
   - *Leaving the motorway* (two lanes, junction 3): follow the signs, mirror and signal by the 300-yard marker, keep up with the traffic until you are on the slip road, then slow for its bend and give way at the roundabout before driving on along the A301. Leaving without a mirror check or a signal, braking hard on the carriageway before the slip road, and taking the slip road's bend too fast are each marked.

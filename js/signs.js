@@ -208,7 +208,7 @@ const kit = () => KIT || (KIT = { board: new T.PlaneGeometry(6.4, 4.0), leg: new
   grey: new T.MeshLambertMaterial({ color: 0x8a9096 }), count: {} });
 export function countdownMarker(sg) {
   const K = kit(), grp = new T.Group(), h = 1.8, base = 0.5;
-  const face = K.count[sg.n] || (K.count[sg.n] = new T.MeshLambertMaterial({ map: countdownTex(sg.n) }));
+  const face = K.count[sg.n] || (K.count[sg.n] = new T.MeshLambertMaterial({ map: countdownTex(sg.n) })); FACES.add(face);
   const board = new T.Mesh(K.marker, face); board.position.y = base + h / 2; grp.add(board);
   const back = new T.Mesh(K.marker, K.grey); back.position.set(0, base + h / 2, -0.02); back.rotation.y = Math.PI; grp.add(back);
   const leg = new T.Mesh(K.markerLeg, K.grey); leg.position.z = -0.05; grp.add(leg);
@@ -217,9 +217,16 @@ export function countdownMarker(sg) {
   return grp;
 }
 // a board on two legs on the verge, facing the traffic it is for
+// Sign faces are retroreflective: at dusk they stay readable in the headlights however dark the scene
+// gets, so every face is registered here and lit by setSignsLit().
+const FACES = new Set();
+export function setSignsLit(on) {
+  for (const m of FACES) { m.emissive.setHex(on ? 0x9a9a9a : 0x000000); m.emissiveMap = on ? m.map : null; m.needsUpdate = true; }
+}
 export function motorwaySign(sg) {
   const K = kit(), grp = new T.Group(), w = 6.4, h = 4.0, base = 1.5; // big enough to read at 70 mph
-  const board = new T.Mesh(K.board, new T.MeshLambertMaterial({ map: motorwaySignTex(sg) }));
+  const face = new T.MeshLambertMaterial({ map: motorwaySignTex(sg) }); FACES.add(face);
+  const board = new T.Mesh(K.board, face);
   board.position.y = base + h / 2; grp.add(board);
   const back = new T.Mesh(K.board, K.grey); back.position.set(0, base + h / 2, -0.03); back.rotation.y = Math.PI; grp.add(back);
   for (const x of [-w / 2 + 0.5, w / 2 - 0.5]) { const leg = new T.Mesh(K.leg, K.grey); leg.position.set(x, 0, -0.08); grp.add(leg); }

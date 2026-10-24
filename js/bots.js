@@ -33,6 +33,7 @@ export function makeDriver(api) {
     const A = api.A, t = A.test, pl = api.player, R = t.route, tr = A.traffic, net = A.net; if (!t.running) return null;
     const lesson = api.lesson?.(), status = api.scenarioStatus?.();
     if (lesson?.manoeuvre) return parkingInput();
+    if (t.timeOfDay === 'dusk' && !pl.headlights) pl.headlights = true; // dipped headlights before moving off at dusk
     if (pl.operation?.enabled && pl.operation.transmission !== 'automatic') {
       const missing = ['doorClosed', 'seatSet', 'mirrorsSet', 'belt'].find(k => !pl.operation[k]);
       if (missing) api.operate(missing);

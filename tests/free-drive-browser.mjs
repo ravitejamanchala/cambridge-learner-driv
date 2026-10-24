@@ -56,9 +56,10 @@ try {
   });
 
   // ---------- both lane configurations are playable ----------
-  for (const id of ['m2', 'm3']) {
+  for (const id of ['m2', 'm3', 'm3-dusk']) {
     await start(id); await frames(600); // 30 s
-    const s = await state();
+    const s = await state(), dusk = await page.evaluate(() => ({ on: document.body.classList.contains('dusk'), button: !document.querySelector('#lightsBtn').hidden }));
+    assert.deepEqual(dusk, { on: id.endsWith('dusk'), button: id.endsWith('dusk') }, `${id}: wrong time of day`);
     assert.equal(s.mode, 'drive', `${id}: the drive did not start`);
     assert.equal(s.ungraded, true, `${id}: free drive must be ungraded`);
     assert.equal(s.cls, 'motorway'); assert.equal(s.lanes, +id[1], `${id}: wrong number of lanes`);
@@ -95,7 +96,8 @@ try {
   }
 
   // ---------- sustained drive right round the circuit: memory and frame time ----------
-  await start('m3'); await page.evaluate(() => { window.__target = 31; });
+  // at dusk, the heavier case: the same road and traffic, plus every car's lamps, the studs and the lit junctions
+  await start('m3-dusk'); await page.evaluate(() => { window.__target = 31; window.cambridgeDrive.player.headlights = true; });
   const samples = [], cycles = Math.round(MINUTES * 60 / 0.8);
   for (let c = 0; c <= cycles; c++) {
     const ft = await page.evaluate(() => { const a = window.cambridgeDrive; a.step(15); const t0 = performance.now(); a.frame(0.05); return performance.now() - t0; });
@@ -137,5 +139,5 @@ try {
   assert.equal(after.account, before.account, 'free drive wrote to the account');
   assert.equal(after.local, before.local, 'free drive wrote to the stored learner record');
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log('Free drive: both lane layouts, a full lap with bounded memory, leaving and rejoining, pause/resume/restart/end, and no record written.');
+  console.log('Free drive: both lane layouts and the dusk circuit, a full lap with bounded memory, leaving and rejoining, pause/resume/restart/end, and no record written.');
 } finally { await browser?.close(); server.kill(); }
