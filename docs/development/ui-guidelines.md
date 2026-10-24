@@ -101,12 +101,6 @@ Keys and touch buttons are all-or-nothing, so the car has to forgive that withou
   `steerLock` in `js/config.js`). Full input at 30 mph used to turn the car at about 25 m/s², which no
   car can do, so every tap was a swerve. The test drivers steer by wheel angle through the same limit
   (`steerFor`), so they cannot do what a person's car cannot.
-- **A steering assist, said out loud.** On keys and touch the car is hard to hold round a bend, so
-  Settings has a steering assist, off by default. With no steering held it steers round the curve of the
-  lane; any steering adds to it, so the learner can always override it. Junctions, roundabouts, walking
-  pace and manoeuvres are left to the learner, and it never runs in the Bot lab or the browser checks.
-  Every result it touched says so: a "Steering assist on" tag by the stars, a line in the run detail with
-  how long it steered, and "the real test has no assist"; the learner's history records it too.
 - **Controllers are first-class.** The left stick or a wheel steers, the triggers are the pedals, LB and
   RB indicate and Y checks the mirrors. A controller is followed closely; keys wind the wheel on
   gradually. Keys always win over an idle controller.

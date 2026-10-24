@@ -4,7 +4,7 @@ import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
-import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor, steerLock } from './config.js';
+import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor } from './config.js';
 import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
@@ -70,7 +70,7 @@ async function boot() {
   // swapped for a supplied model once those have loaded, so traffic never waits on the network.
   let trafficModels = [];
   // evening drives (issue #10): every vehicle carries lamps, lit only at dusk
-  let dusk = false, lowPower = false, assistOn = false; // assistOn: the steering assist, see assisted()
+  let dusk = false, lowPower = false;
   // one spot light lights the road ahead of the learner (left out on low-power graphics, where the lamps
   // alone show the headlights are on). Each map area gets a new scene, so it moves with the camera.
   const headBeam = new T.SpotLight(0xfff1d6, 1.3, 75, 0.46, 0.65, 1.2); headBeam.visible = false;
@@ -193,7 +193,6 @@ async function boot() {
     $('rD').textContent = '–'; $('rS').textContent = '–';
     $('rNote').textContent = plan.drive.title + ' · ungraded, nothing added to your record';
     const lines = freeSummaryLines(st, min);
-    if (stats.assistSeconds >= 1) lines.push(`Steering assist was on for ${Math.round(stats.assistSeconds)} s`);
     $('rReasons').innerHTML = lines.map(l => `<li>${l}</li>`).join('');
     $('coachingReport').textContent = ''; $('nextBtn').hidden = true; $('runDetailList').innerHTML = ''; $('againBtn').textContent = 'Drive again'; $('resultSheet').hidden = false; setMode('lobby'); document.body.classList.remove('free-drive');
   }
@@ -462,8 +461,6 @@ async function boot() {
     const lines = runDetail({ ...about, stats, observations: player.observations });
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
-  // said wherever a result is shown: the drive had help the real test does not give
-  const assistTag = () => stats.assistSeconds >= 1 ? ` <span class="tag assist">Steering assist on</span> ` : '';
   function onFinish() {
     const test = A.test; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
@@ -473,23 +470,23 @@ async function boot() {
       const report = buildReport({ lessonId: plan.lesson.id, scenarioId: plan.scenarioDefinition?.id, pass: res.pass, faults: test.faults, duration: test.elapsed, objectives: plan.lesson.objectives || plan.lesson.steps, evidence: { observations: player.observations.map(e => ({ ...e })), controls: player.operation.events.map(e => ({ ...e })), scenarioEvents: scenario?.events || [], objectiveResult: scenario?.result ? scenario.result() : null } });
       $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
       showRunDetail({ kind: plan.kind, lesson: plan.lesson, test, scenario });
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode, assist: stats.assistSeconds >= 1 }); // bot runs never touch a learner's progress
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
       const n = res.stars || 0, mode = modeOf(res.mode);
-      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}` + assistTag();
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
       const j = judgeMock(test.marking, test), pass = j.pass, mode = modeOf(j.mode);
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, assist: stats.assistSeconds >= 1, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
       const real = mode.id === 'hard' ? '' : ` Marked on ${mode.title}; the real test is Hard (15 driving faults, no serious).`;
-      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + assistTag() + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
         : (test.S > j.maxS ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : j.collision ? 'A collision is never forgiven. The marking sheet shows what to work on.' : `More than ${j.maxD} driving faults means a fail. The marking sheet shows what to work on.`)) + real;
       $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       showRunDetail({ kind: 'mock', lesson: null, test, scenario });
@@ -516,7 +513,7 @@ async function boot() {
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
-    stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; stats.assistSeconds = 0; chaseAuto = -1;
+    stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
@@ -560,8 +557,6 @@ async function boot() {
     seg('#lpSeg [data-lp]', 'lp', on ? 1 : 0); prefs.lp = on ? 1 : 0; savePrefs(); resize();
   };
   document.querySelectorAll('#lpSeg [data-lp]').forEach(b => b.addEventListener('click', () => setLp(b.dataset.lp === '1')));
-  const setSa = (on) => { assistOn = on; seg('#saSeg [data-sa]', 'sa', on ? 1 : 0); prefs.sa = on ? 1 : 0; savePrefs(); };
-  document.querySelectorAll('#saSeg [data-sa]').forEach(b => b.addEventListener('click', () => setSa(b.dataset.sa === '1')));
   const setCo = (on) => { coaching = on; seg('#coSeg [data-co]', 'co', on ? 1 : 0); prefs.co = on ? 1 : 0; savePrefs(); if (A.test) A.test.coach = null; };
   document.querySelectorAll('#coSeg [data-co]').forEach(b => b.addEventListener('click', () => setCo(b.dataset.co === '1')));
   const setGd = (on) => { guide.enabled = on; seg('#gdSeg [data-gd]', 'gd', on ? 1 : 0); prefs.gd = on ? 1 : 0; savePrefs(); };
@@ -729,30 +724,13 @@ async function boot() {
     const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(plan?.lesson?.manoeuvre ? 2 : p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
   }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1); setSa(prefs.sa === 1);
+  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
   // In the chase view the mirrors are always on screen, and the car's surroundings with them, so there is
   // nothing to check by pressing a key: mirror and shoulder checks count as made the whole time and are not
   // marked. The result says so. The mirror-practice lesson, whose whole point is the routine, still asks for
   // it; the Bot lab and the browser checks make their own looks.
-  // Steering assist (Settings, off by default): with no steering held it steers the car round the curve of
-  // its lane; steering input adds to it, so the learner can always override it. It leaves junctions and
-  // roundabouts to the learner, does nothing at walking pace or in a manoeuvre, and never runs in the Bot
-  // lab. How long it steered is shown in the result, because the real test has no assist.
-  function assisted(inp, dt) {
-    const t = A.test;
-    if (!assistOn || botMode || !t?.running || !t.route || plan?.lesson?.manoeuvre) return inp;
-    const v = Math.abs(player.v), nr = t.ctx;
-    if (v < 3 || !nr || nr.way.rb) return inp;
-    if (t.route.instructions.some(i => !i.final && t.sRoute > i.s - 35 && t.sRoute < (i.exitS ?? i.s) + 15)) return inp; // a junction: the turn is yours
-    const ld = Math.max(8, v), q = guide.lanePoint(t.route, Math.min(t.route.len, t.sRoute + ld), A.net);
-    const dx = q.x - player.x, dz = q.z - player.z, d = Math.hypot(dx, dz) || 1;
-    let ang = Math.atan2(-dx, -dz) - player.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-    const help = Math.max(-1, Math.min(1, Math.atan(2 * HANDLING.wheelbase * Math.sin(ang) / d) / steerLock(v))); // pure pursuit to the lane ahead
-    stats.assistSeconds = (stats.assistSeconds || 0) + dt;
-    return { ...inp, steer: Math.abs(inp.steer) > 0.05 ? Math.max(-1, Math.min(1, inp.steer + help)) : help };
-  }
   let chaseAuto = -1;
   function chaseMirrors(dt, now) {
     if (cam !== 0 || botMode || plan?.lesson?.scenario === 'mirrors') return;
@@ -772,7 +750,7 @@ async function boot() {
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
       const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
-      player.update(dt, assisted(readInput(), dt), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       chaseMirrors(dt, traffic.clock);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
