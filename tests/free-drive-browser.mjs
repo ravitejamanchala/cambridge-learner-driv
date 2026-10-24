@@ -30,6 +30,14 @@ try {
   const record = () => page.evaluate(() => localStorage.getItem('cambridge-learner-drive.v1'));
   const before = { local: await record(), account: JSON.stringify({ profile: account.profile, sessions: account.sessions }) };
   const start = (id) => page.evaluate(async id => { await window.cambridgeDrive.pick('free', id, true); window.cambridgeDrive.manual(true); }, id);
+  // ---------- Start in the Free drive sheet starts a free drive, whatever was selected before ----------
+  {
+    await page.locator('[data-open=freeSheet]').first().click(); await page.locator('#freeDetail [data-start]').click();
+    await page.waitForFunction(() => document.body.dataset.mode === 'drive' && window.cambridgeDrive.test?.running, {}, { timeout: 45000 });
+    const s = await page.evaluate(() => ({ area: window.cambridgeDrive.area, ungraded: window.cambridgeDrive.test.ungraded }));
+    assert.deepEqual(s, { area: 'm3', ungraded: true }, 'Start free drive began something else: ' + JSON.stringify(s));
+    console.log('Free drive sheet: Start began the ungraded m3 drive, though the lobby had a lesson selected.');
+  }
   // A steady driver: follows the lane the route is in at a set speed, and keeps a two-second gap to
   // anything ahead in that lane, as a sensible driver would.
   await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player; window.__target = 30; window.__drive = a.addInput(() => {
@@ -76,10 +84,15 @@ try {
     const s = await state();
     assert.ok(s.rerouted >= 1, 'leaving the motorway did not build a route back');
     assert.ok(s.lap.start > 0, 'the rejoin route should carry a lead-in before the lap');
+    // the way back keeps its own directions: the roundabout at the bottom of the slip road comes before
+    // the next junction's countdown
+    const dirs = await page.evaluate(() => window.cambridgeDrive.test.route.instructions.map(i => ({ s: Math.round(i.s), kind: i.kind, junction: i.junction || 0, short: i.short })));
+    const rb = dirs.find(i => i.kind === 'rb'), j = dirs.find(i => i.junction);
+    assert.ok(rb && j && rb.s < j.s, 'the route back lost its roundabout directions: ' + JSON.stringify(dirs.slice(0, 6)));
     await frames(300);
     const later = await state();
     assert.equal(later.off, false, 'the route back onto the circuit could not be followed');
-    console.log(`Left at ${placed}: route back onto the circuit built and followed (lap starts ${Math.round(s.lap.start)} m in).`);
+    console.log(`Left at ${placed}: route back onto the circuit built and followed (lap starts ${Math.round(s.lap.start)} m in); directions: ${dirs.slice(0, 3).map(i => i.short).join(' → ')}.`);
   }
 
   // ---------- sustained drive right round the circuit: memory and frame time ----------

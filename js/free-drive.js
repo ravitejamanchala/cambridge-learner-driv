@@ -26,12 +26,15 @@ export const freeDrive = (id) => FREE_DRIVES.find(d => d.id === id);
 // What a free drive measured, for the summary at the end. Only things the sim recorded: distance,
 // time, laps, junctions passed, and the longest stretch kept at or under the limit.
 export function createFreeStats() {
-  return { distance: 0, seconds: 0, laps: 0, junctions: 0, legalRun: 0, bestLegalRun: 0, topMph: 0 };
+  return { distance: 0, seconds: 0, laps: 0, junctions: 0, legalRun: 0, bestLegalRun: 0, topMph: 0, overSeconds: 0, worst: null };
 }
 export function stepFreeStats(st, dt, v, mph, limit) {
   const d = Math.abs(v) * dt;
   st.distance += d; st.seconds += dt; st.topMph = Math.max(st.topMph, mph);
-  if (mph <= limit + 0.5) { st.legalRun += d; st.bestLegalRun = Math.max(st.bestLegalRun, st.legalRun); } else st.legalRun = 0;
+  if (mph <= limit + 0.5) { st.legalRun += d; st.bestLegalRun = Math.max(st.bestLegalRun, st.legalRun); return; }
+  // over the limit of the road the car is on, whatever that limit is: the worst moment is the furthest over
+  st.legalRun = 0; st.overSeconds += dt;
+  if (!st.worst || mph - limit > st.worst.mph - st.worst.limit) st.worst = { mph, limit };
 }
 
 // The summary, one measured fact per line. Specific numbers, nothing invented, and the one honest
@@ -44,6 +47,7 @@ export function freeSummaryLines(st, minutes) {
   if (st.laps) out.push(`${st.laps} full lap${st.laps > 1 ? 's' : ''} of the circuit`);
   if (st.junctions) out.push(`Drove past ${st.junctions} junction${st.junctions > 1 ? 's' : ''}`);
   out.push(`Longest stretch at or under the limit: ${mi(st.bestLegalRun)} miles`);
-  out.push(st.topMph > 71 ? `Top speed ${Math.round(st.topMph)} mph — over the 70 limit at some point` : `Never over the limit: top speed ${Math.round(st.topMph)} mph`);
+  if (!st.worst) out.push(`Never over the limit: top speed ${Math.round(st.topMph)} mph`);
+  else out.push(`Over the limit for ${Math.max(1, Math.round(st.overSeconds))} s, at worst ${Math.round(st.worst.mph)} mph in a ${st.worst.limit} limit; top speed ${Math.round(st.topMph)} mph`);
   return out;
 }
