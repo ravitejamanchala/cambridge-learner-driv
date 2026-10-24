@@ -45,3 +45,15 @@ The three-lane motorway from above: slower vehicles in the left-hand lane, quick
 Turning left, marked on Medium (chosen in the lesson panel before starting): the result shows two stars and says it was marked on Medium. Hard earns three and is the real test's standard.
 
 [07-marked-on-medium.mp4](07-marked-on-medium.mp4) · 40 s (80 s of driving at 2× speed) · 1.7 MB
+
+## Traffic signals before it moves
+
+Free drive at 55 mph in the left-hand lane, in the chase view: vehicles coming up behind signal right before they pull out to pass, and signal left before they move back in, so you can see where each one is going.
+
+[08-traffic-signals-before-it-moves.mp4](08-traffic-signals-before-it-moves.mp4) · 30 s · 1.0 MB
+
+## A courteous driver lets you in
+
+The learner, at 60 mph in the left-hand lane, checks the mirror and signals right with a car alongside in the next lane. That driver is one of the courteous half: it eases off and drops back to leave a gap, and the learner moves across into it. (For the clip, a driver whose drawn trait is courtesy was moved up beside the learner; the other half hold their speed.)
+
+[09-a-courteous-driver-lets-you-in.mp4](09-a-courteous-driver-lets-you-in.mp4) · 16 s · 0.6 MB
