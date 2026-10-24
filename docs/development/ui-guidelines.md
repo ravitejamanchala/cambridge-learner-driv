@@ -118,6 +118,10 @@ Keys and touch buttons are all-or-nothing, so the car has to forgive that withou
   than that reaction time allows without weaving. `BOT_DRIVER=keys npm run test:bots` sweeps everything
   that way. Its pass rate is a guide to difficulty, not a promise: it depends on what the model assumes
   about people.
+- **Check it in traffic it has not seen.** Lesson traffic is scripted, so the same drive meets the same
+  cars every time and a driver can be tuned to that pattern. The Bot lab's traffic choice (*Random
+  traffic*, `BOT_TRAFFIC=random`) runs the drive in ordinary background traffic instead, a different mix
+  for each run's seed. Sweep the motorway lessons that way before changing a lane rule.
 
 ## Marking: Easy, Medium and Hard
 
@@ -242,6 +246,23 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   left into a gap, pulls out to pass something slower, and gets into the left-hand lane in good time for
   a motorway exit. It changes lane at half a lane a second, and never moves in front of the learner with
   less than 2.5 s between them. A lesson's own placed traffic stays where the lesson put it.
+- **Background traffic says what it is about to do.** A vehicle that is going to change lane flashes its
+  indicator for a couple of seconds first, then moves; one in twenty drivers never signals, as on real
+  roads. If someone turns up alongside before it is across, it goes back to its lane. The indicators are
+  amber lamps on the car itself, so nothing is added to the screen.
+- **Drivers differ.** Each background vehicle draws its own following distance, the gap it will accept,
+  how long it waits before moving, and whether it is courteous, from the seeded traffic generator, so the
+  same seed gives the same traffic but no two cars behave quite alike.
+- **Some drivers make room.** About half are courteous: when the learner, alongside or just ahead in the
+  next lane, signals into theirs, they ease off and leave a gap; some also move over for a learner on an
+  entry slip road when the next lane is free. The rest hold their speed, so a signal is a request, never a
+  right, and the gap rule still decides whether the move was safe.
+- **A lane change is judged once it is a lane change.** The mirror, signal and sweep checks are applied
+  when the car's centre crosses the line, from what was done before it started to move: a drift towards
+  the line that comes back is not a lane change. A gap is too small when the vehicle behind would have to
+  brake (closing within 3 s, under half a second behind, or under a second and not falling back), not
+  for the gap alone: moving in a second ahead of a slower vehicle you are pulling away from makes nobody do
+  anything. Moving left and straight off at an exit is cutting across only inside the last 100 yards.
 - **AI joiners obey the same priority.** A vehicle on an entry slip fits into lane 1 only where the
   vehicle behind keeps 1.5 s and is not closing within 4 s; otherwise it drops back behind, and with no
   gap it waits at the end of the acceleration lane, before the taper, because the taper is in the lane
