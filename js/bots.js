@@ -155,7 +155,9 @@ export function makeDriver(api) {
     }
     if (ins.kind === 'rb' && ahead > 2 && ahead < 22) {
       const vx = net.nx[ins.node], vz = net.nz[ins.node], lit = net.stops.some(s => s.e===ins.approach.e && s.dir===ins.approach.dir && Math.hypot(s.x-vx,s.z-vz)<40);
-      if (!lit && others.some(o => o.alive && o.e.way.rb && o.v > .5 && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 8);
+      // a car on the ring signalling left that leaves the ring before it reaches this entry is not coming past
+      const leavingHere = o => o.ind === 'L' && o.next && !o.next.e.way.rb && (o.dir > 0 ? o.e.len - o.s : o.s) <= Math.hypot(o.x - vx, o.z - vz) + 2;
+      if (!lit && others.some(o => o.alive && o.e.way.rb && o.v > .5 && !leavingHere(o) && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 8);
     }
     for (const m of net.minis) {
       const dx = m.x - pl.x, dz = m.z - pl.z, fw = dx * fx + dz * fz; if (fw < 5 || fw > 26 || Math.abs(dx * fz - dz * fx) > 8) continue;

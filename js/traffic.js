@@ -279,6 +279,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // Which way a vehicle is indicating (a.ind), from what it is about to do: a lane change it has decided on,
   // a turn at the next junction, leaving the roundabout, leaving or joining a motorway. A few drivers never
   // signal, as on real roads.
+  // roads where vehicles change lane freely: motorways and fast dual carriageways, never a roundabout
+  const laneRoad = (a) => { const w = a.e.way; return !w.rb && laneInfo(a.e, a.dir).n >= 2 && (w.cls === 'motorway' || (w.cls === 'trunk' && w.mph >= 50)); };
   function signalFor(a, rem) {
     if (a.traits && !a.traits.signals) { a.ind = null; return; }
     let ind = null;
@@ -314,7 +316,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const w = a.e.way, n = laneInfo(a.e, a.dir).n, rem = a.e.len - a.s;
     // only on motorways and fast dual carriageways: in town the lanes lead to lane arrows and junctions,
     // and side-road traffic joins across them, so there a vehicle keeps the lane it chose
-    if (n < 2 || w.rb || a.pinned || a.keepTo || !(w.cls === 'motorway' || (/^trunk$/.test(w.cls) && w.mph >= 50))) return;
+    if (n < 2 || a.pinned || a.keepTo || !laneRoad(a)) return;
     const mw = w.cls === 'motorway', exiting = mw && a.next && a.next.e.way.cls === 'motorway_link';
     if (!exiting && (rem < 50 || a.s < 10)) return; // near a junction the lane says where it is going
     const here = offsetFor(a, a.e, a.dir), want = w.mph * 0.447 * a.cruise;
@@ -389,14 +391,16 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (a.emergency && !o.isPlayer && !oncoming) continue;
       if (lat < width) {
         vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : blue ? 4.5 : 6.5), blue ? 7 : 5));
-        // and hold back to this driver's own following distance (1.1 to 2.5 s) behind moving traffic
-        if (!bike && !blue && !oncoming && a.traits && Math.abs(o.v) > 3) { const want = a.traits.headway * a.v + 6; if (fwd < want) vmax = Math.min(vmax, Math.abs(o.v) - (want - fwd) * 0.15); }
+        // and hold back to this driver's own following distance (1.1 to 2.5 s) behind a vehicle on the same
+        // stretch of road going the same way (not traffic crossing in front, a cyclist, or anything on a
+        // roundabout, where the ordinary give-way rules decide)
+        if (!bike && !blue && !oBike && !w.rb && a.traits && o.e === a.e && o.dir === a.dir && Math.abs(o.v) > 3) { const want = a.traits.headway * a.v + 6; if (fwd < want) vmax = Math.min(vmax, Math.abs(o.v) - (want - fwd) * 0.15); }
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
     // A learner signalling to move into this vehicle's lane, just ahead of it or alongside: a courteous
     // driver drops back to open the gap; others hold their speed. Same direction, one lane across.
-    if (!bike && !blue && player && player.indicator && a.traits?.courtesy && Math.abs(player.v) > 3 && Math.cos(player.th - a.th) > 0.95) {
+    if (!bike && !blue && player && player.indicator && a.traits?.courtesy && laneRoad(a) && Math.abs(player.v) > 3 && Math.cos(player.th - a.th) > 0.95) {
       const rx = player.x - a.x, rz = player.z - a.z, ahead = rx * fx + rz * fz, left = rx * fz - rz * fx; // + the learner is to this vehicle's left
       if (ahead > -6 && ahead < 45 && (player.indicator === 'R' ? left > 2 && left < 5.5 : left < -2 && left > -5.5)) { vmax = Math.min(vmax, Math.max(0, Math.abs(player.v) - 2.5)); a.yielding = true; } else a.yielding = false;
     } else a.yielding = false;
