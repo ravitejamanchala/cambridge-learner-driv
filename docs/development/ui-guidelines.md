@@ -227,6 +227,7 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   cannot be judged. The one thing assessed is the headlights themselves: driving off without dipped
   headlights is a single driving fault under ancillary controls (Rules 113 and 115). The lights button
   shows only at dusk, beside the look buttons, with **H** on a keyboard.
+- **Measure what lighting costs.** `npm run evidence -- evening extra` times day, dusk and low power at the same spot, finishing every frame before the next. Anything drawn across the whole circuit (the studs were) belongs in squares drawn only near the car.
 - **Low-power graphics** (Settings → Graphics) drop shadows, the headlight beam, the light pools and the
   pixel ratio; the lamps stay, so it is still plain whether the headlights are on. Menus honour
   `prefers-reduced-motion`, which `npm run test:access` checks.

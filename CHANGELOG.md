@@ -9,6 +9,7 @@
   - **Fair at dusk**: the fog never closes in nearer than 600 m and every vehicle shows its lamps, so nothing the examiner marks is hidden by the lighting.
   - **Low-power graphics** (Settings → Graphics): no shadows, no headlight beam or light pools on the road, and a lower pixel ratio, with the lamps kept. Menus honour reduced motion.
   - **Fixed along the way:** the headlight beam was left behind in the previous scene whenever a new map area loaded, so it never lit the road.
+  - **Cheap enough to draw.** The first measurement put a dusk frame at 2.6× the cost of a day one: every road stud on the 24 km circuit was drawn every frame, 100,000 of the 140,000 triangles in view. Studs are now drawn only within 800 m of the car (about 500 of them), and a dusk frame costs about 1.35× a day one; on low-power graphics it costs less than day.
   - Evidence: clips, day-and-dusk stills from the same spot and frame times in [docs/evidence/10-evening-motorway](docs/evidence/10-evening-motorway/README.md). The frame times are from the headless software renderer, so they compare day, dusk and low power with each other; measuring on real phones and laptops is still to do.
 - **Leaving the motorway, and missing your exit** (issue #9).
   - **Exits are signed**: blue advance direction signs at 1 mile and ½ mile, countdown markers at 300, 200 and 100 yards, and the final sign at the slip road, on both carriageways of both motorway worlds.

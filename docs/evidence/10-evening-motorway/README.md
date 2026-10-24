@@ -44,13 +44,13 @@ From the driver's seat, 330 m before junction 3 with the headlights on: by day, 
 
 ## What it costs to draw
 
-Milliseconds per frame (simulation and drawing, median of three runs of 30 frames) at the same spot. Measured in the headless software renderer these clips are made with, so the numbers compare day, dusk and low power with each other; they are not what a phone or laptop GPU will do, which still needs measuring on real devices.
+Milliseconds per frame (simulation and drawing, each frame finished before the next; median of three runs of 30 frames) at the same spot. Measured in the headless software renderer these clips are made with, so the numbers compare day, dusk and low power with each other; they are not what a phone or laptop GPU will do, which still needs measuring on real devices.
 
 | Window | Lighting | ms per frame |
 |---|---|---|
-| 1280×720 | day | 123.2 |
-| 1280×720 | dusk | 319.8 |
-| 1280×720 | dusk, low power | 251.7 |
-| 390×844 | day | 84.2 |
-| 390×844 | dusk | 263.8 |
-| 390×844 | dusk, low power | 220.8 |
+| 1280×720 | day | 141.2 |
+| 1280×720 | dusk | 190.2 |
+| 1280×720 | dusk, low power | 104.3 |
+| 390×844 | day | 93.9 |
+| 390×844 | dusk | 121.8 |
+| 390×844 | dusk, low power | 89.4 |

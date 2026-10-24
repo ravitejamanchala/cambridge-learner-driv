@@ -175,15 +175,22 @@ export function buildWorld(scene, net, traffic) {
   }
   const pm = flatMat(W.pave), rm = flatMat(W.road), cm = flatMat(W.cycle);
   const wm = new T.MeshBasicMaterial({ color: W.line, side: T.DoubleSide }); wm.depthWrite = false;
-  // the studs, one instanced mesh per colour, hidden in daylight
-  const studMeshes = [];
+  // the studs, hidden in daylight: one instanced mesh per colour for each 300 m square, and only the squares
+  // near the car drawn. A whole circuit's studs at once were most of the triangles in the view.
+  const studMeshes = [], STUD_CELL = 300, STUD_R = 800;
   { const g = new T.BoxGeometry(0.14, 0.04, 0.1).translate(0, 0.06, 0), M = new T.Matrix4();
     for (const [k, c] of [['white', 0xf4f4ee], ['red', 0xe2241c], ['amber', 0xf3a51a], ['green', 0x2fd36a]]) {
-      const list = studs[k]; if (!list.length) continue;
-      const im = new T.InstancedMesh(g, new T.MeshBasicMaterial({ color: c }), list.length / 2);
-      for (let i = 0; i < list.length; i += 2) { M.makeTranslation(list[i], 0, list[i + 1]); im.setMatrixAt(i / 2, M); }
-      im.visible = false; im.frustumCulled = false; im.userData.studs = true; scene.add(im); studMeshes.push(im);
+      const list = studs[k], mat = new T.MeshBasicMaterial({ color: c }), cells = new Map();
+      for (let i = 0; i < list.length; i += 2) { const key = Math.floor(list[i] / STUD_CELL) + ',' + Math.floor(list[i + 1] / STUD_CELL); (cells.get(key) || cells.set(key, []).get(key)).push(list[i], list[i + 1]); }
+      for (const [key, pts] of cells) {
+        const im = new T.InstancedMesh(g, mat, pts.length / 2), [cx, cz] = key.split(',').map(Number);
+        for (let i = 0; i < pts.length; i += 2) { M.makeTranslation(pts[i], 0, pts[i + 1]); im.setMatrixAt(i / 2, M); }
+        im.visible = false; im.frustumCulled = false; im.userData = { studs: true, x: (cx + 0.5) * STUD_CELL, z: (cz + 0.5) * STUD_CELL };
+        scene.add(im); studMeshes.push(im);
+      }
     } }
+  let studsOn = false, studAt = { x: 0, z: 0 };
+  const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
   for (const [key, A] of roadChunks) {
     for (const [acc, mat, ord] of [[A.pave, pm, 1], [A.road, rm, 2], [A.cyc, cm, 3], [A.white, wm, 4]]) {
       if (!acc.idx.length) continue; const m = acc.mesh(mat, ord); m.frustumCulled = true; m.receiveShadow = true; A.meshes.push(m); scene.add(m);
@@ -322,7 +329,7 @@ export function buildWorld(scene, net, traffic) {
     sun.color.setHex(dusk ? DUSK.sun.colour : 0xffe4c2); sun.intensity = dusk ? DUSK.sun.intensity : 0.92;
     if (dusk) SUN_OFF.set(...DUSK.sun.offset); else SUN_OFF.copy(SUN_DAY);
     wm.color.setHex(dusk ? DUSK.lines : W.line);
-    for (const m of studMeshes) m.visible = dusk;
+    studsOn = dusk; updateStuds(studAt.x, studAt.z);
     if (lighting.heads) { lighting.heads.material.color.setHex(dusk ? 0xffe2a8 : 0x5a5f63); lighting.pools.visible = dusk && !lowPower; }
     setSignsLit(dusk);
   }
@@ -347,6 +354,7 @@ export function buildWorld(scene, net, traffic) {
     scene.remove(g);
   }
   function updateChunks(px, pz, budget) {
+    if (studsOn) updateStuds(px, pz);
     const r = Math.ceil(WORLD.buildRadius / C), pcx = Math.floor(px / C), pcz = Math.floor(pz / C);
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) {
       const cx = pcx + i, cz = pcz + j, key = net.ck(cx, cz);

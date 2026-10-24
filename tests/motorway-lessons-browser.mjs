@@ -220,6 +220,7 @@ try {
     assert.ok(seen.cars > 0 && seen.lit === seen.cars, `every other vehicle should show its lamps at dusk: ${seen.lit} of ${seen.cars}`);
     assert.ok(seen.fogFar >= 600, `the dusk fog may not hide the road ahead: far ${seen.fogFar} m`);
     assert.ok(seen.studs > 100, 'the road studs should show at dusk: ' + seen.studs);
+    assert.ok(seen.studs < 2000, `only the studs near the car should be drawn, not the whole circuit's: ${seen.studs}`);
     assert.ok(seen.glowing > 0, 'the signs should be lit at dusk: ' + JSON.stringify(seen));
     // driving off with the lights off is a driving fault, marked once, and named in the feedback
     await set({ mph: 60 }); await steps(400);

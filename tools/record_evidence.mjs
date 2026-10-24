@@ -253,7 +253,9 @@ GROUPS.evening = {
     for (const view of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) for (const [id, lp, name] of [['mw-exit', false, 'day'], ['mw-dusk-exit', false, 'dusk'], ['mw-dusk-exit', true, 'dusk, low power']]) {
       const page = await open(view); await spot(page, id, lp);
       const ms = await page.evaluate(async () => { const a = window.cambridgeDrive, out = [];
-        for (let k = 0; k < 3; k++) { await new Promise(r => requestAnimationFrame(r)); const t0 = performance.now(); for (let i = 0; i < 30; i++) a.frame(0.05); out.push((performance.now() - t0) / 30); }
+        // reading back one pixel makes each frame finish drawing before the next, so the time is the whole frame
+        const c = document.querySelector('canvas'), gl = c.getContext('webgl2') || c.getContext('webgl'), px = new Uint8Array(4);
+        for (let k = 0; k < 3; k++) { await new Promise(r => requestAnimationFrame(r)); const t0 = performance.now(); for (let i = 0; i < 30; i++) { a.frame(0.05); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } out.push((performance.now() - t0) / 30); }
         out.sort((x, y) => x - y); return out[1]; });
       times.push({ view: `${view.width}×${view.height}`, name, ms: ms.toFixed(1) }); await page.close();
     }
@@ -261,7 +263,7 @@ GROUPS.evening = {
       'From the driver\'s seat, 330 m before junction 3 with the headlights on: by day, at dusk, and at dusk on low-power graphics (no shadows, no headlight beam or light pools, the lamps still on).', '',
       ...shots.map(n => `![${n}](still-${n}.jpg)`), '',
       '## What it costs to draw', '',
-      'Milliseconds per frame (simulation and drawing, median of three runs of 30 frames) at the same spot. Measured in the headless software renderer these clips are made with, so the numbers compare day, dusk and low power with each other; they are not what a phone or laptop GPU will do, which still needs measuring on real devices.', '',
+      'Milliseconds per frame (simulation and drawing, each frame finished before the next; median of three runs of 30 frames) at the same spot. Measured in the headless software renderer these clips are made with, so the numbers compare day, dusk and low power with each other; they are not what a phone or laptop GPU will do, which still needs measuring on real devices.', '',
       '| Window | Lighting | ms per frame |', '|---|---|---|', ...times.map(t => `| ${t.view} | ${t.name} | ${t.ms} |`), ''];
   },
 };
@@ -299,6 +301,11 @@ try {
     await page.close();
   }
   if (group.extra && (!process.argv[3] || process.argv[3] === 'extra')) extra = await group.extra(open, group.dir);
+  // `<group> extra` redoes only the stills and measurements, in place in the existing index
+  if (process.argv[3] === 'extra' && extra.length && fs.existsSync(path.join(group.dir, 'README.md'))) {
+    const old = fs.readFileSync(path.join(group.dir, 'README.md'), 'utf8'), at = old.indexOf(extra[0]);
+    fs.writeFileSync(path.join(group.dir, 'README.md'), (at >= 0 ? old.slice(0, at) : old.trimEnd() + '\n\n') + extra.join('\n'));
+  }
   if (!process.argv[3]) {
     const lines = [`# ${group.title}`, '', `Recorded with \`node tools/record_evidence.mjs ${process.argv[2]}\` on ${new Date().toISOString().slice(0, 10)}: the real application,`,
       `stepped at ${FPS} frames a second and captured frame by frame, so each clip plays at true speed unless it says otherwise.`,
