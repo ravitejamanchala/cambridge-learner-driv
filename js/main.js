@@ -218,7 +218,7 @@ async function boot() {
     test.ctx = nearest(A.net,player.x,player.z);
     test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
     // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
-    test.mode = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
+    test.marking = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
     test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
     applyTimeOfDay(test.timeOfDay); setHeadlights(false);
     if (test.ungraded) startFreeDrive(pl, test);
@@ -481,7 +481,7 @@ async function boot() {
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
-      const j = judgeMock(test.mode, test), pass = j.pass, mode = modeOf(j.mode);
+      const j = judgeMock(test.marking, test), pass = j.pass, mode = modeOf(j.mode);
       if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');

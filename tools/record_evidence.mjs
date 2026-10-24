@@ -288,6 +288,11 @@ GROUPS.handling = {
     { name: '05-leaving-the-road-is-marked', seconds: 16, caption: 'Drifting off the motorway onto the verge: a wheel over the edge is marked as mounting the kerb, the car off the road as a serious fault, and the lesson is not passed. Before, this was at most one driving fault.',
       async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await p.evaluate(() => { window.cambridgeDrive.addInput(() => window.__drift ? { throttle: 0.4, brake: 0, steer: 0.35 } : null); }); await camera(p, 0); },
       script: (p) => { const go = once(() => p.evaluate(() => { window.__drift = true; })), stop = once(() => p.evaluate(() => { window.__drift = false; window.cambridgeDrive.test.finish(); })); return async t => { await at(t, 2, go); await at(t, 11, stop); }; } },
+    { name: '06-slow-traffic-keeps-left', seconds: 30, caption: 'The three-lane motorway from above: slower vehicles in the left-hand lane, quicker ones pulling out to pass and moving back left once past, each lane change into a real gap at half a lane a second.',
+      async setup(p) { await startDrive(p, 'free', 'm3'); await p.evaluate(() => { window.__target = 31; window.cambridgeDrive.step(20 * 40); }); await camera(p, 2); } },
+    { name: '07-marked-on-medium', driver: 'bot', lesson: { id: 'turn-left' }, seconds: 40, speed: 2,
+      caption: 'Turning left, marked on Medium (chosen in the lesson panel before starting): the result shows two stars and says it was marked on Medium. Hard earns three and is the real test\'s standard.',
+      async setup(p) { await p.evaluate(() => localStorage.setItem('cambridge-learner-drive.mode', 'medium')); await startDrive(p, 'lesson', 'turn-left'); await camera(p, 0); } },
   ],
 };
 const group = GROUPS[process.argv[2]];

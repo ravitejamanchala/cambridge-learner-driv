@@ -351,7 +351,7 @@ export function evaluate(lesson, test, scen) {
   const reasons = [];
   const focus = test.faults.filter(f => (lesson.focus || []).some(p => f.cat.startsWith(p)));
   const r = scen && scen.result ? scen.result() : null;
-  const j = judgeLesson(test.mode, { D: test.D, S: test.S, faults: test.faults, focus, maxD: lesson.maxD ?? 2, objective: r });
+  const j = judgeLesson(test.marking, { D: test.D, S: test.S, faults: test.faults, focus, maxD: lesson.maxD ?? 2, objective: r });
   let pass = j.pass; reasons.push(...j.why);
   if (r && r.why) reasons.push(r.why);
   // always say what the faults were, not just how many

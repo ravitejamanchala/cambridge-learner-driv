@@ -71,6 +71,21 @@ try {
     console.log(`${id}: ${Math.round(s.sRoute)} m in 30 s (${Math.round(s.sRoute / 30 * 2.23694)} mph average), ${s.cars} cars, all going the right way`);
   }
 
+  // ---------- slower traffic keeps left (Rule 264): nobody sits in an outer lane with nothing to pass ----------
+  {
+    await start('m3'); await page.evaluate(() => { window.__target = 31; }); await frames(200);
+    const hog = await page.evaluate(() => { const a = window.cambridgeDrive, out = new Map();
+      for (let t = 0; t < 90; t++) { a.step(20);
+        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway' || c.lane === 0) { out.delete(c); continue; }
+          const fx = -Math.sin(c.th), fz = -Math.cos(c.th);
+          const passing = a.traffic.cars.some(o => o !== c && o.alive && o.e === c.e && o.dir === c.dir && o.lane < c.lane && (() => { const f = (o.x - c.x) * fx + (o.z - c.z) * fz; return f > -10 && f < 120; })());
+          out.set(c, passing ? 0 : (out.get(c) || 0) + 1); } }
+      const worst = Math.max(0, ...out.values()), lanes = [0, 0, 0]; for (const c of a.traffic.cars) if (c.alive && c.e.way.cls === 'motorway') lanes[Math.min(2, c.lane)]++;
+      return { worst, lanes }; });
+    assert.ok(hog.worst <= 15, `a car sat ${hog.worst} s in an outer lane with nothing to pass`);
+    console.log(`Keep left: the longest any car sat in an outer lane with nothing to pass was ${hog.worst} s; cars by lane ${hog.lanes.join(' / ')}.`);
+  }
+
   // ---------- leaving at a junction: a route back onto the circuit is built from wherever you are ----------
   {
     await start('m3'); await frames(20);

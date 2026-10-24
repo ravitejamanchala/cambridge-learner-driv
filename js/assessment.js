@@ -3,7 +3,7 @@
 // test's: 15 or fewer driving faults and no serious ones. The easier modes allow more, but never a
 // collision, and never without doing what the lesson asks; the result always says which mode it was.
 //
-// The mode is read from the drive (test.mode), set when it starts, so changing it afterwards cannot turn
+// The mode is read from the drive (test.marking), set when it starts, so changing it afterwards cannot turn
 // a fail into a pass.
 import { MARKING } from './config.js';
 

@@ -108,7 +108,7 @@ try {
       assert.equal(await page.locator(`#puzzleDetail .mode-pick [data-mode="${mode}"]`).getAttribute('aria-checked'), 'true');
       await page.locator('#puzzleDetail [data-start]').click();
       await page.waitForFunction(() => document.body.dataset.mode === 'drive' && window.cambridgeDrive.test?.running, {}, { timeout: 45000 });
-      await page.evaluate(n => { const a = window.cambridgeDrive; a.manual(true); for (let i = 0; i < n; i++) a.test.fault('D', 'Signals – necessary', 'Test fault ' + i, 'tf' + i, 0); a.test.finish(); }, nD);
+      await page.evaluate(n => { const a = window.cambridgeDrive; a.manual(true); for (let i = 0; i < n; i++) a.test.fault('D', 'Signals – necessary', 'Test fault ' + i, 'tf' + i, 0); if (a.scenario && a.scenario.result) a.scenario.result = () => ({ ok: true, why: '' }); a.test.finish(); }, nD); // the puzzle's own goal stands in as met: only the faults are being judged here
       return page.evaluate(() => ({ reasons: [...document.querySelectorAll("#rReasons li")].map(l => l.textContent).join(" / "), verdict: document.querySelector("#verdict").textContent, note: document.querySelector('#rNote').textContent, stars: document.querySelectorAll('#rNote .stars [data-on], #rNote .stars .on').length, label: document.querySelector('#rNote .stars').getAttribute('aria-label') }));
     };
     const hard = await drive('hard', 4); // the easy tier allows 3 driving faults on Hard

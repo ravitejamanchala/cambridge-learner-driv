@@ -119,6 +119,21 @@ Keys and touch buttons are all-or-nothing, so the car has to forgive that withou
   that way. Its pass rate is a guide to difficulty, not a promise: it depends on what the model assumes
   about people.
 
+## Marking: Easy, Medium and Hard
+
+How strictly a drive is judged is the learner's choice, made where the drive starts (the lesson, puzzle
+and mock-test panels), and fixed for that drive (`test.marking`, `js/assessment.js`). A pass earns one
+star on Easy, two on Medium and three on Hard; the lesson keeps its best.
+
+- **Hard is the real standard.** It is exactly what every drive was judged on before modes existed, and
+  for a mock test it is the real test: 15 or fewer driving faults, no serious faults. The Bot lab always
+  marks on Hard.
+- **Easier modes allow more, never everything.** Medium allows three more driving faults and one fault in
+  the lesson's own subject; Easy six more, and forgives one serious fault. Neither forgives a collision,
+  and the lesson's goal (overtake the lorry, join the motorway) is required in every mode.
+- **Say which mode it was.** The result shows the stars and "marked on Medium"; a mock test passed below
+  Hard says the real test is Hard. Changing the mode after a drive changes nothing it earned.
+
 ## Camera
 
 - **Looking round never steers the car.** `Z` and `X` swing the camera; the car keeps the heading the
@@ -222,6 +237,11 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   On the main carriageway, keeping your lane and speed, easing off, and moving over into a safe gap are
   all accepted; being in the middle lane while traffic comes down a slip road beside you is courtesy,
   not hogging. What is never accepted is "making room" by moving into a gap that makes someone brake.
+- **Background traffic keeps left (Rule 264).** On any road with two or more lanes each way, slower
+  vehicles start in the left-hand lane; a vehicle in an outer lane with nothing slower to pass moves back
+  left into a gap, pulls out to pass something slower, and gets into the left-hand lane in good time for
+  a motorway exit. It changes lane at half a lane a second, and never moves in front of the learner with
+  less than 2.5 s between them. A lesson's own placed traffic stays where the lesson put it.
 - **AI joiners obey the same priority.** A vehicle on an entry slip fits into lane 1 only where the
   vehicle behind keeps 1.5 s and is not closing within 4 s; otherwise it drops back behind, and with no
   gap it waits at the end of the acceleration lane, before the taper, because the taper is in the lane
