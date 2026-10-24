@@ -331,13 +331,18 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const slowerAhead = (l, within) => inLane(l, 0, within).some(h => h.fwd > 4 && Math.abs(h.o.v) < want - 2.5);
     // A driver signals first and moves only when the signal has been on a moment (1.5 to 3 s, by driver)
     // and the gap is still there: so the learner can see what the vehicle is about to do.
-    const intend = (to) => { if (a.intent && a.intent.to === to) { if (clock >= a.intent.at && clear(to)) { a.prevLane = a.lane; a.lane = to; a.intent = null; } else if (!clear(to) && clock > a.intent.at + 4) a.intent = null; return true; }
-      a.intent = { to, at: clock + (a.traits?.wait ?? 2) }; return true; };
+    // Once signalling, a driver keeps signalling while it still wants that lane and moves when the gap is
+    // there, giving up after a while; a gap closing for a moment does not start the wait again.
+    const intend = (to) => { if (a.intent && a.intent.to === to) { if (clock >= a.intent.at && clear(to)) { a.prevLane = a.lane; a.lane = to; a.intent = null; } else if (!clear(to) && clock > a.intent.at + 6) a.intent = null; return; }
+      a.intent = { to, at: clock + (a.traits?.wait ?? 2) }; };
     // courtesy: a learner coming down a slip road beside the left-hand lane, and the next lane clear
     const makeRoom = mw && a.lane === 0 && a.traits?.courtesy && playerOnSlip && player && (() => { const f = (player.x - a.x) * fx + (player.z - a.z) * fz; return f > -30 && f < 140; })();
-    if (makeRoom && clear(1) && intend(1)) return;
-    if (a.lane > 0 && (exiting || !slowerAhead(a.lane - 1, 70)) && clear(a.lane - 1) && intend(a.lane - 1)) return;
-    if (!exiting && a.lane < n - 1 && slowerAhead(a.lane, 45) && clear(a.lane + 1) && intend(a.lane + 1)) return;
+    const wants = [];
+    if (makeRoom) wants.push(1);
+    if (a.lane > 0 && (exiting || !slowerAhead(a.lane - 1, 70))) wants.push(a.lane - 1);
+    if (!exiting && a.lane < n - 1 && slowerAhead(a.lane, 45)) wants.push(a.lane + 1);
+    if (a.intent && wants.includes(a.intent.to)) { intend(a.intent.to); return; }
+    const to = wants.find(l => clear(l)); if (to != null) { intend(to); return; }
     if (a.intent && !a.intent.keep) a.intent = null; // nothing to do after all: signal off
   }
   function updateAgent(a, dt) {
@@ -398,6 +403,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
+    // signalled to move left and waited, but someone is keeping pace in that lane: ease off and drop in behind
+    if (a.intent && a.intent.to < a.lane && clock > a.intent.at + 1) vmax = Math.min(vmax, a.v - 1.5, w.mph * 0.447 * a.cruise - 3);
     // A learner signalling to move into this vehicle's lane, just ahead of it or alongside: a courteous
     // driver drops back to open the gap; others hold their speed. Same direction, one lane across.
     if (!bike && !blue && player && player.indicator && a.traits?.courtesy && laneRoad(a) && Math.abs(player.v) > 3 && Math.cos(player.th - a.th) > 0.95) {

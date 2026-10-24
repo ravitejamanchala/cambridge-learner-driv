@@ -248,7 +248,8 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   less than 2.5 s between them. A lesson's own placed traffic stays where the lesson put it.
 - **Background traffic says what it is about to do.** A vehicle that is going to change lane flashes its
   indicator for a couple of seconds first, then moves; one in twenty drivers never signals, as on real
-  roads. If someone turns up alongside before it is across, it goes back to its lane. The indicators are
+  roads. With no gap it keeps signalling, eases off to drop in behind anyone keeping pace in that lane,
+  and gives up after a few seconds; if someone turns up alongside before it is across, it goes back. The indicators are
   amber lamps on the car itself, so nothing is added to the screen.
 - **Drivers differ.** Each background vehicle draws its own following distance, the gap it will accept,
   how long it waits before moving, and whether it is courteous, from the seeded traffic generator, so the

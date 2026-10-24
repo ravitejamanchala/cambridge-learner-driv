@@ -77,10 +77,12 @@ try {
     const hog = await page.evaluate(() => { const a = window.cambridgeDrive, out = new Map();
       for (let t = 0; t < 90; t++) { a.step(20);
         for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway' || c.lane === 0) { out.delete(c); continue; }
-          const fx = -Math.sin(c.th), fz = -Math.cos(c.th);
+          const fx = -Math.sin(c.th), fz = -Math.cos(c.th), was = out.get(c);
+          // a vehicle recycled and placed afresh elsewhere is a new one: start its count again
+          const fresh = !was || Math.hypot(c.x - was.x, c.z - was.z) > c.v * 1.5 + 20;
           const passing = a.traffic.cars.some(o => o !== c && o.alive && o.e === c.e && o.dir === c.dir && o.lane < c.lane && (() => { const f = (o.x - c.x) * fx + (o.z - c.z) * fz; return f > -10 && f < 120; })());
-          out.set(c, passing ? 0 : (out.get(c) || 0) + 1); } }
-      const worst = Math.max(0, ...out.values()), lanes = [0, 0, 0]; for (const c of a.traffic.cars) if (c.alive && c.e.way.cls === 'motorway') lanes[Math.min(2, c.lane)]++;
+          out.set(c, { n: passing ? 0 : (fresh ? 0 : was.n) + 1, x: c.x, z: c.z }); } }
+      const worst = Math.max(0, ...[...out.values()].map(o => o.n)), lanes = [0, 0, 0]; for (const c of a.traffic.cars) if (c.alive && c.e.way.cls === 'motorway') lanes[Math.min(2, c.lane)]++;
       return { worst, lanes }; });
     assert.ok(hog.worst <= 15, `a car sat ${hog.worst} s in an outer lane with nothing to pass`);
     console.log(`Keep left: the longest any car sat in an outer lane with nothing to pass was ${hog.worst} s; cars by lane ${hog.lanes.join(' / ')}.`);
@@ -108,8 +110,9 @@ try {
       const fx = -Math.sin(c.th), fz = -Math.cos(c.th), lx = fz, lz = -fx; // c's left
       // put the learner one lane to the car's left, 12 m ahead, at the car's speed, signalling right
       p.place(c.x + fx * 12 + lx * 3.65, c.z + fz * 12 + lz * 3.65, c.th); p.v = c.v; if (p.indicator !== 'R') p.signal('R');
-      const v0 = c.v; window.__target = c.v; for (let i = 0; i < 60; i++) a.step(1);
-      const r = { v0, v1: c.v, yielding: !!c.yielding }; p.signal('R'); return r; });
+      // it stops yielding once the gap is open, so the question is whether it did at all
+      const v0 = c.v; let yielded = false; window.__target = c.v; for (let i = 0; i < 60; i++) { a.step(1); yielded ||= !!c.yielding; }
+      const r = { v0, v1: c.v, yielding: yielded }; p.signal('R'); return r; });
     assert.ok(room && room.yielding && room.v1 < room.v0 - 1.5, 'a courteous driver should drop back for a learner signalling into its lane: ' + JSON.stringify(room));
     console.log(`Signals: ${sig.signalled} of ${sig.changes} lane changes signalled first; a courteous driver dropped from ${(room.v0 * 2.237).toFixed(0)} to ${(room.v1 * 2.237).toFixed(0)} mph to let the learner in.`);
   }

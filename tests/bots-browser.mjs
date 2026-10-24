@@ -40,9 +40,7 @@ try{
  const runs=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('cld.bot.'))
    .map(k=>JSON.parse(localStorage.getItem(k))).sort((a,b)=>a.key.localeCompare(b.key)));
  assert.ok(runs.length,'the bot recorded no runs');
- // Known to stall before these changes too: verified by running this same sweep against main.
- // The bot cannot get onto the two-lane roundabout and gives up after 90 s without progress.
- const KNOWN_STUCK=new Set(['lesson:rb-big']);
+ const KNOWN_STUCK=new Set(); // drives known to stall; none at present
  const bad=runs.filter(r=>r.end!=='done'&&!KNOWN_STUCK.has(r.key));
  const known=runs.filter(r=>r.end!=='done'&&KNOWN_STUCK.has(r.key));
  for(const r of runs){
