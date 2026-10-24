@@ -148,3 +148,11 @@ test('free-drive summary: speeding under a lower limit is not "never over the li
   for (let i = 0; i < 20 * 8; i++) stepFreeStats(ok, 0.05, 17, 38, 40);
   assert.ok(freeSummaryLines(ok, ok.seconds / 60).some(l => /^Never over the limit: top speed 67 mph$/.test(l)));
 });
+
+test('free-drive summary: time with wheels off the road is said plainly', () => {
+  const st = createFreeStats();
+  for (let i = 0; i < 20 * 60; i++) stepFreeStats(st, 0.05, 25, 56, 70, i < 20 * 4 ? 2 : 0); // 4 s with two wheels on the verge
+  assert.ok(freeSummaryLines(st, st.seconds / 60).includes('Wheels off the road for 4 s'));
+  const clean = createFreeStats(); for (let i = 0; i < 20 * 60; i++) stepFreeStats(clean, 0.05, 25, 56, 70, 0);
+  assert.ok(!freeSummaryLines(clean, 1).some(l => /off the road/.test(l)));
+});

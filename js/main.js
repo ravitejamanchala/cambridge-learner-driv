@@ -4,7 +4,7 @@ import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
-import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
+import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor } from './config.js';
 import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
@@ -13,7 +13,7 @@ import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './car.js';
 import { createGarage } from './garage.js';
 import { createPedestrianFactory } from './pedestrian-models.js';
-import { createTest } from './test.js';
+import { createTest, wheelsOff } from './test.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
 import { createScenario, evaluate } from './course.js';
@@ -181,7 +181,7 @@ async function boot() {
   function stepFreeDrive(dt) {
     if (!freeStats || !A.test?.running) return;
     const nr = A.test.ctx, limit = nr ? nr.way.mph : 70;
-    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit);
+    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit, wheelsOff(A.net, player).wheels);
     for (const j of freeJunctions) if (A.traffic.clock - j.at > 60 && Math.hypot(j.x - player.x, j.z - player.z) < 30) { j.at = A.traffic.clock; freeStats.junctions++; }
   }
   // the payoff for an ungraded drive: what it measured, said plainly, and nothing written to the record
@@ -425,7 +425,7 @@ async function boot() {
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
-    get freeStats() { return freeStats; } };
+    get freeStats() { return freeStats; }, steerFor };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
@@ -509,7 +509,7 @@ async function boot() {
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
-    stats.distance = 0; stats.topSpeed = 0;
+    stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
@@ -723,6 +723,21 @@ async function boot() {
   setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
+  // In the chase view the mirrors are always on screen, and the car's surroundings with them, so there is
+  // nothing to check by pressing a key: mirror and shoulder checks count as made the whole time and are not
+  // marked. The result says so. The mirror-practice lesson, whose whole point is the routine, still asks for
+  // it; the Bot lab and the browser checks make their own looks.
+  let chaseAuto = -1;
+  function chaseMirrors(dt, now) {
+    if (cam !== 0 || botMode || plan?.lesson?.scenario === 'mirrors') return;
+    stats.chaseSeconds = (stats.chaseSeconds || 0) + dt;
+    if (now - chaseAuto < 0.4 && now >= chaseAuto) return;
+    chaseAuto = now;
+    const obs = player.observations, keepFrom = now - 15;
+    for (let i = obs.length - 1; i >= 0; i--) if (obs[i].auto && obs[i].at < keepFrom) obs.splice(i, 1);
+    for (const view of ['interior', 'left', 'right', 'blindspot']) obs.push({ view, at: now, x: player.x, z: player.z, auto: true });
+    player.lookAt = now;
+  }
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
@@ -732,6 +747,7 @@ async function boot() {
       const nr = nearest(net, player.x, player.z);
       const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
       player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      chaseMirrors(dt, traffic.clock);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);

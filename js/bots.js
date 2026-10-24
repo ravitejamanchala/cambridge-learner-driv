@@ -1,6 +1,7 @@
 import { createParkingDriver } from './parking-driver.js';
 import { senseMotorway, overtaking } from './lane-discipline.js';
 import { posAt } from './net.js';
+import { steerFor, steerLock, HANDLING } from './config.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -81,7 +82,7 @@ export function makeDriver(api) {
     // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
     const mw = joinPlan(api, st, t, pl, tr) || exitPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
     if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
-      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: Math.max(-1, Math.min(1, dm * 2)) }; }
+      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: steerFor(dm, 2, pl.v), aim: dm }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
     if(nearMini)target=Math.min(target,3.5);
     if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
@@ -183,7 +184,7 @@ export function makeDriver(api) {
     if (api.scenarioPhase?.() === 'coming') target = Math.min(target, 1.6);
     if (ins.signal && ahead < 80 && ahead > 3 && pl.indicator !== ins.signal && !(ins.kind === 'rb' && t.sRoute > ins.prevExitS - 0.3)) pl.signal(ins.signal);
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
-    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
+    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: steerFor(d, 2.4, pl.v), aim: d };
   };
 }
 
@@ -352,8 +353,9 @@ function download(name, text, type, url) { const a = document.createElement('a')
 // drive is for someone driving it by hand: how often they leave the road, and how much steering it takes.
 //   device 'keys'  on/off steering and pedals, as the keyboard and touch buttons are
 //   device 'stick' an analog stick or wheel, with a little unsteadiness in the hand
-export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, clock, seed = 7 } = {}) {
+export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, clock, speed: api_v = () => 0, seed = 7 } = {}) {
   const seen = []; let next = -1, key = 0, stick = 0, pedal = { throttle: 0, brake: 0 }, r = seed >>> 0;
+  const acc = { steer: 0, throttle: 0, brake: 0 }, out = { steer: 0, throttle: 0, brake: 0 };
   const rand = () => { r = (r + 0x6D2B79F5) >>> 0; let x = Math.imul(r ^ (r >>> 15), 1 | r); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   const stats = { presses: 0, steerTravel: 0 };
   const human = () => {
@@ -362,10 +364,19 @@ export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, cl
     seen.push([now, o]); while (seen.length > 2 && seen[1][0] <= now - reaction) seen.shift();
     if (now < next && now >= next - 1) return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
     next = now + 1 / rate;
-    const late = seen[0][1]; // what the driver had seen `reaction` seconds ago
+    const late = { ...seen[0][1] }; // what the driver had seen `reaction` seconds ago
+    // A person steers only as firmly as their reaction time allows without weaving (McRuer's crossover
+    // model): the wheel angle per radian of heading error is capped at about 0.8 × wheelbase / (speed ×
+    // reaction time). The reference driver, reacting at once, can afford to steer harder.
+    const v = Math.max(3, Math.abs(api_v())), lock = steerLock(v);
+    if (typeof late.aim === 'number' && late.aim) { const wheel = late.steer * lock, cap = 0.8 * HANDLING.wheelbase / (v * reaction) * Math.abs(late.aim);
+      late.steer = Math.max(-1, Math.min(1, Math.sign(wheel) * Math.min(Math.abs(wheel), cap) / lock)); }
     if (device === 'keys') {
-      const was = key; key = Math.abs(late.steer) > (key ? 0.08 : 0.22) ? Math.sign(late.steer) : 0; if (key && key !== was) stats.presses++;
-      pedal = { throttle: late.throttle > 0.3 ? 1 : 0, brake: late.brake > 0.15 ? 1 : 0 };
+      // keys are on or off, so a person taps: a gentle turn or a light throttle is a key pressed some of
+      // the time, more often the more is wanted (each decision makes up for what the last ones fell short by)
+      const tapped = (want, k) => { acc[k] += want - out[k]; out[k] = Math.abs(acc[k]) >= 0.5 ? Math.sign(acc[k]) : 0; return out[k]; };
+      const was = key; key = tapped(late.steer, 'steer'); if (key && key !== was) stats.presses++;
+      pedal = { throttle: Math.max(0, tapped(late.throttle, 'throttle')), brake: Math.max(0, tapped(late.brake, 'brake')) };
     } else {
       const was = stick; stick = Math.max(-1, Math.min(1, late.steer + (rand() - 0.5) * 0.08)); stats.steerTravel += Math.abs(stick - was);
       pedal = { throttle: late.throttle, brake: late.brake };
@@ -463,7 +474,7 @@ export function createBotLab(api) {
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
-    const who = $('blDriver').value, input = who === 'reference' ? drive : humanize(drive, { device: who, clock: () => A.traffic.clock, seed });
+    const who = $('blDriver').value, input = who === 'reference' ? drive : humanize(drive, { device: who, clock: () => A.traffic.clock, speed: () => api.player.v, seed });
     api.setInput(input);
     while (!t.done) {
       if (stopReq) { end = 'stopped'; break; }

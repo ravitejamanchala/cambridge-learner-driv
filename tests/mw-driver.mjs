@@ -27,7 +27,7 @@ export async function installMwDriver(page) {
       if (M.gap != null) for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
         if (f > 0 && f < 150 && Math.abs(dx * fz - dz * fx) < 1.8) want = Math.min(want, c.v + ((f - 4.6) - M.gap * p.v) * 0.4); }
       let ang = Math.atan2(-(x - p.x), -(z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-      return { throttle: p.v < want - 0.3 ? 1 : 0, brake: p.v > want + 0.6 ? Math.min(1, (p.v - want) / 4) : 0, steer: Math.max(-1, Math.min(1, ang * 2)) };
+      return { throttle: p.v < want - 0.3 ? 1 : 0, brake: p.v > want + 0.6 ? Math.min(1, (p.v - want) / 4) : 0, steer: a.steerFor(ang, 2, p.v) };
     });
   });
   const steps = (n) => page.evaluate(k => window.cambridgeDrive.step(k), n);

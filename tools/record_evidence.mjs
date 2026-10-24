@@ -33,18 +33,19 @@ const installDriver = (page) => page.evaluate(() => {
     for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
       if (f > 0 && f < Math.max(20, p.v * 2.2) && Math.abs(dx * fz - dz * fx) < 2.2) want = Math.min(want, c.v - (f < p.v * 1.6 ? 2 : 0)); }
     let ang = Math.atan2(-(q.x - p.x), -(q.z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-    return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1.0 ? Math.min(1, (p.v - want) / 6) : 0, steer: Math.max(-1, Math.min(1, ang * 3)) };
+    return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1.0 ? Math.min(1, (p.v - want) / 6) : 0, steer: a.steerFor(ang, 3, p.v) };
   });
 });
 // The Bot lab's own reference driver (js/bots.js), the one test:bots runs every lesson with, driving here
 // in the open application instead of the lab.
-const installBot = (page, lesson) => page.addScriptTag({ type: 'module', content: `
-  import { makeDriver } from '/js/bots.js';
+const installBot = (page, lesson, human = null) => page.addScriptTag({ type: 'module', content: `
+  import { makeDriver, humanize } from '/js/bots.js';
   const a = window.cambridgeDrive, lesson = ${JSON.stringify(lesson)};
   const drive = makeDriver({ get A() { return { test: a.test, traffic: a.traffic, net: a.net }; }, player: a.player, lesson: () => lesson,
     scenarioStatus: () => null, scenarioPhase: () => null, estopBanner: () => false, operate: () => {}, gear: () => {}, lanePoint: (s) => a.lanePoint(s),
     look: (view = 'all-round') => { a.player.lookAt = a.traffic.clock; a.player.observations.push({ view, at: a.traffic.clock, x: a.player.x, z: a.player.z }); } });
-  a.addInput(() => drive()); window.__botReady = true;` }).then(() => page.waitForFunction(() => window.__botReady));
+  const human = ${JSON.stringify(human)}, d = human ? humanize(drive, { device: human, clock: () => a.traffic.clock, speed: () => a.player.v }) : drive;
+  a.addInput(() => d()); window.__botReady = true;` }).then(() => page.waitForFunction(() => window.__botReady));
 // run the simulation without drawing until the predicate (a function source run in the page) holds
 const ffUntil = (page, pred, maxSeconds = 600) => page.evaluate(([src, max]) => { const f = new Function('a', 'return (' + src + ')(a)'), a = window.cambridgeDrive;
   for (let i = 0; i < max * 20; i += 10) { if (f(a)) return true; a.step(10); } return false; }, [pred.toString(), maxSeconds]);
@@ -267,6 +268,28 @@ GROUPS.evening = {
       '| Window | Lighting | ms per frame |', '|---|---|---|', ...times.map(t => `| ${t.view} | ${t.name} | ${t.ms} |`), ''];
   },
 };
+GROUPS.handling = {
+  dir: 'docs/evidence/handling',
+  title: 'Steering a person can manage, and leaving the road marked',
+  driverNote: 'The "person on keys" is the Bot lab\'s human-like driver: the reference driver\'s intentions seen 0.3 s late, decided ten times a second, on/off keys tapped, and steering no firmer than that reaction time allows. The lessons were chosen before recording (the simplest town turn and the simplest motorway lesson), not picked for the result. The "old steering" clips are the same build with only the old steering mapping put back (`BEFORE_URL`).',
+  clips: [
+    { name: '01-turn-left-on-keys-old-steering', site: 'before', driver: 'bot', human: 'keys', lesson: { id: 'turn-left' }, seconds: 40, speed: 2,
+      caption: 'Turning left, driven on keys with the old steering: every tap turns the car at up to 25 m/s², so it weaves and runs onto the kerb.',
+      async setup(p) { await startDrive(p, 'lesson', 'turn-left'); await camera(p, 0); } },
+    { name: '02-turn-left-on-keys-new-steering', driver: 'bot', human: 'keys', lesson: { id: 'turn-left' }, seconds: 40, speed: 2,
+      caption: 'The same person, the same lesson, with steering limited by grip: the taps nudge the car instead of throwing it.',
+      async setup(p) { await startDrive(p, 'lesson', 'turn-left'); await camera(p, 0); } },
+    { name: '03-motorway-on-keys-old-steering', site: 'before', driver: 'bot', human: 'keys', lesson: { id: 'mw-keep-left', scenario: 'motorway' }, seconds: 40,
+      caption: 'Keep left on the motorway, on keys, old steering: at 70 mph a tap was nearly as sharp as at 30, and the car snakes across the lanes.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await camera(p, 0); } },
+    { name: '04-motorway-on-keys-new-steering', driver: 'bot', human: 'keys', lesson: { id: 'mw-keep-left', scenario: 'motorway' }, seconds: 40,
+      caption: 'The same, new steering: a tap at 70 mph is a gentle move within the lane.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await camera(p, 0); } },
+    { name: '05-leaving-the-road-is-marked', seconds: 16, caption: 'Drifting off the motorway onto the verge: a wheel over the edge is marked as mounting the kerb, the car off the road as a serious fault, and the lesson is not passed. Before, this was at most one driving fault.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await p.evaluate(() => { window.cambridgeDrive.addInput(() => window.__drift ? { throttle: 0.4, brake: 0, steer: 0.35 } : null); }); await camera(p, 0); },
+      script: (p) => { const go = once(() => p.evaluate(() => { window.__drift = true; })), stop = once(() => p.evaluate(() => { window.__drift = false; window.cambridgeDrive.test.finish(); })); return async t => { await at(t, 2, go); await at(t, 11, stop); }; } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
@@ -290,11 +313,12 @@ try {
   let extra = [];
   for (const c of group.clips) {
     if (process.argv[3] && !c.name.includes(process.argv[3])) continue;
-    const page = await open(), errors = page.errors;
+    if (c.site === 'before' && !process.env.BEFORE_URL) { console.log(`  ${c.name}: skipped, needs BEFORE_URL`); continue; }
+    const page = await open(VIEW, c.site === 'before' ? process.env.BEFORE_URL : url), errors = page.errors;
     // the scripted driver is the one tests/motorway-lessons-browser.mjs uses (tests/mw-driver.mjs), so a
     // clip shows exactly the drive the check makes
     const ctx = {};
-    if (c.driver === 'bot') await installBot(page, c.lesson); else if (c.driver === 'scripted') ctx.d = await installMwDriver(page); else await installDriver(page);
+    if (c.driver === 'bot') await installBot(page, c.lesson, c.human || null); else if (c.driver === 'scripted') ctx.d = await installMwDriver(page); else await installDriver(page);
     await c.setup(page, ctx);
     made.push({ ...c, ...(await clip(page, group.dir, c.name, c.seconds, c.script?.(page, ctx), c.speed || 1)) });
     if (errors.length) throw new Error(`${c.name}: ${errors.join('; ')}`);

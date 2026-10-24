@@ -91,6 +91,34 @@ rather than painting anything over the road, and its text must be short enough f
   blind-spot check are the same head movement held for different lengths, so a tap on `X` records the
   right mirror and holding it records the blind spot. That deleted a three-button panel outright.
 
+## Steering a person can manage
+
+The car is driven by people on keyboards, touch buttons and game controllers, not by the reference bot.
+Keys and touch buttons are all-or-nothing, so the car has to forgive that without driving itself.
+
+- **Steering is limited by grip, not by the keys.** Full input turns the wheels as far as the tyres
+  could use: full lock at walking pace, then no more than about 7 m/s² sideways (`HANDLING.turnGrip`,
+  `steerLock` in `js/config.js`). Full input at 30 mph used to turn the car at about 25 m/s², which no
+  car can do, so every tap was a swerve. The test drivers steer by wheel angle through the same limit
+  (`steerFor`), so they cannot do what a person's car cannot.
+- **Controllers are first-class.** The left stick or a wheel steers, the triggers are the pedals, LB and
+  RB indicate and Y checks the mirrors. A controller is followed closely; keys wind the wheel on
+  gradually. Keys always win over an idle controller.
+- **Don't ask for what is already on screen.** In the chase view the mirrors are always shown, and the
+  car's surroundings with them, so mirror and shoulder checks count as made the whole time: there is no
+  key to press and nothing is marked. The run detail says the drive was in the chase view and that those
+  checks were not marked, so a pass there is not mistaken for a mirror routine. In the driver's view they
+  are marked as before, and the mirror-practice lesson asks for them in any view.
+- **Leaving the road is never free.** A wheel over the edge of the road as drawn is mounting the kerb
+  (a driving fault); the middle of the car off the road is driving off it (serious). Free drive marks
+  nothing but its summary still says how long the wheels were off.
+- **Check it with people's limits, not the bot's.** The Bot lab's driver choice runs any drive as *a
+  person on keys* or *a person on a controller*: the reference driver's intentions seen 0.3 s late,
+  decided ten times a second, with taps on keys or a slightly unsteady stick, and steering no firmer
+  than that reaction time allows without weaving. `BOT_DRIVER=keys npm run test:bots` sweeps everything
+  that way. Its pass rate is a guide to difficulty, not a promise: it depends on what the model assumes
+  about people.
+
 ## Camera
 
 - **Looking round never steers the car.** `Z` and `X` swing the camera; the car keeps the heading the
@@ -274,6 +302,7 @@ npm run test:browser     # the course end to end: prerequisites, control lessons
 npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
 npm run test:free        # motorway free drive: both layouts and dusk, a 14-minute dusk drive with memory sampled
 npm run test:motorway    # motorway lessons: careless driving marked, repeatably; lane strip, gap reading, dusk
+npm run test:control     # leaving the road marked, steering limits, game controllers
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
 npm run evidence -- <group>  # real-time videos of a feature, into docs/evidence/
 ```

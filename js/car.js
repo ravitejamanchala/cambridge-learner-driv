@@ -1,5 +1,5 @@
 // Player car: physics, glTF model loading (with steering/rolling wheels), L-plates, indicators, and simple box cars for traffic.
-import { CAR, HANDLING } from './config.js';
+import { CAR, HANDLING, steerLock } from './config.js';
 import { createVehicleState, canDrive } from './vehicle-state.js';
 import { automaticVelocity } from './automatic.js';
 
@@ -148,12 +148,6 @@ function bodyColour(material, fallback = 0x1d6a46) {
     return (Math.round(r / used) << 16) | (Math.round(g / used) << 8) | Math.round(b / used);
   } catch (_) { return hex; } // a cross-origin texture cannot be read back
 }
-
-// How far the front wheels turn at full input: full lock at walking pace, for junctions and parking; above
-// that, no more than a firm turn (HANDLING.turnGrip m/s² sideways), as a real car's tyres allow. Before
-// this, full input at 30 mph would have turned the car at about 25 m/s², so every tap of a key was a swerve
-// and holding a gentle bend took constant correcting.
-export const steerLock = (v) => Math.min(HANDLING.maxSteer, Math.atan(HANDLING.wheelbase * HANDLING.turnGrip / Math.max(1, v * v)));
 
 export function createPlayer(scene) {
   const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, headlights: false, mesh: makeBoxCar(0x1a7c52, true) };

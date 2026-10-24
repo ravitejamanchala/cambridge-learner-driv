@@ -2,6 +2,13 @@
 
 ## Unreleased: motorways, junction markings and pull-request previews
 
+- **Driving off the road is marked, and the car is easier for a person to steer.**
+  - **Leaving the road could pass.** Nothing was marked until the middle of the car was 0.8 m past the edge, and then only as one driving fault, so a car could run onto the verge and still pass. Now the wheels are judged against the road as drawn: a wheel over the edge is *Mounted the kerb* (driving fault), and the car off the road is *Drove off the road* (serious). Free drive still marks nothing, but its summary says how long the wheels were off the road.
+  - **Steering is limited by grip.** Full input turns the wheels to full lock at walking pace, then no further than a firm turn of about 7 m/s² sideways. Before, a full press at 30 mph turned the car at about 25 m/s² (no car can), so every tap of a key was a swerve.
+  - **No mirror checks to press in the chase view.** The mirrors are always on screen there, so mirror and shoulder checks count as made and are not marked; the run detail says so. The driver's view marks them as before.
+  - **Game controllers and wheels** work: left stick or wheel steers, triggers are the pedals, LB and RB indicate, Y checks the mirrors. Keys and touch still work as before and win over an idle controller.
+  - **A person-like driver in the Bot lab** (*A person on keys*, *A person on a controller*) runs any drive with a reaction time, a few decisions a second, tapped keys or an unsteady stick. Over all 60 drives, the steering change halved the time a person on keys spent off the road (274 s to 134 s) and cut it fivefold on a controller (88 s to 16 s, serious faults 33 to 6). On keys the pass rate did not move (34 of 60): town turns on on/off keys still clip kerbs.
+  - The reference bot now steers by wheel angle through the same grip limit as everyone else, and passes all 60 drives, including the two-lane roundabout that used to stall.
 - **Evening motorway driving** (issue #10).
   - **Three lessons at dusk**: *Joining at dusk*, *Following at dusk* and *Leaving the motorway at dusk*, the same motorway lessons set as the light goes, with the time of day saved in the lesson data. A **Motorway at dusk** free drive too.
   - **What changes is only what you see**: a dusk sky, lamps on every vehicle (tail lights always, headlights on), road studs in their proper colours, lit columns at each junction, and signs that glow in the headlights. The road, the traffic and every rule are the same as by day: the same careless drive is given the same faults at dusk, and the Bot lab's careful drives come out the same.
