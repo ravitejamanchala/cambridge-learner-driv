@@ -174,7 +174,10 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
         if (m.join) {
           const near = inLane(f, 0).filter(o => o.fw > -150 && o.fw < 100);
           m.trafficMph = near.length ? Math.round(near.reduce((a, o) => a + o.v, 0) / near.length * MPH) : null;
-          if (near.length && f.v < near.reduce((a, o) => a + o.v, 0) / near.length - LANE.joinSlower)
+          // held up by traffic joining ahead of you on the slip road is not joining too slowly: you could go
+          // no faster than it, and it was waiting for its own gap
+          const heldUp = f.others.some(o => o.lane === -1 && o.fw > 0 && o.fw < 80);
+          if (near.length && !heldUp && f.v < near.reduce((a, o) => a + o.v, 0) / near.length - LANE.joinSlower)
             mark('D', 'Use of speed', `Joined at ${Math.round(f.v * MPH)} mph into traffic doing about ${m.trafficMph} mph: build up your speed on the slip road (Rule 259)`, 'mwjoinslow');
         }
       }

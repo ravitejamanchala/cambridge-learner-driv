@@ -271,3 +271,9 @@ test('a wobble towards the lane line that comes back is not a lane change: nothi
   const r = run({ v: 66 * MPH, lane: 0, seconds: 20, script: (t) => (t === 2 ? { target: 0.4 } : t === 4 ? { target: 0 } : null) });
   assert.deepEqual(cats(r), []);
 });
+test('joining slowly because traffic joining ahead of you was waiting is not marked as too slow', () => {
+  const A = createLaneAssessor({ fault: (k, c, text) => { throw new Error(text); } });
+  // on the slip road at walking pace behind another joiner, then into a clear left-hand lane
+  for (let t = 0; t < 4; t += 0.1) A.step({ t, dt: 0.1, v: 2, laneF: -1 + Math.min(1, t / 3), lanes: 3, indicator: 'R', joining: true, looks: [{ view: 'right', at: 0 }, { view: 'blindspot', at: 0.2 }],
+    others: [{ id: 1, lane: -1, fw: 25, v: 3 }, { id: 2, lane: 0, fw: 200, v: 26 }, { id: 3, lane: 0, fw: -240, v: 26 }] });
+});

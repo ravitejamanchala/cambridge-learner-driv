@@ -308,6 +308,9 @@ function joinPlan(api, st, t, pl, tr) {
       if (mergeIn < 110) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 3 * (mergeIn - 85))));
     }
   }
+  // and never faster than the vehicle ahead on the slip road allows: other traffic joins here too
+  const ahead = tr.cars.filter(c => c.alive && c.e === nr.e).map(c => ({ c, d: (c.s - nr.s) * (nr.dir ?? 1) })).filter(o => o.d > 0).sort((a, b) => a.d - b.d)[0];
+  if (ahead) target = Math.min(target, Math.max(0, ahead.c.v + (ahead.d - CAR - 2 - 2.2 * v) * 0.4)); // two seconds and a little
   return { p: api.lanePoint(t.sRoute + 25), target };
 }
 

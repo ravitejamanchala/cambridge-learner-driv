@@ -92,8 +92,9 @@ try {
     const sig = await page.evaluate(() => { const a = window.cambridgeDrive, seen = new Map(); let changes = 0, signalled = 0, indicating = 0, flashing = 0;
       for (let t = 0; t < 1200; t++) { a.frame(0.05);
         for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway') continue; const was = seen.get(c);
-          if (was && was.lane !== c.lane && was.e === c.e && c.traits?.signals) { changes++; if (was.ind) signalled++; } // (the few who never signal aside)
-          seen.set(c, { lane: c.lane, e: c.e, ind: c.ind });
+          // the same vehicle carrying on along the same road (not one recycled and placed afresh), the few who never signal aside
+          if (was && was.lane !== c.lane && was.e === c.e && c.s >= was.s && c.s - was.s < 5 && c.traits?.signals) { changes++; if (was.ind) signalled++; }
+          seen.set(c, { lane: c.lane, e: c.e, s: c.s, ind: c.ind });
           if (c.ind) { indicating++; const g = c.mesh.getObjectByName('indicators'); if (g && (g.userData.L.visible || g.userData.R.visible)) flashing++; } } }
       return { changes, signalled, indicating, flashing }; });
     assert.ok(sig.changes > 0, 'no traffic changed lane in a minute');
