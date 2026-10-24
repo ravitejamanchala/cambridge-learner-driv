@@ -176,7 +176,7 @@ export function createHub({ meta, onPick, onStart }) {
     $('passTitle').textContent = g.done === VISIBLE_LESSONS.length ? 'Course complete' : UNITS[ui].title;
     const summary = Profiles.summary();
     $('practiceSummary').textContent = `${Math.round(summary.practiceSeconds / 60)} min practice · ${summary.attempts} recorded attempts`;
-    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious</li>`).join('') || '<li>No recent reports yet.</li>';
+    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious${r.assist ? ' · steering assist on' : ''}</li>`).join('') || '<li>No recent reports yet.</li>';
     $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / VISIBLE_LESSONS.length * 100) + '%';
     const pl = plan();
     if (pl.kind === 'lesson') {

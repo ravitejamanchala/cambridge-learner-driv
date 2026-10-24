@@ -98,6 +98,22 @@ try {
     await page.evaluate(() => window.cambridgeDrive.setCam(1));
     console.log(`Mirrors: driver view marks "${driver[0]}"; chase view marks nothing and says so.`);
   }
+  // ---------- steering assist: follows the curve when you are not steering, and the result says so ----------
+  {
+    const noHands = async () => { await start('lesson', 'mw-keep-left'); await hold({ throttle: 0.5, brake: 0, steer: 0 }); await steps(20 * 60);
+      return page.evaluate(() => ({ off: window.cambridgeDrive.test.offRoad.max, faults: window.cambridgeDrive.test.faults.map(f => f.text) })); };
+    const without = await noHands();
+    await page.evaluate(() => document.querySelector('#saSeg [data-sa="1"]').click());
+    const withIt = await noHands(); await hold(null);
+    assert.ok(without.off > 1, `with no steering and no assist the car should leave the road on the circuit's bends (${without.off} m)`);
+    assert.equal(withIt.off, 0, `with the assist on, no steering kept the car on the road (${withIt.off} m)`);
+    await page.evaluate(() => window.cambridgeDrive.test.finish());
+    const shown = await page.evaluate(() => ({ tag: document.querySelector('#rNote .tag.assist')?.textContent || '', detail: [...document.querySelectorAll('#runDetailList li')].map(l => l.textContent) }));
+    assert.equal(shown.tag, 'Steering assist on');
+    assert.ok(shown.detail.some(l => /^Steering assist was on: it steered round the curves for \d+ s of this drive\. The real test has no assist\./.test(l)), shown.detail.join('\n'));
+    await page.evaluate(() => document.querySelector('#saSeg [data-sa="0"]').click());
+    console.log(`Steering assist: a minute with no steering left the road by ${without.off.toFixed(1)} m without it, stayed on with it; the result says so.`);
+  }
   // ---------- marking modes: chosen where the drive starts, fixed for it, stars by mode ----------
   {
     const lobby = () => page.evaluate(() => { const t = window.cambridgeDrive.test; if (t) t.running = false; document.querySelector('#hubBtn').click(); });

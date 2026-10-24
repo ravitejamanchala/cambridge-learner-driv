@@ -45,3 +45,9 @@ The three-lane motorway from above: slower vehicles in the left-hand lane, quick
 Turning left, marked on Medium (chosen in the lesson panel before starting): the result shows two stars and says it was marked on Medium. Hard earns three and is the real test's standard.
 
 [07-marked-on-medium.mp4](07-marked-on-medium.mp4) · 40 s (80 s of driving at 2× speed) · 1.7 MB
+
+## Steering assist
+
+Steering assist on, no steering held at all on the motorway: it holds the curve of the lane. Then the result: the "Steering assist on" tag by the stars and the line saying how long it steered. (The lesson is not passed: it asks for an overtake, and the assist never overtakes.)
+
+[08-steering-assist.mp4](08-steering-assist.mp4) · 36 s · 1.1 MB
