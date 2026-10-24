@@ -345,6 +345,37 @@ function download(name, text, type, url) { const a = document.createElement('a')
 
 
 // ---------- runner + panel ----------
+// A person at the controls. The reference driver above always knows the right steering angle, applies it
+// exactly and at once, twenty times a second. A person sees the road a moment late, decides a few times a
+// second, and on a keyboard or the touch buttons can only press left, right, accelerator or brake all the
+// way. This wraps the reference driver's intentions in those limits, so the Bot lab can show how hard a
+// drive is for someone driving it by hand: how often they leave the road, and how much steering it takes.
+//   device 'keys'  on/off steering and pedals, as the keyboard and touch buttons are
+//   device 'stick' an analog stick or wheel, with a little unsteadiness in the hand
+export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, clock, seed = 7 } = {}) {
+  const seen = []; let next = -1, key = 0, stick = 0, pedal = { throttle: 0, brake: 0 }, r = seed >>> 0;
+  const rand = () => { r = (r + 0x6D2B79F5) >>> 0; let x = Math.imul(r ^ (r >>> 15), 1 | r); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  const stats = { presses: 0, steerTravel: 0 };
+  const human = () => {
+    const now = clock(), o = drive(); if (!o) return o;
+    if (seen.length && now < seen[seen.length - 1][0]) { seen.length = 0; next = -1; } // a new drive: the clock started again
+    seen.push([now, o]); while (seen.length > 2 && seen[1][0] <= now - reaction) seen.shift();
+    if (now < next && now >= next - 1) return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+    next = now + 1 / rate;
+    const late = seen[0][1]; // what the driver had seen `reaction` seconds ago
+    if (device === 'keys') {
+      const was = key; key = Math.abs(late.steer) > (key ? 0.08 : 0.22) ? Math.sign(late.steer) : 0; if (key && key !== was) stats.presses++;
+      pedal = { throttle: late.throttle > 0.3 ? 1 : 0, brake: late.brake > 0.15 ? 1 : 0 };
+    } else {
+      const was = stick; stick = Math.max(-1, Math.min(1, late.steer + (rand() - 0.5) * 0.08)); stats.steerTravel += Math.abs(stick - was);
+      pedal = { throttle: late.throttle, brake: late.brake };
+    }
+    return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+  };
+  human.stats = stats;
+  return human;
+}
+
 export function createBotLab(api) {
   const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const f = q.shift(); f && f(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
   const drive = makeDriver(api);
@@ -362,6 +393,7 @@ export function createBotLab(api) {
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
+<div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
 <div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
 <div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
@@ -431,7 +463,8 @@ export function createBotLab(api) {
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
-    api.setInput(drive);
+    const who = $('blDriver').value, input = who === 'reference' ? drive : humanize(drive, { device: who, clock: () => A.traffic.clock, seed });
+    api.setInput(input);
     while (!t.done) {
       if (stopReq) { end = 'stopped'; break; }
       if (paused) { await new Promise(r => requestAnimationFrame(r)); api.frame(0); continue; }
@@ -456,7 +489,8 @@ export function createBotLab(api) {
     const pl = api.player;
     saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
-      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)] });
+      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)],
+      driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
     render();
   }
 

@@ -26,6 +26,7 @@ try{
  await page.locator('#blN').fill('1');await page.locator('#blSpd').selectOption('0');await page.locator('#blLoop').uncheck();
  await page.locator('#blSeed').fill(process.env.BOT_SEED||'7'); // same traffic every sweep unless BOT_SEED asks for another
  await page.locator('#blPick').selectOption(pick);
+ if(process.env.BOT_DRIVER) await page.locator('#blDriver').selectOption(process.env.BOT_DRIVER); // reference | keys | stick
  const expected=await page.evaluate(v=>{
   const list=[...document.querySelectorAll('#blPick option')].map(o=>o.value);
   return v.startsWith('all:')?null:list.includes(v)?1:0;
@@ -43,13 +44,17 @@ try{
  const bad=runs.filter(r=>r.end!=='done'&&!KNOWN_STUCK.has(r.key));
  const known=runs.filter(r=>r.end!=='done'&&KNOWN_STUCK.has(r.key));
  for(const r of runs){
-  console.log(` ${r.end==='done'?(r.pass?'pass':'fail'):'STUCK'.padEnd(4)}  ${r.key.padEnd(26)} ${String(r.reached).padStart(5)}/${String(r.len).padEnd(5)} m  D${r.D} S${r.S}  ${r.end}${r.why?'  '+r.why.slice(0,70):''}`);
+  const off=r.offRoad&&r.offRoad.max?` off-road ${r.offRoad.max} m for ${r.offRoad.seconds} s`:'', st=r.steering?(r.steering.presses?` ${r.steering.presses} steering presses`:` stick travel ${r.steering.steerTravel.toFixed(0)}`):'';
+  console.log(` ${r.end==='done'?(r.pass?'pass':'fail'):'STUCK'.padEnd(4)}  ${r.key.padEnd(26)} ${String(r.reached).padStart(5)}/${String(r.len).padEnd(5)} m  D${r.D} S${r.S}  ${r.end}${off}${st}${r.why?'  '+r.why.slice(0,70):''}`);
   if(!r.pass&&r.cats?.length) console.log(`         ${[...new Set(r.cats)].join(' · ')}`);
   if((!r.pass||process.env.BOT_VERBOSE)&&r.where?.length) for(const [kind,text,x,z] of r.where) console.log(`           ${kind} ${text} (x ${x}, z ${z})`);
  }
  console.log(`\n${runs.length} drives · ${runs.filter(r=>r.pass).length} passed · ${bad.length} did not finish${known.length?` · ${known.length} known stall(s): ${known.map(r=>r.key).join(', ')}`:''}`);
  // a known stall that starts finishing is good news, but the list should be trimmed
  for(const r of runs) if(KNOWN_STUCK.has(r.key)&&r.end==='done') console.log(` note: ${r.key} now runs to completion — remove it from KNOWN_STUCK`);
+ // a drive that left the road must not pass: the examiner marks a wheel over the edge, and the car off the road is serious
+ const flattering=runs.filter(r=>r.pass&&r.offRoad&&r.offRoad.max>1);
+ assert.deepEqual(flattering.map(r=>`${r.key}: passed ${r.offRoad.max} m off the road`),[],'a drive passed after leaving the road');
  assert.deepEqual(bad.map(r=>`${r.key}: ${r.end} at ${r.reached}/${r.len} m`),[],'every drive must run to completion');
  assert.equal(errors.length,0,errors.join('\n'));
 }finally{await browser?.close();server.kill();}

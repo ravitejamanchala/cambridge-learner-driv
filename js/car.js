@@ -149,6 +149,12 @@ function bodyColour(material, fallback = 0x1d6a46) {
   } catch (_) { return hex; } // a cross-origin texture cannot be read back
 }
 
+// How far the front wheels turn at full input: full lock at walking pace, for junctions and parking; above
+// that, no more than a firm turn (HANDLING.turnGrip m/s² sideways), as a real car's tyres allow. Before
+// this, full input at 30 mph would have turned the car at about 25 m/s², so every tap of a key was a swerve
+// and holding a gentle bend took constant correcting.
+export const steerLock = (v) => Math.min(HANDLING.maxSteer, Math.atan(HANDLING.wheelbase * HANDLING.turnGrip / Math.max(1, v * v)));
+
 export function createPlayer(scene) {
   const p = { x: 0, z: 0, th: 0, v: 0, steer: 0, delta: 0, roll: 0, hold: 0, lean: 0, isPlayer: true, indicator: null, indTh: 0, headlights: false, mesh: makeBoxCar(0x1a7c52, true) };
   p.operation = createVehicleState(); p.observations = [];
@@ -164,8 +170,10 @@ export function createPlayer(scene) {
     if (blocked) inp = { ...inp, throttle: 0, brake: Math.abs(p.v) > 0.3 ? 1 : 0 };
     p.inp = inp;
     const H = HANDLING, st = clamp(inp.steer, -1, 1) * H.steerSensitivity;
-    const rate = Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
-    const delta = p.steer * H.maxSteer / (1 + Math.max(0, Math.abs(p.v) - 4) * 0.08); p.delta = delta; // full lock at walking pace; less lock as speed builds
+    // keys and touch buttons are all-or-nothing, so the wheel winds on gradually while one is held and
+    // comes back when it is let go; a controller's stick or a wheel is followed closely
+    const rate = inp.analog ? 8 : Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
+    const delta = p.steer * steerLock(Math.abs(p.v)); p.delta = delta;
     if (p.operation.transmission === 'automatic') {
       p.v = automaticVelocity(p.v, p.rawInput, p.operation, dt, H, surface); p.hold = 0;
     } else {

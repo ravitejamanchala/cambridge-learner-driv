@@ -430,7 +430,23 @@ async function boot() {
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
-    return { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    const k = { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    if (k.throttle || k.brake || k.steer) return k; // keys and touch always win
+    return readPad() || k;
+  }
+  // A game controller or a USB wheel (the browser's standard mapping): the left stick or the wheel steers,
+  // the right trigger accelerates and the left brakes; LB and RB indicate, Y checks the mirrors. It takes
+  // over only once it has been touched, so a controller left plugged in never fights the keyboard.
+  let padUsed = false; const padWas = [];
+  function readPad() {
+    const g = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null; if (!g) return null;
+    const b = (i) => (g.buttons[i] ? g.buttons[i].value : 0), tap = (i) => { const on = b(i) > 0.5, was = padWas[i]; padWas[i] = on; return on && !was; };
+    if (tap(4)) { player.signal('L'); sigBtns(); } if (tap(5)) { player.signal('R'); sigBtns(); } if (tap(3)) look('interior');
+    // a small dead zone, then a gentle curve so small movements of the stick make small corrections
+    const ax = g.axes[0] || 0, dz = 0.08, x = Math.abs(ax) < dz ? 0 : Math.sign(ax) * ((Math.abs(ax) - dz) / (1 - dz)) ** 1.6;
+    const thr = b(7), brk = b(6);
+    if (x || thr > 0.05 || brk > 0.05) padUsed = true;
+    return padUsed ? { throttle: thr, brake: brk, steer: -x, analog: true } : null;
   }
 
   // ---------- drive flow ----------
