@@ -372,7 +372,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const fx = -Math.sin(a.th), fz = -Math.cos(a.th);
     const others = player ? all.concat([player]) : all;
     // look further ahead at speed so fast traffic can stop behind a slower learner
-    const look = Math.max(20, a.v * a.v / 10 + 12); let blocked = false;
+    const look = Math.max(20, a.v * a.v / 10 + 12); let blocked = false, waitOn = null, waitV = Infinity;
     for (const o of others) {
       if (o === a || o.alive === false) continue;
       if (a.ghost > 0 && !o.isPlayer) continue;
@@ -395,7 +395,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       // rather than queueing and never reaching the learner at all.
       if (a.emergency && !o.isPlayer && !oncoming) continue;
       if (lat < width) {
-        vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : blue ? 4.5 : 6.5), blue ? 7 : 5));
+        const stopFor = brakeTo(0, fwd - (bike || oBike ? 4 : blue ? 4.5 : 6.5), blue ? 7 : 5);
+        if (stopFor < waitV) { waitV = stopFor; waitOn = o; }
+        vmax = Math.min(vmax, stopFor);
         // and hold back to this driver's own following distance (1.1 to 2.5 s) behind a vehicle on the same
         // stretch of road going the same way (not traffic crossing in front, a cyclist, or anything on a
         // roundabout, where the ordinary give-way rules decide)
@@ -437,7 +439,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     if (!bike) signalFor(a, rem);
     if (!bike) a.laneF = (a.laneF ?? a.lane) + Math.max(-dt * 0.5, Math.min(dt * 0.5, a.lane - (a.laneF ?? a.lane))); // half a lane a second
     if (a.v < 0.2 && vmax < 0.4) a.stuck += dt; else a.stuck = 0;
-    if (a.stuck > 8) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;
+    // Stuck for a while, a vehicle may slip through the traffic around it (a ghost, for a moment) so a knot of
+    // background traffic never locks for good. Not when it is queueing behind the learner, or behind someone
+    // who is: then it waits its turn in the line, as anyone would, rather than piling through the queue.
+    a.queued = !!waitOn && (waitOn.isPlayer || !!waitOn.queued) && Math.abs(waitOn.v || 0) < 0.5;
+    if (a.stuck > 8 && !a.queued) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;
     a.v = a.v > vmax ? Math.max(vmax, a.v - 7 * dt) : Math.min(vmax, a.v + (bike ? 1.2 : 2.2) * dt);
     a.s += a.v * dt;
     while (a.s >= a.e.len) {

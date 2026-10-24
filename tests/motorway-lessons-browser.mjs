@@ -106,8 +106,9 @@ try {
       // wait for the car alongside in the middle lane to get clear, then mirror, shoulder, signal, over
       for (let i = 0; i < 400 && !(await laneClear(1, 60, 30)); i++) await steps(5);
       await look('right'); await look('blindspot'); await signal('R'); await steps(40); await set({ want: 1 }); await steps(70); await signal('R');
-      // once the joiners are in and the left-hand lane is clear around you, back left the same way
-      for (let i = 0; i < 600 && !((await joinersIn()) && (await laneClear(0, 50, 80))); i++) await steps(5); // two seconds and more behind
+      // once the joiners are in and the left-hand lane is clear around you, back left the same way (30 m clear
+      // behind is well over a second ahead of joiners doing 48 mph, and you are pulling away from them)
+      for (let i = 0; i < 600 && !((await joinersIn()) && (await laneClear(0, 30, 80))); i++) await steps(5);
       await look('left'); await look('left-blindspot'); await signal('L'); await steps(40); await set({ want: 0 }); await steps(70); await signal('L');
     }
     await untilDone(); const r = await outcome();
