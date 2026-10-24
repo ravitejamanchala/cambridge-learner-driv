@@ -24,6 +24,10 @@ A 3D mock UK driving test in the browser. `README.md` covers what it is and how 
 
 ## Working here
 
+- **Learner Drive is dopamine-driven.** Every feature needs a clear goal, progress you can feel, an
+  earned payoff and a reason to go again — and every reward must come from what the drive measured.
+  The checklist is at the top of the interface guidelines; run it and record it in each pull request.
+
 - Run the checks listed at the end of the interface guidelines before calling a change done.
 - Keep existing lesson IDs stable: learner progress is stored against them.
 - Assessment is measured, never flattering. Nothing may turn a fail into a pass after the fact.

@@ -3,6 +3,32 @@
 House rules for anything the learner sees while driving. They come from testing the simulator, and they
 are the first thing to check before adding a panel, a message or a control.
 
+## Learner Drive is dopamine-driven
+
+Learners come back because driving here *feels* like progress. Every feature has to earn that feeling,
+and it has to be earned honestly: a reward only ever comes from something the drive measured. Nothing
+may flatter, and nothing may turn a fail into a pass (`CLAUDE.md`). The two rules don't pull against
+each other — a reward is only worth having when the learner knows it can't be faked.
+
+Every lesson, puzzle, mock test and free drive goes through this check before it ships, and the check
+is written into its pull request:
+
+1. **A clear goal before Start.** The lesson card says what "done" looks like, in one line.
+2. **Progress you can feel while driving** — on the instruments, never as a sentence over the road:
+   ticks filling, a distance counting down, a target band going green, a junction number coming up.
+3. **A payoff moment at the end.** The result shows what was earned *as it is earned*: the XP added,
+   the stars, the level bar moving, the unit filling. A pass is a moment, not a line of text.
+4. **Praise that is specific and measured.** "You held a two-second gap for 4.1 miles" beats "Well
+   done". Name the thing they did, with the number the drive recorded.
+5. **One next thing.** Never a list of faults on its own: the most useful single thing to practise,
+   and a button that goes straight to it.
+6. **A reason to go again.** The next lesson unlocking, a star still to win, a personal best to beat.
+
+What it must never be: a reward for nothing, a streak that punishes a missed day, a timer that pushes
+someone into driving faster, confetti over a fail, or a nag mid-drive. Ungraded practice (free drive)
+still gets a payoff — a session summary of what was measured — but never writes to lesson progress or
+the learner's record.
+
 ## The view is the product
 
 The learner is looking at a road. Everything drawn on top of it costs them something.
