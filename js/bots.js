@@ -404,6 +404,7 @@ export function createBotLab(api) {
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
+<div class="row"><label>Traffic <select id="blTraffic" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="lesson">The lesson's own</option><option value="random">Add random traffic</option></select></label></div>
 <div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
 <div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
@@ -470,7 +471,7 @@ export function createBotLab(api) {
 
   async function runOne(p, label, iteration) {
     const base=$("blSeed").value,seed=base===""?crypto.getRandomValues(new Uint32Array(1))[0]:(Number(base)+iteration)>>>0;
-    await api.start(p.kind, p.id,seed);
+    await api.start(p.kind, p.id, seed, { traffic: $('blTraffic').value });
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
@@ -501,7 +502,7 @@ export function createBotLab(api) {
     saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
       simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)],
-      driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
+      traffic: $('blTraffic').value, driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
     render();
   }
 

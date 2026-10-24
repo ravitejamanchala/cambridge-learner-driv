@@ -27,6 +27,8 @@ try{
  await page.locator('#blSeed').fill(process.env.BOT_SEED||'7'); // same traffic every sweep unless BOT_SEED asks for another
  await page.locator('#blPick').selectOption(pick);
  if(process.env.BOT_DRIVER) await page.locator('#blDriver').selectOption(process.env.BOT_DRIVER); // reference | keys | stick
+ if(process.env.BOT_TRAFFIC) await page.locator('#blTraffic').selectOption(process.env.BOT_TRAFFIC); // lesson | random
+ if(process.env.BOT_RUNS) await page.locator('#blN').fill(process.env.BOT_RUNS); // runs of each drive, each on its own seed
  const expected=await page.evaluate(v=>{
   const list=[...document.querySelectorAll('#blPick option')].map(o=>o.value);
   return v.startsWith('all:')?null:list.includes(v)?1:0;

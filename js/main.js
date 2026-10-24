@@ -8,7 +8,7 @@ import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor } from './config.js';
 import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
-import { attachLamps, setLamps } from './evening.js';
+import { attachLamps, setLamps, attachIndicators, setIndicators } from './evening.js';
 import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './car.js';
 import { createGarage } from './garage.js';
@@ -77,7 +77,7 @@ async function boot() {
   const dressCar = (slot, index) => {
     const body = trafficModels.length ? trafficModels[index % trafficModels.length].clone(true) : shadowed(makeBoxCar(slot.userData.colour, false));
     slot.userData.model = trafficModels.length ? index % trafficModels.length : -1;
-    slot.remove(...slot.children); slot.add(body); attachLamps(body); setLamps(body, dusk);
+    slot.remove(...slot.children); slot.add(body); attachLamps(body); attachIndicators(body); setLamps(body, dusk);
   };
   const makeCar = (c) => {
     let m = carPool[carI];
@@ -783,6 +783,7 @@ async function boot() {
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
     // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
     setLamps(player.mesh, dusk, !!player.headlights);
+    { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's
     headBeam.visible = dusk && !!player.headlights && !lowPower;
     if (headBeam.visible) { const fx = -Math.sin(player.th), fz = -Math.cos(player.th); headBeam.position.set(player.x + fx * 2, 0.8, player.z + fz * 2); headBeam.target.position.set(player.x + fx * 32, 0, player.z + fz * 32); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
@@ -816,10 +817,13 @@ async function boot() {
     estopBanner: () => A.test?.alert?.tone === 'stop',
     setInput: (fn) => { botInput = fn; },
     botMode: (on) => { botMode = on; manual = on; },
-    async start(kind, id, seed) {
+    async start(kind, id, seed, { traffic = 'lesson' } = {}) {
       botSeed=seed;
       const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
       await pickPlan(pl, true); await areaChain;
+      // random traffic on top of whatever the lesson places, from this run's seed: a lesson with its own
+      // scripted traffic otherwise meets exactly the same drive every time
+      if (traffic === 'random') { A.traffic.setDensity('normal'); A.traffic.reset(player.x, player.z, seed); }
     },
     result: () => plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
     plans: [...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]

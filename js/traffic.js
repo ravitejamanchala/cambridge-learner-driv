@@ -150,6 +150,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (all.some(o => o !== a && o.alive && Math.hypot(o.x - p.x, o.z - p.z) < (a.kind === 'bike' ? 10 : 18))) continue;
       Object.assign(a, { v: a.kind === 'bike' ? 4 : 5, x: p.x, z: p.z, th: Math.atan2(-p.tx, -p.tz), stuck: 0, ghost: 0, alive: true });
       a.next = chooseNext(a); a.cruise = a.kind === 'bike' ? 4.4 + random() * 2.2 : 0.88 + random() * 0.12;
+      // every driver a little different, from the drive's own seed: how close they follow, how big a gap
+      // they want before changing lane, how long they signal first, whether they make room for others,
+      // and the few who never signal
+      if (a.kind === 'car') a.traits = { headway: 1.1 + random() * 1.4, gap: 0.8 + random() * 0.6, wait: 1.5 + random() * 1.5, courtesy: random() < 0.55, signals: random() > 0.05 };
+      a.intent = null; a.ind = null;
       // Motorway traffic is not all one speed: lane 1 carries the slower vehicles (lorries are limited to
       // 56 mph), the outer lanes the faster ones, so there is always something to catch up with.
       if (a.kind === 'car' && e.way.cls === 'motorway') a.cruise = [0.76, 0.9, 0.95][Math.min(lane, 2)] + random() * 0.07;
@@ -268,9 +273,32 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // behind or 25 m ahead, and never in front of the learner with less than 2.5 s between them, so the
   // learner is never given a following-distance fault by someone cutting in. A lesson's own placed traffic
   // stays in the lane it was put in.
+  // Which way a vehicle is indicating (a.ind), from what it is about to do: a lane change it has decided on,
+  // a turn at the next junction, leaving the roundabout, leaving or joining a motorway. A few drivers never
+  // signal, as on real roads.
+  function signalFor(a, rem) {
+    if (a.traits && !a.traits.signals) { a.ind = null; return; }
+    let ind = null;
+    if (a.intent) ind = a.intent.to < a.lane ? 'L' : 'R';
+    else if (Math.abs((a.laneF ?? a.lane) - a.lane) > 0.15) ind = a.laneF > a.lane ? 'L' : 'R'; // still moving across
+    else if (a.next) {
+      const w = a.e.way, nw = a.next.e.way;
+      if (w.cls === 'motorway' && nw.cls === 'motorway_link' && rem < 300) ind = 'L';
+      else if (w.cls === 'motorway_link' && nw.cls === 'motorway' && rem < MERGE_ZONE + 60) ind = 'R';
+      else if (w.rb && !nw.rb && rem < 25) ind = 'L';
+      else if (!w.rb && !nw.rb && rem < 35) {
+        const p = along(a.e, a.e.len - 0.5, a.dir), q = along(a.next.e, Math.min(4, a.next.e.len / 2), a.next.dir);
+        const turn = Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz);
+        if (Math.abs(turn) > 0.5) ind = turn < 0 ? 'L' : 'R';
+      }
+    }
+    if (!ind && a.ind && a.s < 10 && a.indHold > 0) ind = a.ind; // just round the corner: still cancelling
+    a.indHold = ind ? 1.2 : Math.max(0, (a.indHold || 0) - 0.05);
+    a.ind = ind;
+  }
   function keepLeft(a, dt, others, fx, fz) {
     a.lcT = (a.lcT || 0) - dt; if (a.lcT > 0 || a.lane !== Math.round(a.laneF ?? a.lane)) return;
-    a.lcT = 0.5;
+    a.lcT = a.intent ? 0.1 : 0.5;
     const w = a.e.way, n = laneInfo(a.e, a.dir).n, rem = a.e.len - a.s;
     // only on motorways and fast dual carriageways: in town the lanes lead to lane arrows and junctions,
     // and side-road traffic joins across them, so there a vehicle keeps the lane it chose
@@ -285,10 +313,18 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
         if (Math.cos((o.th || 0) - a.th) < 0.8) continue; // not going this way
         if (Math.abs(rx * fz - rz * fx - d) < 2) hits.push({ o, fwd }); }
       return hits; };
-    const clear = (l) => inLane(l, 20, 25).length === 0 && !inLane(l, 60, 0).some(h => h.o.isPlayer && -h.fwd < Math.max(15, Math.abs(h.o.v) * 2.5));
+    const g = a.traits?.gap ?? 1, clear = (l) => inLane(l, 20 * g, 25 * g).length === 0 && !inLane(l, 60, 0).some(h => h.o.isPlayer && -h.fwd < Math.max(15, Math.abs(h.o.v) * 2.5));
     const slowerAhead = (l, within) => inLane(l, 0, within).some(h => h.fwd > 4 && Math.abs(h.o.v) < want - 2.5);
-    if (a.lane > 0 && (exiting || !slowerAhead(a.lane - 1, 70)) && clear(a.lane - 1)) { a.lane--; return; }
-    if (!exiting && a.lane < n - 1 && slowerAhead(a.lane, 45) && clear(a.lane + 1)) a.lane++;
+    // A driver signals first and moves only when the signal has been on a moment (1.5 to 3 s, by driver)
+    // and the gap is still there: so the learner can see what the vehicle is about to do.
+    const intend = (to) => { if (a.intent && a.intent.to === to) { if (clock >= a.intent.at && clear(to)) { a.lane = to; a.intent = null; } else if (!clear(to) && clock > a.intent.at + 4) a.intent = null; return true; }
+      a.intent = { to, at: clock + (a.traits?.wait ?? 2) }; return true; };
+    // courtesy: a learner coming down a slip road beside the left-hand lane, and the next lane clear
+    const makeRoom = mw && a.lane === 0 && a.traits?.courtesy && playerOnSlip && player && (() => { const f = (player.x - a.x) * fx + (player.z - a.z) * fz; return f > -30 && f < 140; })();
+    if (makeRoom && clear(1) && intend(1)) return;
+    if (a.lane > 0 && (exiting || !slowerAhead(a.lane - 1, 70)) && clear(a.lane - 1) && intend(a.lane - 1)) return;
+    if (!exiting && a.lane < n - 1 && slowerAhead(a.lane, 45) && clear(a.lane + 1) && intend(a.lane + 1)) return;
+    if (a.intent && !a.intent.keep) a.intent = null; // nothing to do after all: signal off
   }
   function updateAgent(a, dt) {
     const w = a.e.way, bike = a.kind === 'bike', blue = !!a.emergency;
@@ -341,9 +377,17 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (a.emergency && !o.isPlayer && !oncoming) continue;
       if (lat < width) {
         vmax = Math.min(vmax, brakeTo(0, fwd - (bike || oBike ? 4 : blue ? 4.5 : 6.5), blue ? 7 : 5));
+        // and hold back to this driver's own following distance (1.1 to 2.5 s) behind moving traffic
+        if (!bike && !blue && !oncoming && a.traits && Math.abs(o.v) > 3) { const want = a.traits.headway * a.v + 6; if (fwd < want) vmax = Math.min(vmax, Math.abs(o.v) - (want - fwd) * 0.15); }
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
+    // A learner signalling to move into this vehicle's lane, just ahead of it or alongside: a courteous
+    // driver drops back to open the gap; others hold their speed. Same direction, one lane across.
+    if (!bike && !blue && player && player.indicator && a.traits?.courtesy && Math.abs(player.v) > 3 && Math.cos(player.th - a.th) > 0.95) {
+      const rx = player.x - a.x, rz = player.z - a.z, ahead = rx * fx + rz * fz, left = rx * fz - rz * fx; // + the learner is to this vehicle's left
+      if (ahead > -6 && ahead < 45 && (player.indicator === 'R' ? left > 2 && left < 5.5 : left < -2 && left > -5.5)) { vmax = Math.min(vmax, Math.max(0, Math.abs(player.v) - 2.5)); a.yielding = true; } else a.yielding = false;
+    } else a.yielding = false;
     // cyclists pass a stopped car with room to spare (or wait until they can)
     if (bike) a.swing = blocked ? Math.min(1.9, (a.swing || 0) + dt * 1.2) : Math.max(0, (a.swing || 0) - dt * 0.6);
     // everyone makes way for a blue light coming up behind: slow right down and let it through
@@ -367,6 +411,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       }
     }
     if (!bike && !blue && !a.scripted) keepLeft(a, dt, others, fx, fz);
+    if (!bike) signalFor(a, rem);
     if (!bike) a.laneF = (a.laneF ?? a.lane) + Math.max(-dt * 0.5, Math.min(dt * 0.5, a.lane - (a.laneF ?? a.lane))); // half a lane a second
     if (a.v < 0.2 && vmax < 0.4) a.stuck += dt; else a.stuck = 0;
     if (a.stuck > 8) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;
@@ -393,8 +438,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     ringBikes.forEach((b,i)=>{b.ang=(i%3)*2.1+net.cycleRings.indexOf(b.ring);b.v=4.4;b.cruise=4.2+(i%3)*.35;b.pinned=0;b.alive=true;});
     updateRingBikes(0);
   }
+  let playerOnSlip = false;
   function update(dt, pl) {
     clock += dt; player = pl;
+    { const n = nearestWhere(net, pl.x, pl.z, e => /^motorway/.test(e.way.cls)); playerOnSlip = !!n && n.d < 8 && n.way.cls === 'motorway_link'; }
     for (const a of all) {
       const pool = a.kind === 'bike' ? bikes : cars;
       if (!a.scripted && (density === 'none' || (density === 'light' && pool.indexOf(a) >= Math.ceil(pool.length / 3)))) { a.alive = false; a.mesh.visible = false; continue; }
@@ -419,7 +466,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // path (optional): route steps the car should follow instead of choosing turns at random
   // lane (optional): which lane, 0 nearest the kerb; keepTo (optional): a road class it never leaves
   function placeCar(c, e, dir, s, speed, cruise = 1, path = null, lane = 0, keepTo = null) {
-    Object.assign(c, { scripted: true, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), laneF: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false });
+    Object.assign(c, { scripted: true, traits: null, intent: null, ind: null, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), laneF: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };

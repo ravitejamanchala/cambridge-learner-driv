@@ -86,6 +86,32 @@ try {
     console.log(`Keep left: the longest any car sat in an outer lane with nothing to pass was ${hog.worst} s; cars by lane ${hog.lanes.join(' / ')}.`);
   }
 
+  // ---------- traffic signals what it is about to do, and some drivers make room for the learner ----------
+  {
+    await start('m3'); await page.evaluate(() => { window.__target = 31; }); await frames(100);
+    const sig = await page.evaluate(() => { const a = window.cambridgeDrive, seen = new Map(); let changes = 0, signalled = 0, indicating = 0, flashing = 0;
+      for (let t = 0; t < 1200; t++) { a.frame(0.05);
+        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway') continue; const was = seen.get(c);
+          if (was && was.lane !== c.lane && was.e === c.e && c.traits?.signals) { changes++; if (was.ind) signalled++; } // (the few who never signal aside)
+          seen.set(c, { lane: c.lane, e: c.e, ind: c.ind });
+          if (c.ind) { indicating++; const g = c.mesh.getObjectByName('indicators'); if (g && (g.userData.L.visible || g.userData.R.visible)) flashing++; } } }
+      return { changes, signalled, indicating, flashing }; });
+    assert.ok(sig.changes > 0, 'no traffic changed lane in a minute');
+    assert.equal(sig.signalled, sig.changes, `${sig.signalled} of ${sig.changes} lane changes by drivers who signal were signalled first`);
+    assert.ok(sig.flashing > 0 && sig.flashing < sig.indicating, 'indicators should flash, on and off');
+    // the learner signals right with a courteous driver just behind in the next lane: it drops back
+    const room = await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player;
+      const c = a.traffic.cars.find(c => c.alive && c.traits && c.e.way.cls === 'motorway'); if (!c) return null;
+      c.traits.courtesy = true; c.traits.signals = true;
+      const fx = -Math.sin(c.th), fz = -Math.cos(c.th), lx = fz, lz = -fx; // c's left
+      // put the learner one lane to the car's left, 12 m ahead, at the car's speed, signalling right
+      p.place(c.x + fx * 12 + lx * 3.65, c.z + fz * 12 + lz * 3.65, c.th); p.v = c.v; if (p.indicator !== 'R') p.signal('R');
+      const v0 = c.v; window.__target = c.v; for (let i = 0; i < 60; i++) a.step(1);
+      const r = { v0, v1: c.v, yielding: !!c.yielding }; p.signal('R'); return r; });
+    assert.ok(room && room.yielding && room.v1 < room.v0 - 1.5, 'a courteous driver should drop back for a learner signalling into its lane: ' + JSON.stringify(room));
+    console.log(`Signals: ${sig.signalled} of ${sig.changes} lane changes signalled first; a courteous driver dropped from ${(room.v0 * 2.237).toFixed(0)} to ${(room.v1 * 2.237).toFixed(0)} mph to let the learner in.`);
+  }
+
   // ---------- leaving at a junction: a route back onto the circuit is built from wherever you are ----------
   {
     await start('m3'); await frames(20);
