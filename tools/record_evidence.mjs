@@ -35,6 +35,30 @@ const installDriver = (page) => page.evaluate(() => {
     return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1.0 ? Math.min(1, (p.v - want) / 6) : 0, steer: Math.max(-1, Math.min(1, ang * 3)) };
   });
 });
+// The Bot lab's own reference driver (js/bots.js), the one test:bots runs every lesson with, driving here
+// in the open application instead of the lab.
+const installBot = (page, lesson) => page.addScriptTag({ type: 'module', content: `
+  import { makeDriver } from '/js/bots.js';
+  const a = window.cambridgeDrive, lesson = ${JSON.stringify(lesson)};
+  const drive = makeDriver({ get A() { return { test: a.test, traffic: a.traffic, net: a.net }; }, player: a.player, lesson: () => lesson,
+    scenarioStatus: () => null, scenarioPhase: () => null, estopBanner: () => false, operate: () => {}, gear: () => {}, lanePoint: (s) => a.lanePoint(s),
+    look: (view = 'all-round') => { a.player.lookAt = a.traffic.clock; a.player.observations.push({ view, at: a.traffic.clock, x: a.player.x, z: a.player.z }); } });
+  a.addInput(() => drive()); window.__botReady = true;` }).then(() => page.waitForFunction(() => window.__botReady));
+// The browser check's scriptable driver (tests/motorway-lessons-browser.mjs): the route's line offset by
+// window.__mw.lane lanes, moving across at half a lane a second towards .want, at .mph. It looks and
+// signals only when told to, which is how the careless drives are made.
+const installScripted = (page) => page.evaluate(() => {
+  const a = window.cambridgeDrive, p = a.player; window.__mw = { lane: 0, want: 0, mph: 60 };
+  a.addInput(() => { const M = window.__mw, t = a.test; if (!t.running) return null;
+    M.lane += Math.sign(M.want - M.lane) * Math.min(Math.abs(M.want - M.lane), 0.025);
+    const q = a.lanePoint(Math.min(t.route.len, t.sRoute + 25)), off = M.lane * 3.65, x = q.x - q.tz * off, z = q.z + q.tx * off, want = M.mph * 0.44704;
+    let ang = Math.atan2(-(x - p.x), -(z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
+    return { throttle: p.v < want - 0.3 ? 1 : 0, brake: p.v > want + 0.6 ? Math.min(1, (p.v - want) / 4) : 0, steer: Math.max(-1, Math.min(1, ang * 2)) }; });
+});
+// run the simulation without drawing until the predicate (a function source run in the page) holds
+const ffUntil = (page, pred, maxSeconds = 600) => page.evaluate(([src, max]) => { const f = new Function('a', 'return (' + src + ')(a)'), a = window.cambridgeDrive;
+  for (let i = 0; i < max * 20; i += 10) { if (f(a)) return true; a.step(10); } return false; }, [pred.toString(), maxSeconds]);
+const fw = `(a, c) => { const p = a.player; return (c.x - p.x) * -Math.sin(p.th) + (c.z - p.z) * -Math.cos(p.th); }`;
 const startDrive = (page, kind, id) => page.evaluate(async ([k, i]) => { const a = window.cambridgeDrive; a.manual(true); await a.pick(k, i, true); a.manual(true); }, [kind, id]);
 const camera = (page, n) => page.evaluate(n => window.cambridgeDrive.setCam(n), n);
 // put the car on the route, s metres in, at speed v
@@ -55,7 +79,7 @@ const nextExit = (page, after) => page.evaluate(after => {
 }, after);
 
 // ---------- recording ----------
-async function clip(page, dir, name, seconds, script) {
+async function clip(page, dir, name, seconds, script, speed = 1) {
   const file = path.join(dir, name + '.mp4');
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-i', '-',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', file], { stdio: ['pipe', 'inherit', 'inherit'] });
@@ -65,7 +89,7 @@ async function clip(page, dir, name, seconds, script) {
   await page.evaluate(([dt, n]) => { for (let i = 0; i < n; i++) window.cambridgeDrive.frame(dt); }, [DT, FPS]); await page.waitForTimeout(300);
   for (let f = 0; f < frames; f++) {
     await script?.(f / FPS, f);
-    await page.evaluate(dt => window.cambridgeDrive.frame(dt), DT);
+    await page.evaluate(([dt, n]) => { for (let i = 0; i < n; i++) window.cambridgeDrive.frame(dt); }, [DT, speed]);
     const jpg = await page.screenshot({ type: 'jpeg', quality: 82 });
     if (!ff.stdin.write(jpg)) await new Promise(r => ff.stdin.once('drain', r));
   }
@@ -105,6 +129,36 @@ const GROUPS = {
   },
 };
 
+GROUPS.lanes = {
+  dir: 'docs/evidence/7-motorway-lane-discipline',
+  title: 'Motorway lane discipline, overtaking and following (issue #7)',
+  driverNote: 'The careful drives use the Bot lab\'s reference driver (`js/bots.js`, the one `npm run test:bots` checks every lesson with); the careless one uses the scriptable driver from `npm run test:motorway`.',
+  clips: [
+    { name: '01-overtake-and-move-back', driver: 'bot', lesson: { id: 'mw-keep-left', scenario: 'motorway' }, seconds: 45,
+      caption: 'Keep left, overtake, move back (three lanes). Once the faster car in the middle lane has gone by, catching a slower vehicle: right mirror and a look over the shoulder, signal, out into a clear lane, past, and back to the left once the vehicle passed is more than two seconds behind. The lane strip by the instruction box shows the lanes that are right for you (amber) and the one you are in (marked underneath).',
+      // from just after the faster car in the middle lane has gone by (the driver rightly waits for it)
+      async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await camera(p, 0); await ffUntil(p, `a => a.traffic.cars.some(c => c.alive && c.lane === 1 && (${fw})(a, c) > 5)`); } },
+    { name: '02-waiting-for-a-safe-gap', driver: 'bot', lesson: { id: 'mw-busy-lane', scenario: 'motorway' }, seconds: 52,
+      caption: 'Overtaking when the next lane is busy (two lanes). A lorry ahead and a stream of faster cars passing on the right: the driver drops back to two seconds behind the lorry and waits, then goes once the stream has passed and the next car is far enough back that nobody has to brake.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-busy-lane'); await camera(p, 0); } },
+    { name: '03-following-as-traffic-slows', driver: 'bot', lesson: { id: 'mw-following', scenario: 'motorway' }, seconds: 45,
+      caption: 'Following distance at 70. The traffic in every lane slows from 60 to about 42 mph and speeds up again; the driver stays at least two seconds behind the car ahead the whole way and does not dive into the next lane, which is moving no faster.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-following'); await camera(p, 0); await ffUntil(p, 'a => a.traffic.clock > 15', 30); } },
+    { name: '04-across-three-lanes-for-an-exit', driver: 'bot', lesson: { id: 'mw-exit-prep', scenario: 'motorway' }, seconds: 40, speed: 2,
+      caption: 'Getting into lane for your exit. From the right-hand lane with traffic in the other two: one lane at a time, settling in each, easing off to drop into a gap rather than forcing one, in the left-hand lane well before the 300-yard point, then off along the slip road. The instruction box counts down to J2 · Ashwell.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-exit-prep'); await camera(p, 0); } },
+    { name: '05-careless-pull-out-and-what-it-is-marked-for', driver: 'scripted', seconds: 20,
+      caption: 'The careless version of clip 2: straight out without a mirror check or a signal, just as the first of the faster cars arrives. Then the result, with every fault named for what it was, and the lane change itemised in the feedback.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-busy-lane'); await camera(p, 0); await p.evaluate(() => { window.__mw.mph = 55; });
+        await ffUntil(p, `a => a.traffic.cars.some(c => c.alive && c.lane === 1 && (${fw})(a, c) > -24 && (${fw})(a, c) < -14)`, 60); },
+      script: (p) => { const go = once(() => p.evaluate(() => Object.assign(window.__mw, { want: 1, mph: 60 })));
+        const end = once(() => p.evaluate(() => { const a = window.cambridgeDrive; window.__mw.want = 0; for (let i = 0; i < 4000 && !a.test.done; i++) a.step(1); }));
+        return async t => { await at(t, 1, go); await at(t, 11, end); }; } },
+    { name: '06-feedback-after-a-careful-run', driver: 'bot', lesson: { id: 'mw-keep-left', scenario: 'motorway' }, seconds: 8,
+      caption: 'The result after the careful run of clip 1: passed, nothing marked, and the feedback itemises each lane change with what was checked first and the gap it was made into, how long was spent out of the left-hand lane and why.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-keep-left'); await ffUntil(p, 'a => a.test.done', 400); } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
@@ -126,18 +180,19 @@ try {
     await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv')?.hidden, {}, { timeout: 45000 }); await signedIn(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' });
     await page.waitForTimeout(5000); // let the car models arrive, so nothing on the road is still a box
-    await installDriver(page);
+    if (c.driver === 'bot') await installBot(page, c.lesson); else if (c.driver === 'scripted') await installScripted(page); else await installDriver(page);
     const ctx = {};
     await c.setup(page, ctx);
-    made.push({ ...c, ...(await clip(page, group.dir, c.name, c.seconds, c.script?.(page, ctx))) });
+    made.push({ ...c, ...(await clip(page, group.dir, c.name, c.seconds, c.script?.(page, ctx), c.speed || 1)) });
     if (errors.length) throw new Error(`${c.name}: ${errors.join('; ')}`);
     await page.close();
   }
   if (!process.argv[3]) {
     const lines = [`# ${group.title}`, '', `Recorded with \`node tools/record_evidence.mjs ${process.argv[2]}\` on ${new Date().toISOString().slice(0, 10)}: the real application,`,
-      `stepped at ${FPS} frames a second and captured frame by frame, so each clip plays at true speed. The car is driven by the`,
-      'same steady driver the browser checks use.', ''];
-    for (const m of made) lines.push(`## ${m.name.replace(/^\d+-/, '').replace(/-/g, ' ').replace(/^./, c => c.toUpperCase())}`, '', m.caption, '', `[${m.file}](${m.file}) · ${m.seconds} s · ${m.mb} MB`, '');
+      `stepped at ${FPS} frames a second and captured frame by frame, so each clip plays at true speed unless it says otherwise.`,
+      group.driverNote || 'The car is driven by the same steady driver the browser checks use.', ''];
+    for (const m of made) lines.push(`## ${m.name.replace(/^\d+-/, '').replace(/-/g, ' ').replace(/^./, c => c.toUpperCase())}`, '', m.caption, '',
+      `[${m.file}](${m.file}) · ${m.seconds} s${m.speed > 1 ? ` (${m.seconds * m.speed} s of driving at ${m.speed}× speed)` : ''} · ${m.mb} MB`, '');
     fs.writeFileSync(path.join(group.dir, 'README.md'), lines.join('\n'));
   }
 } finally { await browser?.close(); server.kill(); }

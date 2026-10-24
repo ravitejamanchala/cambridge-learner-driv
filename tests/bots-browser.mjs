@@ -45,6 +45,7 @@ try{
  for(const r of runs){
   console.log(` ${r.end==='done'?(r.pass?'pass':'fail'):'STUCK'.padEnd(4)}  ${r.key.padEnd(26)} ${String(r.reached).padStart(5)}/${String(r.len).padEnd(5)} m  D${r.D} S${r.S}  ${r.end}${r.why?'  '+r.why.slice(0,70):''}`);
   if(!r.pass&&r.cats?.length) console.log(`         ${[...new Set(r.cats)].join(' · ')}`);
+  if((!r.pass||process.env.BOT_VERBOSE)&&r.where?.length) for(const [kind,text,x,z] of r.where) console.log(`           ${kind} ${text} (x ${x}, z ${z})`);
  }
  console.log(`\n${runs.length} drives · ${runs.filter(r=>r.pass).length} passed · ${bad.length} did not finish${known.length?` · ${known.length} known stall(s): ${known.map(r=>r.key).join(', ')}`:''}`);
  // a known stall that starts finishing is good news, but the list should be trimmed
