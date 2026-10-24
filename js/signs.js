@@ -3,6 +3,7 @@
 // speed-limit roundels and terminal signs where the limit changes, no-entry signs on one-way streets,
 // and lane arrows on multi-lane approaches.
 import { along, laneInfo, laneCentre, stopsNear, nearest, laneArrows } from './net.js';
+import { giveWayDist } from './markings.js';
 
 const T = THREE;
 const RANK = { motorway: 7, motorway_link: 6.5, trunk: 6, trunk_link: 5.5, primary: 5, primary_link: 4.5, secondary: 4, secondary_link: 3.5, tertiary: 3, tertiary_link: 2.5, unclassified: 2, residential: 1, living_street: 0 };
@@ -95,7 +96,7 @@ export function buildSigns(scene, net) {
       quad([[a.x + nx * o, a.z + nz * o], [a.x + nx * b2, a.z + nz * b2], [a.x + nx * b2 - a.tx * th, a.z + nz * b2 - a.tz * th], [a.x + nx * o - a.tx * th, a.z + nz * o - a.tz * th]]);
     }
   };
-  const hasDataGW = new Set(net.giveways.map(g => g.e.id));
+  const hasDataGW = new Set(net.giveways.map(g => g.e.id + ':' + g.dir)); // per approach: a line at one end of a road is not one at the other
   const miniAt = (v) => net.minis.some(m => Math.hypot(m.x - net.nx[v], m.z - net.nz[v]) < 10);
   const sigAt = (v) => stopsNear(net, net.nx[v], net.nz[v]).some(s => Math.hypot(s.x - net.nx[v], s.z - net.nz[v]) < 32);
   const arriveDir = (o) => -o.dir; // o.dir leaves the node; arriving travel is the opposite
@@ -118,11 +119,10 @@ export function buildSigns(scene, net) {
       const continues = others.some(p => Math.abs(turn(tin, tangentOut(p))) < 0.5 && !p.e.way.rb);
       const minor = hasRb || mini || r < maxO || (r === maxO && !continues);
       const ad = arriveDir(o), e = o.e;
-      const majorW = Math.max(...others.map(p => p.e.way.w));
-      let stopDist = hasRb ? majorW / 2 + 0.8 : majorW / 2 + 1.0;
+      const stopDist = giveWayDist(net, v, e); // where every give-way line at a junction sits (js/markings.js)
       if (!signals && minor && e.len > stopDist + 4) {
         const ts = e.len - stopDist;
-        if (!hasDataGW.has(e.id)) giveWayLine(e, ts, ad);
+        if (!hasDataGW.has(e.id + ':' + ad)) giveWayLine(e, ts, ad);
         if (ts > 18) paint(B.tri, e, ts - 14, ad, laneCentre(e, ad, 0), 1.6, 3.6);
         if (hasRb && ts > 40) paint(B.slow, e, ts - 32, ad, laneCentre(e, ad, 0), 1.6, 4.2);
         if (hasRb || mini || maxO >= 3) signAt(B.gwSign, B.triBack, e, ts + 0.3, ad, e.way.w / 2 + 0.7, 0.9);

@@ -1,4 +1,5 @@
 // Road network: decodes the map file, answers "where am I on the road?", routes, and writes examiner instructions.
+import { isJunction, giveWayDist, toNode, facedNode } from './markings.js';
 
 const CELL = 40;
 const ck = (cx, cz) => (cx + 4000) * 8192 + (cz + 4000);
@@ -67,6 +68,10 @@ export function buildNet(d) {
   net.stopsByEdge = new Map(); net.zebrasByEdge = new Map();
   for (const s of net.stops) push(net.stopsByEdge, s.e.id, s);
   for (const z of net.zebras) push(net.zebrasByEdge, z.e.id, z);
+  // KEEP CLEAR across the lanes of one direction, centred `s` along the edge and `len` long; only where a
+  // map or layout configures it, never by rule (issue #4)
+  net.keepClear = (d.keepClear || []).map(([ei, s, dir, len]) => feature(net, { e: edges[ei], s: s / 10, dir, len: (len || 100) / 10 }));
+  tidyJunctionLines(net);
   net.fillets = junctionFillets(net);
   net.stopGrid = new Map();
   for (const s of net.stops) push(net.stopGrid, ck(Math.floor(s.x / CELL), Math.floor(s.z / CELL)), s);
@@ -130,6 +135,33 @@ export function inFillet(net, x, z) {
   return false;
 }
 function push(m, k, v) { let a = m.get(k); if (!a) m.set(k, a = []); a.push(v); }
+// Give-way and stop lines at the mouth of the junction they serve, one per approach (issue #4). Lines from
+// the map that sat inside the other carriageway, or a few metres back from where a learner would stop,
+// move to the mouth; a second line on the same approach (the map had both ends of a bell-mouth) is
+// dropped, so a learner is never marked twice for one junction. Surveyed stop lines (the `stop` flag)
+// stay where they were seen unless that is inside the junction, as do traffic-light stop lines.
+function tidyJunctionLines(net) {
+  const kept = [], byApproach = new Map();
+  for (const g of net.giveways) {
+    const v = facedNode(g);
+    if (isJunction(net, v)) {
+      const want = giveWayDist(net, v, g.e), now = toNode(g);
+      const to = g.stop ? Math.max(now, want) : Math.abs(now - want) < 15 ? want : now;
+      if (to !== now && to < g.e.len - 0.5) { g.s = g.dir > 0 ? g.e.len - to : to; feature(net, g); }
+    }
+    const k = g.e.id + ':' + g.dir, same = (byApproach.get(k) || []).find(h => Math.abs(h.s - g.s) < 3);
+    if (same) { if (g.stop && !same.stop) Object.assign(same, { stop: true }); continue; }
+    push(byApproach, k, g); kept.push(g);
+  }
+  net.giveways = kept;
+  net.giveByEdge = new Map(); for (const g of kept) push(net.giveByEdge, g.e.id, g);
+  for (const st of net.stops) {
+    const v = facedNode(st); if (st.single || !isJunction(net, v)) continue;
+    const want = giveWayDist(net, v, st.e);
+    if (toNode(st) < want - 0.7 && want < st.e.len - 0.5) { st.s = st.dir > 0 ? st.e.len - want : want; feature(net, st); }
+  }
+}
+
 function feature(net, f) {
   const p = posAt(f.e, f.s);
   f.x = p.x; f.z = p.z; f.tx = p.tx * f.dir; f.tz = p.tz * f.dir; f.w = f.e.way.w;

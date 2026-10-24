@@ -2,6 +2,7 @@
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
 import { posAt, laneInfo, nearest, paved } from './net.js';
+import { lineDashes } from './markings.js';
 import { MW, JUNCTIONS, centreLine, sampleAt, circuitLength } from './motorway.js';
 import { buildChunkContent, kitResources } from './city.js';
 import { buildSigns, setSignsLit } from './signs.js';
@@ -104,28 +105,9 @@ export function buildWorld(scene, net, traffic) {
     if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
       const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
-    if (!wy.rb && e.len > 5) {
-      // How far the markings stay clear of the junction at each end. A road is cut into an edge per
-      // junction, so a fixed clearance left every short edge bare: a stretch of Hills Road 12 m long
-      // got no centre line at all, and the road looked unmarked between two marked stretches.
-      const clear = (want) => Math.min(want, e.len * 0.28);
-      // lane dividers within each direction: dashed, then long solid-looking dashes on the last 30 m before a junction
-      for (const dir of wy.oneway ? [1] : [1, -1]) {
-        const L = laneInfo(e, dir), c = clear(8);
-        for (let k = 1; k < L.n; k++) {
-          const o = (L.outer - L.laneW * k) * dir;
-          for (let s = c; s + 1.2 < e.len - c; s += 9) {
-            const toEnd = dir > 0 ? e.len - s : s; // distance to the junction you are driving towards
-            dash(white, e, s, Math.min(toEnd < 38 ? 7 : 3, e.len - c - s), o, 0.07);
-          }
-        }
-      }
-      // centre line on two-way main roads, kept clear of junctions
-      if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2)) {
-        const c = clear(9);
-        for (let s = c; s + 1.2 < e.len - c; s += 9) dash(white, e, s, Math.min(3.2, e.len - c - s), 0, 0.07);
-      }
-    }
+    // lane dividers and centre line: they stop at the give-way or stop line of a junction and carry on
+    // through bends and lane changes (js/markings.js)
+    for (const d of lineDashes(net, e)) dash(white, e, d.s, d.len, d.off, 0.07);
     // cycle lanes: red surface, solid edge line if mandatory, long dashes if advisory, bike symbols
     for (const [code, side] of [[wy.cl, 1], [wy.cr, -1]]) {
       if ((code !== 1 && code !== 2) || e.len < 6) continue;
@@ -149,6 +131,24 @@ export function buildWorld(scene, net, traffic) {
       const o2 = Math.min(o + 0.5, z.w / 2 - 0.2), nx = z.tz, nz = -z.tx;
       white.quad(z.x + nx * o - z.tx * 1.6, z.z + nz * o - z.tz * 1.6, z.x + nx * o2 - z.tx * 1.6, z.z + nz * o2 - z.tz * 1.6, z.x + nx * o2 + z.tx * 1.6, z.z + nz * o2 + z.tz * 1.6, z.x + nx * o + z.tx * 1.6, z.z + nz * o + z.tz * 1.6, 0.07);
     }
+  }
+  // KEEP CLEAR (diagram 1026) across the lanes of one direction, only where configured: the words read
+  // from the approaching driver, KEEP nearest, elongated as road text is so it reads at a shallow angle
+  const keepClear = [], textMats = [];
+  for (const k of net.keepClear || []) {
+    const L = laneInfo(k.e, k.dir);
+    for (let i = 0; i < L.n; i++) {
+      const off = (L.outer - L.laneW * (i + 0.5)) * k.dir, w = Math.min(2.6, L.laneW - 0.5);
+      for (const [word, at] of [['KEEP', -1.6], ['CLEAR', 1.6]]) {
+        const p = posAt(k.e, Math.max(0, Math.min(k.e.len, k.s + at * k.dir))), tx = p.tx * k.dir, tz = p.tz * k.dir;
+        keepClear.push({ word, x: p.x + p.tz * off, z: p.z - p.tx * off, yaw: Math.atan2(-tx, -tz), w });
+      }
+    }
+  }
+  if (keepClear.length) {
+    const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    const mats = {}; for (const word of ['KEEP', 'CLEAR']) textMats.push(mats[word] = new T.MeshBasicMaterial({ map: roadText(word), transparent: true, depthWrite: false }));
+    for (const k of keepClear) { const m = new T.Mesh(g, mats[k.word]); m.position.set(k.x, 0.08, k.z); m.rotation.y = k.yaw; m.scale.set(k.w, 1, 2.4); m.renderOrder = 5; m.userData.keepClear = k.word; scene.add(m); }
   }
   // Dutch-style roundabouts: red cycle track round the outside with white "elephant's footprint" edges where it crosses the roads
   const annulus = (acc, ring, r0, r1, y) => { const N = 96; for (let i = 0; i < N; i++) { const a0 = i / N * 2 * Math.PI, a1 = (i + 1) / N * 2 * Math.PI, P = (r, a) => [ring.x + r * Math.sin(a), ring.z - r * Math.cos(a)];
@@ -329,6 +329,7 @@ export function buildWorld(scene, net, traffic) {
     sun.color.setHex(dusk ? DUSK.sun.colour : 0xffe4c2); sun.intensity = dusk ? DUSK.sun.intensity : 0.92;
     if (dusk) SUN_OFF.set(...DUSK.sun.offset); else SUN_OFF.copy(SUN_DAY);
     wm.color.setHex(dusk ? DUSK.lines : W.line);
+    for (const m of textMats) m.color.setHex(dusk ? DUSK.lines : 0xffffff); // road text dims with the lines
     studsOn = dusk; updateStuds(studAt.x, studAt.z);
     if (lighting.heads) { lighting.heads.material.color.setHex(dusk ? 0xffe2a8 : 0x5a5f63); lighting.pools.visible = dusk && !lowPower; }
     setSignsLit(dusk);
@@ -405,6 +406,15 @@ function dash(acc, e, s, len, off, y, half = 0.07) {
   const ax = a.x + a.tz * off, az = a.z - a.tx * off, bx = b.x + b.tz * off, bz = b.z - b.tx * off;
   const nx = a.tz * half, nz = -a.tx * half;
   acc.quad(ax + nx, az + nz, ax - nx, az - nz, bx - nx, bz - nz, bx + nx, bz + nz, y);
+}
+// a word of road text, white on clear, drawn tall and narrow: laid flat and seen from a driver's eye it
+// foreshortens back to normal proportions
+function roadText(word) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');
+  g.fillStyle = '#f2f2ec'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `bold ${word.length > 4 ? 120 : 150}px Arial, sans-serif`;
+  g.save(); g.translate(128, 256); g.scale(1, 3.2); g.fillText(word, 0, 0); g.restore();
+  const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
 }
 function bikeTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
