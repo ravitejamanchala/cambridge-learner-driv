@@ -43,11 +43,13 @@ export function attachLamps(body) {
 // material for all of them.
 let IND = null;
 export function attachIndicators(body) {
-  IND = IND || { geo: new T.BoxGeometry(0.16, 0.09, 0.09), mat: new T.MeshBasicMaterial({ color: 0xffa31a }) };
+  // larger than life: on screen a real-sized lamp is a pixel or two at 30 m,
+  // and seeing which way a vehicle is about to go is the point of them
+  IND = IND || { geo: new T.BoxGeometry(0.3, 0.17, 0.14), mat: new T.MeshBasicMaterial({ color: 0xffa31a }) };
   const box = new T.Box3().setFromObject(body); if (!isFinite(box.min.x)) return null;
   const g = new T.Group(); g.name = 'indicators';
-  const y = box.min.y + (box.max.y - box.min.y) * 0.42, x = (box.max.x - box.min.x) / 2 - 0.06, L = new T.Group(), R = new T.Group();
-  for (const [side, sx] of [[L, -x], [R, x]]) for (const z of [box.min.z + 0.05, box.max.z - 0.05]) { const m = new T.Mesh(IND.geo, IND.mat); m.position.set(sx, y, z); side.add(m); }
+  const y = box.min.y + (box.max.y - box.min.y) * 0.42, x = (box.max.x - box.min.x) / 2 - 0.1, L = new T.Group(), R = new T.Group();
+  for (const [side, sx] of [[L, -x], [R, x]]) for (const z of [box.min.z + 0.04, box.max.z - 0.04]) { const m = new T.Mesh(IND.geo, IND.mat); m.position.set(sx, y, z); side.add(m); }
   L.visible = R.visible = false; g.add(L, R); g.userData = { L, R }; body.add(g);
   return g;
 }

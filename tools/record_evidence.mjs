@@ -28,7 +28,9 @@ const installDriver = (page) => page.evaluate(() => {
     return pts[k];
   };
   a.addInput(() => {
-    const q = aim(), fx = -Math.sin(p.th), fz = -Math.cos(p.th);
+    // window.__lat moves the aim that many lanes to the right of the route's lane (a lane change)
+    let q = aim(); const off = (window.__lat || 0) * 3.65; if (off && q.tx != null) q = { x: q.x - q.tz * off, z: q.z + q.tx * off };
+    const fx = -Math.sin(p.th), fz = -Math.cos(p.th);
     let want = window.__target;
     for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
       if (f > 0 && f < Math.max(20, p.v * 2.2) && Math.abs(dx * fz - dz * fx) < 2.2) want = Math.min(want, c.v - (f < p.v * 1.6 ? 2 : 0)); }
@@ -293,6 +295,17 @@ GROUPS.handling = {
     { name: '07-marked-on-medium', driver: 'bot', lesson: { id: 'turn-left' }, seconds: 40, speed: 2,
       caption: 'Turning left, marked on Medium (chosen in the lesson panel before starting): the result shows two stars and says it was marked on Medium. Hard earns three and is the real test\'s standard.',
       async setup(p) { await p.evaluate(() => localStorage.setItem('cambridge-learner-drive.mode', 'medium')); await startDrive(p, 'lesson', 'turn-left'); await camera(p, 0); } },
+    { name: '08-traffic-signals-before-it-moves', seconds: 30, caption: 'Free drive at 55 mph in the left-hand lane, in the chase view: vehicles coming up behind signal right before they pull out to pass, and signal left before they move back in, so you can see where each one is going.',
+      async setup(p) { await startDrive(p, 'free', 'm3'); await p.evaluate(() => { window.__target = 24.5; window.cambridgeDrive.step(20 * 40); }); await camera(p, 0); } },
+    { name: '09-a-courteous-driver-lets-you-in', seconds: 16, caption: 'The learner, at 60 mph in the left-hand lane, checks the mirror and signals right with a car alongside in the next lane. That driver is one of the courteous half: it eases off and drops back to leave a gap, and the learner moves across into it. (For the clip, a driver whose drawn trait is courtesy was moved up beside the learner; the other half hold their speed.)',
+      async setup(p) { await startDrive(p, 'free', 'm3'); await p.evaluate(() => { const a = window.cambridgeDrive, pl = a.player; window.__target = 27; window.__lat = 0; a.step(20 * 30);
+        // move one of the courteous drivers alongside the learner in the next lane, keeping its own traits
+        const c = a.traffic.cars.find(c => c.alive && c.kind === 'car' && c.traits?.courtesy), traits = c.traits, x = a.test.ctx, dir = x.dir ?? 1;
+        const along = dir > 0 ? x.s : x.e.len - x.s; a.traffic.placeCar(c, x.e, dir, along + 1, pl.v, pl.v / (x.e.way.mph * 0.447), null, 1); // cruising at the learner's speed
+        Object.assign(c, { traits, scripted: false, pinned: 0 }); }); await camera(p, 0); },
+      script: (p) => { const signal = once(() => p.evaluate(() => { const a = window.cambridgeDrive; a.player.observations.push({ view: 'right', at: a.traffic.clock, x: a.player.x, z: a.player.z }); if (a.player.indicator !== 'R') a.player.signal('R'); })),
+        move = once(() => p.evaluate(() => { window.__lat = 1; })), off = once(() => p.evaluate(() => { const pl = window.cambridgeDrive.player; if (pl.indicator) pl.signal(pl.indicator); }));
+        return async t => { await at(t, 0.5, signal); await at(t, 5, move); await at(t, 10, off); }; } },
   ],
 };
 const group = GROUPS[process.argv[2]];
