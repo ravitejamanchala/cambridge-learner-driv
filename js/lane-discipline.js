@@ -259,7 +259,7 @@ export function senseMotorway({ t, dt, player, test, traffic, net = null, exitIn
     const slip = c.e.way.cls !== 'motorway'; if (slip && !joiningCar(c)) return;
     const dx = c.x - player.x, dz = c.z - player.z, fw = dx * fx + dz * fz;
     if (Math.abs(fw) > 300 || Math.abs(dx * fz - dz * fx) > lanes * 3.65 + (slip ? 12 : 2)) return;
-    others.push({ id, lane: slip ? -1 : c.lane, fw, v: c.v });
+    others.push({ id, lane: slip ? -1 : c.lane, fw, v: c.v, into: c.intent ? c.intent.to : null }); // into: the lane it is signalling to move into
   });
   return { t, dt, v: Math.max(0, player.v), vSigned: player.v, laneF, lanes, indicator: player.indicator || null, looks: player.observations || [], others, exitIn, joining, leaving, mergeIn };
 }

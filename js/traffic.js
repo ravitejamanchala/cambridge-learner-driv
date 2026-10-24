@@ -297,7 +297,16 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     a.ind = ind;
   }
   function keepLeft(a, dt, others, fx, fz) {
+    // part-way across and someone else has moved into the space alongside (two lanes merging into one gap):
+    // a driver gives up and drifts back, as people do
+    if (a.lane !== Math.round(a.laneF ?? a.lane) && a.prevLane != null && !a.aborted) {
+      const d = laneCentre(a.e, a.dir, a.lane) - offsetFor(a, a.e, a.dir);
+      if (others.some(o => o !== a && o.alive !== false && o.kind !== 'bike' && Math.cos((o.th || 0) - a.th) > 0.8 && (() => { const rx = o.x - a.x, rz = o.z - a.z, fw = rx * fx + rz * fz, lat = rx * fz - rz * fx;
+        return fw > -8 && fw < 10 && Math.abs(lat - d) < 1.6 && Math.sign(lat || d) === Math.sign(d); })())) { a.lane = a.prevLane; a.aborted = true; }
+      return;
+    }
     a.lcT = (a.lcT || 0) - dt; if (a.lcT > 0 || a.lane !== Math.round(a.laneF ?? a.lane)) return;
+    a.aborted = false;
     a.lcT = a.intent ? 0.1 : 0.5;
     const w = a.e.way, n = laneInfo(a.e, a.dir).n, rem = a.e.len - a.s;
     // only on motorways and fast dual carriageways: in town the lanes lead to lane arrows and junctions,
@@ -317,7 +326,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const slowerAhead = (l, within) => inLane(l, 0, within).some(h => h.fwd > 4 && Math.abs(h.o.v) < want - 2.5);
     // A driver signals first and moves only when the signal has been on a moment (1.5 to 3 s, by driver)
     // and the gap is still there: so the learner can see what the vehicle is about to do.
-    const intend = (to) => { if (a.intent && a.intent.to === to) { if (clock >= a.intent.at && clear(to)) { a.lane = to; a.intent = null; } else if (!clear(to) && clock > a.intent.at + 4) a.intent = null; return true; }
+    const intend = (to) => { if (a.intent && a.intent.to === to) { if (clock >= a.intent.at && clear(to)) { a.prevLane = a.lane; a.lane = to; a.intent = null; } else if (!clear(to) && clock > a.intent.at + 4) a.intent = null; return true; }
       a.intent = { to, at: clock + (a.traits?.wait ?? 2) }; return true; };
     // courtesy: a learner coming down a slip road beside the left-hand lane, and the next lane clear
     const makeRoom = mw && a.lane === 0 && a.traits?.courtesy && playerOnSlip && player && (() => { const f = (player.x - a.x) * fx + (player.z - a.z) * fz; return f > -30 && f < 140; })();

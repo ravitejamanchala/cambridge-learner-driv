@@ -205,12 +205,13 @@ function motorwayPlan(api, st, t, pl, tr) {
   const M = st.mw; M.clock = tr.clock;
   const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
   const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
-  const inLane = l => f.others.filter(o => o.lane === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
+  // a vehicle signalling to move into a lane counts as in it: a careful driver waits for it rather than meeting it there
+  const inLane = l => f.others.filter(o => o.lane === l || o.into === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
   // a gap nobody has to brake for: well clear of anything behind (more when moving back in, so as never
   // to cut in), clear of anything alongside, and not on the tail of anything ahead
   const safeInto = (l, back) => l >= 0 && l < f.lanes && inLane(l).every(o => {
     if (Math.abs(o.fw) < 7) return false;
-    if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > (back ? 2.2 : 1.6) && (close <= 0.3 || d / close > 6); }
+    if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > (back ? 1.5 : 1.6) && (close <= 0.3 || d / close > 6); }
     return (o.fw - CAR) / v > 1.6 || o.v > pl.v + 1;
   });
   const look = (dir) => { const vs = dir > 0 ? ['right', 'blindspot'] : ['left', 'left-blindspot'];
@@ -232,7 +233,7 @@ function motorwayPlan(api, st, t, pl, tr) {
       // getting across for an exit: pick the gap in the lane you need and match its speed to drop into it
       const cars = inLane(want), gaps = [];
       for (let g = 0; g <= cars.length; g++) {
-        const b = cars[g - 1], a = cars[g], lo = b ? b.fw + CAR + 2.3 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
+        const b = cars[g - 1], a = cars[g], lo = b ? b.fw + CAR + 1.6 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
         if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? cruise });
       }
       const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];

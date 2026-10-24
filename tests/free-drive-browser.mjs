@@ -102,7 +102,8 @@ try {
     assert.ok(sig.flashing > 0 && sig.flashing < sig.indicating, 'indicators should flash, on and off');
     // the learner signals right with a courteous driver just behind in the next lane: it drops back
     const room = await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player;
-      const c = a.traffic.cars.find(c => c.alive && c.traits && c.e.way.cls === 'motorway'); if (!c) return null;
+      // a car at motorway speed with a lane to its left for the learner to signal from
+      const c = a.traffic.cars.find(c => c.alive && c.traits && c.e.way.cls === 'motorway' && c.lane >= 1 && c.v > 20); if (!c) return null;
       c.traits.courtesy = true; c.traits.signals = true;
       const fx = -Math.sin(c.th), fz = -Math.cos(c.th), lx = fz, lz = -fx; // c's left
       // put the learner one lane to the car's left, 12 m ahead, at the car's speed, signalling right
