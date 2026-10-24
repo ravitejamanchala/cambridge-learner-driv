@@ -28,3 +28,11 @@ test('sign-in uses separate account data and sign-out restores untouched guest p
  Profiles.useAccount('bob',{name:'Bob',lessons:{},history:[],mocks:[],practiceSeconds:0});assert.equal(Profiles.lesson('private-lesson'),null);
  Profiles.useAccount(null);assert.equal(Profiles.current().name,'Guest');assert.equal(Profiles.lesson('guest-lesson').passed,true);assert.equal(Profiles.lesson('private-lesson'),null);
 });
+test('marking modes: a lesson keeps its best stars, and the mode it was last driven on',()=>{
+ Profiles.useAccount(null);Profiles.create('Stars');
+ Profiles.recordLesson('turn-left',{pass:true,D:1,S:0,stars:3,mode:'hard'});
+ Profiles.recordLesson('turn-left',{pass:true,D:0,S:0,stars:1,mode:'easy'});
+ Profiles.recordLesson('turn-left',{pass:false,D:9,S:1,stars:0,mode:'medium'});
+ const L=Profiles.lesson('turn-left');assert.equal(L.bestStars,3,'an easier pass or a fail never lowers the stars');assert.equal(L.lastMode,'medium');assert.equal(L.passed,true);
+ Profiles.recordMock('west',{pass:true,D:18,S:0,mode:'medium',stars:2});assert.equal(Profiles.current().mocks[0].mode,'medium');assert.equal(Profiles.current().mocks[0].stars,2);
+});

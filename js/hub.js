@@ -4,6 +4,7 @@ import { LESSONS } from './course.js';
 import { VISIBLE_LESSONS, VISIBLE_UNITS as UNITS } from './course-menu.js';
 import { hasFullAccess, canAccessPlan, isFreeLesson, needsLogin } from './access.js';
 import { TIERS, PUZZLES, starsFor } from './puzzles.js';
+import { MODES, MODE_IDS, getMode, setMode, starsOf } from './assessment.js';
 import { ROUTES } from './config.js';
 import { FREE_DRIVES, freeDrive } from './free-drive.js';
 import { Profiles } from './profile.js';
@@ -14,6 +15,9 @@ import { ICONS, LESSON_ICON, STAR } from './icons.js';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const miles = m => (m / 1609.34).toFixed(1);
+// how the next drive will be marked, chosen where it starts: Easy, Medium or Hard, one to three stars
+const modePicker = (mock) => { const cur = getMode(), m = MODES[cur];
+  return `<div class="mode-pick"><span class="muted">Marking</span><div class="seg" role="radiogroup" aria-label="Marking">${MODE_IDS.map(id => `<button data-mode="${id}" role="radio" aria-checked="${id === cur}" aria-pressed="${id === cur}">${MODES[id].title} ${'★'.repeat(MODES[id].stars)}</button>`).join('')}</div><small class="muted">${mock ? (cur === 'hard' ? 'The real test: 15 or fewer driving faults, no serious faults.' : `${m.mock.maxD} or fewer driving faults${m.mock.maxS ? ', one serious fault forgiven (never a collision)' : ', no serious faults'}. The real test is Hard.`) : m.blurb}</small></div>`; };
 const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>`;
 
 // XP: 40 per lesson passed, 15 per puzzle star, 100 per mock pass, 10 per mock attempt. 100 XP per level.
@@ -66,6 +70,7 @@ export function createHub({ meta, onPick, onStart }) {
   const anyOpen = () => [...document.querySelectorAll('.sheet')].some(s => !s.hidden && !modal(s));
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-open]'); if (o) { openSheet(o.dataset.open); return; }
+    const md = e.target.closest('[data-mode]'); if (md && md.closest('.mode-pick')) { setMode(md.dataset.mode); render(); return; }
     const c = e.target.closest('[data-close]'); if (c) { const s = c.closest('.sheet'); if (s) s.hidden = true; return; }
     if (e.target.classList && e.target.classList.contains('sheet') && !modal(e.target)) e.target.hidden = true; // tap the dim backdrop
     // a Start button starts what its own sheet shows, whatever was chosen before the sheet opened
@@ -96,14 +101,14 @@ export function createHub({ meta, onPick, onStart }) {
       const entitled=!needsLogin()&&(hasFullAccess()||isFreeLesson(l.id));
       const [txt, cls] = needsLogin()?['Sign in','locked']:!entitled?['Subscribe','locked']:access.available ? status(l.id) : ['Locked', 'locked']; n++;
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
-        <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? '<span class="tick">✓</span>' : ''}<span class="tt">${esc(l.title)}${needsLogin()?'':isFreeLesson(l.id)?' · Free':!hasFullAccess()?' · Plus':''}</span></button>`;
+        <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? `<span class="tick">${stars(starsOf(Profiles.lesson(l.id)))}</span>` : ''}<span class="tt">${esc(l.title)}${needsLogin()?'':isFreeLesson(l.id)?' · Free':!hasFullAccess()?' · Plus':''}</span></button>`;
     }).join('') + '</div>').join('');
     const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id), qz = !!l.questions;
     $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><p class="muted">${esc(l.difficulty)}${l.prerequisites.length ? ' · Prerequisites: ' + l.prerequisites.map(id => esc(LESSONS.find(x => x.id === id).title)).join(', ') : ''}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
       <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
-      <div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
+      ${qz ? '' : modePicker(false)}<div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
   $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
 
@@ -123,8 +128,8 @@ export function createHub({ meta, onPick, onStart }) {
     $('puzzleDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[z.icon]}</span><div><h3>${esc(z.title)}</h3><span class="tag" style="background:${t.colour};color:#fff">${esc(t.title)}</span> ${stars(starsFor(L))}</div></div>
       <p>${esc(z.goal)}</p><ul>${z.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(z.rule.n)}</b><span>${esc(z.rule.t)}</span></div>
-      <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · not giving way or going through a red fails it; ${t.maxD ? `otherwise up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''} allowed` : 'no other faults allowed'}. 3 stars for a clean drive.</p>
-      <div class="btns">${open ? '<button class="cbtn go" data-start>Start puzzle</button>' : `<p class="muted" style="margin:0">Locked. Solve any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} puzzle first.</p>`}</div>`;
+      <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · not giving way or going through a red fails it; ${t.maxD ? `otherwise up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''} allowed` : 'no other faults allowed'}. Stars by marking: Easy 1, Medium 2, Hard 3.</p>
+      ${open ? modePicker(false) : ''}<div class="btns">${open ? '<button class="cbtn go" data-start>Start puzzle</button>' : `<p class="muted" style="margin:0">Locked. Solve any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} puzzle first.</p>`}</div>`;
   }
   $('puzzleList').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b) return; st.kind = 'puzzle'; st.puzzle = b.dataset.z; pick(); });
 
@@ -137,9 +142,9 @@ export function createHub({ meta, onPick, onStart }) {
     }).join('');
     const R = ROUTES[st.route], s = Profiles.mockStats(R.id), m = meta('route:' + R.id);
     $('mockDetail').innerHTML = `<h3>${esc(R.name)}</h3><p>${esc(R.blurb)}</p><p class="muted">First instruction: ${esc(m.first)}</p>
-      <div class="rule"><b>Marking</b><span>15 or fewer driving faults and no serious or dangerous faults is a pass, like the real test.</span></div>
+
       ${s ? `<p class="muted">Last try: ${s.last.pass ? 'pass' : 'fail'}, ${s.last.D} driving and ${s.last.S} serious faults.</p>` : ''}
-      <div class="btns"><button class="cbtn go" data-start>Start mock test</button></div>`;
+      ${modePicker(true)}<div class="btns"><button class="cbtn go" data-start>Start mock test</button></div>`;
   }
   $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick(); });
 

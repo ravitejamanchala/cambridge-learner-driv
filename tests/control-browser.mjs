@@ -98,6 +98,30 @@ try {
     await page.evaluate(() => window.cambridgeDrive.setCam(1));
     console.log(`Mirrors: driver view marks "${driver[0]}"; chase view marks nothing and says so.`);
   }
+  // ---------- marking modes: chosen where the drive starts, fixed for it, stars by mode ----------
+  {
+    const lobby = () => page.evaluate(() => { const t = window.cambridgeDrive.test; if (t) t.running = false; document.querySelector('#hubBtn').click(); });
+    await lobby();
+    const drive = async (mode, nD) => {
+      await page.locator('[data-open=puzzleSheet]').first().click(); await page.locator('[data-z="pz-trumpington"]').click();
+      await page.locator(`#puzzleDetail .mode-pick [data-mode="${mode}"]`).click();
+      assert.equal(await page.locator(`#puzzleDetail .mode-pick [data-mode="${mode}"]`).getAttribute('aria-checked'), 'true');
+      await page.locator('#puzzleDetail [data-start]').click();
+      await page.waitForFunction(() => document.body.dataset.mode === 'drive' && window.cambridgeDrive.test?.running, {}, { timeout: 45000 });
+      await page.evaluate(n => { const a = window.cambridgeDrive; a.manual(true); for (let i = 0; i < n; i++) a.test.fault('D', 'Signals – necessary', 'Test fault ' + i, 'tf' + i, 0); a.test.finish(); }, nD);
+      return page.evaluate(() => ({ reasons: [...document.querySelectorAll("#rReasons li")].map(l => l.textContent).join(" / "), verdict: document.querySelector("#verdict").textContent, note: document.querySelector('#rNote').textContent, stars: document.querySelectorAll('#rNote .stars [data-on], #rNote .stars .on').length, label: document.querySelector('#rNote .stars').getAttribute('aria-label') }));
+    };
+    const hard = await drive('hard', 4); // the easy tier allows 3 driving faults on Hard
+    assert.equal(hard.verdict, 'Not yet'); assert.match(hard.label, /^0 of 3/);
+    await lobby();
+    const medium = await drive('medium', 4);
+    assert.equal(medium.verdict, 'Solved', medium.reasons); assert.match(medium.label, /^2 of 3/); assert.match(medium.note, /marked on Medium/);
+    // changing the mode afterwards changes nothing already earned
+    await page.evaluate(() => { localStorage.setItem('cambridge-learner-drive.mode', 'easy'); });
+    const rec = await page.evaluate(() => { for (const k of Object.keys(localStorage)) { if (!k.startsWith('cambridge-learner-drive.v1')) continue; const d = JSON.parse(localStorage.getItem(k)); const p = (d.profiles || []).find(x => x.id === d.current); if (p && p.lessons['pz-trumpington']) return p.lessons['pz-trumpington']; } return null; });
+    if (rec) assert.equal(rec.bestStars, 2, 'the record keeps the stars earned on Medium');
+    console.log(`Marking: 4 driving faults on an easy-tier puzzle: Hard "${hard.verdict}", Medium "${medium.verdict}" with ${medium.label}${rec ? '; record keeps 2 stars' : ''}.`);
+  }
   assert.deepEqual(errors, []);
   console.log('Control: leaving the road is marked and fails the lesson; free drive measures it; steering is firm at speed and full at walking pace; controllers work.');
 } finally { await browser?.close(); server.kill(); }

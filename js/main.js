@@ -14,6 +14,7 @@ import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './
 import { createGarage } from './garage.js';
 import { createPedestrianFactory } from './pedestrian-models.js';
 import { createTest, wheelsOff } from './test.js';
+import { getMode, modeOf, judgeMock } from './assessment.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
 import { createScenario, evaluate } from './course.js';
@@ -217,6 +218,7 @@ async function boot() {
     test.ctx = nearest(A.net,player.x,player.z);
     test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
     // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
+    test.mode = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
     test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
     applyTimeOfDay(test.timeOfDay); setHeadlights(false);
     if (test.ungraded) startFreeDrive(pl, test);
@@ -468,22 +470,24 @@ async function boot() {
       const report = buildReport({ lessonId: plan.lesson.id, scenarioId: plan.scenarioDefinition?.id, pass: res.pass, faults: test.faults, duration: test.elapsed, objectives: plan.lesson.objectives || plan.lesson.steps, evidence: { observations: player.observations.map(e => ({ ...e })), controls: player.operation.events.map(e => ({ ...e })), scenarioEvents: scenario?.events || [], objectiveResult: scenario?.result ? scenario.result() : null } });
       $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
       showRunDetail({ kind: plan.kind, lesson: plan.lesson, test, scenario });
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report }); // bot runs never touch a learner's progress
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
-      const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
-      $('rNote').innerHTML = (pz ? `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` : '') + plan.lesson.title.replace(/[<>&]/g, '');
+      // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
+      const n = res.stars || 0, mode = modeOf(res.mode);
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
-      const pass = test.passed();
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
+      const j = judgeMock(test.mode, test), pass = j.pass, mode = modeOf(j.mode);
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
-      $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
-        : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
+      const real = mode.id === 'hard' ? '' : ` Marked on ${mode.title}; the real test is Hard (15 driving faults, no serious).`;
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+        : (test.S > j.maxS ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : j.collision ? 'A collision is never forgiven. The marking sheet shows what to work on.' : `More than ${j.maxD} driving faults means a fail. The marking sheet shows what to work on.`)) + real;
       $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       showRunDetail({ kind: 'mock', lesson: null, test, scenario });
       reasons.innerHTML = ''; next.hidden = true;
