@@ -352,7 +352,7 @@ function motorway(lanes) {
       // exit: ease out alongside lane 1, run as a deceleration lane, then sweep away to the roundabout
       const ex = [];
       for (let d = 0; d < J.out; d += 10) {
-        const lat = d < 80 ? lane0 + (off0 - lane0) * smooth(d / 80) : d < J.decel ? off0 : off0 + (sideOff - off0) * smooth((d - J.decel) / (J.out - J.decel));
+        const lat = d < MW.taper ? lane0 + (off0 - lane0) * smooth(d / MW.taper) : d < J.decel ? off0 : off0 + (sideOff - off0) * smooth((d - J.decel) / (J.out - J.decel));
         ex.push(at(d, lat));
       }
       ex[0] = at(0, 0); ex.splice(1, 0, at(1.5, lane0)); ex.push(R(bUp));
@@ -361,7 +361,7 @@ function motorway(lanes) {
       const en = [R(bDown)], startD = J.out + 2 * r;
       for (let d = startD + 10; d < J.len; d += 10) {
         const lat = d < J.len - J.accel ? off0 + (sideOff - off0) * (1 - smooth((d - startD) / (J.len - J.accel - startD)))
-          : d < J.len - 80 ? off0 : lane0 + (off0 - lane0) * (1 - smooth((d - (J.len - 80)) / 80));
+          : d < J.len - MW.taper ? off0 : lane0 + (off0 - lane0) * (1 - smooth((d - (J.len - MW.taper)) / MW.taper));
         en.push(at(d, lat));
       }
       const merge = onCarriageway(line, lanes, side, sp.merge); en.push(at(J.len - 1.5, lane0), [merge.x, merge.z]);

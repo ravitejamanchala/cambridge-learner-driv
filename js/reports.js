@@ -48,6 +48,11 @@ export function runDetail({ kind = 'lesson', lesson = null, test, scenario = nul
   }
   // motorway lessons: every lane change, with what was checked before it and the gap it was made into
   const side = (from, to) => to > from ? 'right' : 'left', lanesN = (e) => e.lanes === 2 ? ['left-hand', 'right-hand'] : ['left-hand', 'middle', 'right-hand'];
+  for (const e of events.filter(e => e.type === 'join')) {
+    const checks = [e.mirror ? 'right mirror checked' : 'no right mirror check', e.blind ? 'a look over the shoulder' : 'no shoulder check', e.signalFor > 0 ? `signalled ${e.signalFor.toFixed(1)} s before` : 'no signal'];
+    if (e.behindS != null) checks.push(`${e.behindS.toFixed(1)} s ahead of the vehicle behind`);
+    lines.push(`Joined the motorway at ${e.mph} mph${e.trafficMph ? ` (the traffic was doing about ${e.trafficMph})` : ''}: ${checks.join(', ')}.`);
+  }
   for (const e of events.filter(e => e.type === 'lane')) {
     const names = lanesN(e), checks = [e.mirror ? `${side(e.from, e.to)} mirror checked` : `no ${side(e.from, e.to)} mirror check`, e.blind ? 'a look over the shoulder' : 'no shoulder check',
       e.signalFor > 0 ? `signalled ${e.signalFor.toFixed(1)} s before` : 'no signal'];

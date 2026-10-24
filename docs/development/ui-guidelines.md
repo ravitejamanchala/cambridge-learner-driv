@@ -188,6 +188,19 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   one frame at a time, so `tests/lane-discipline.test.mjs` judges scripted traces with exactly the
   rules a live drive gets, and the Bot lab's motorway driver uses its `overtaking()` test so the
   reference driver and the examiner can never disagree about when staying out is justified.
+- **Joining traffic gives way; motorway traffic never has to** (issue #8, Rule 259). Joining is a lane
+  change from the acceleration lane ("lane −1", measured from the carriageway) into lane 1, with the same
+  checks, plus being far slower than the traffic (over 20 mph slower) and moving out again within 5 s.
+  On the main carriageway, keeping your lane and speed, easing off, and moving over into a safe gap are
+  all accepted; being in the middle lane while traffic comes down a slip road beside you is courtesy,
+  not hogging. What is never accepted is "making room" by moving into a gap that makes someone brake.
+- **AI joiners obey the same priority.** A vehicle on an entry slip fits into lane 1 only where the
+  vehicle behind keeps 1.5 s and is not closing within 4 s; otherwise it drops back behind, and with no
+  gap it waits at the end of the acceleration lane, before the taper, because the taper is in the lane
+  itself. Nothing on the motorway brakes or moves over for it, and none of it is scripted to collide.
+- **One set of junction numbers.** The slip roads' shape (`tools/layouts.mjs`), their markings
+  (`js/world.js`), the AI's merge zone (`js/traffic.js`) and the lessons all read `MW.junction.accel`,
+  `MW.junction.decel` and `MW.taper`, and `tests/motorway.test.mjs` measures every slip road against them.
 - **Motorway lessons script their own traffic.** Background traffic is off (`scenarioVariants`) and
   every vehicle that matters is placed by the lesson, so a run is the same every time; each lesson starts
   far enough along its route for the vehicles placed behind it, which `tests/motorway.test.mjs` checks.
