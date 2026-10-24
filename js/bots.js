@@ -1,6 +1,6 @@
 import { createParkingDriver } from './parking-driver.js';
 import { senseMotorway, overtaking } from './lane-discipline.js';
-import { posAt } from './net.js';
+import { posAt, nearestWhere } from './net.js';
 import { steerFor, steerLock, HANDLING } from './config.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
@@ -255,7 +255,11 @@ function motorwayPlan(api, st, t, pl, tr) {
     }
   }
   // two seconds and a bit behind whatever is ahead, in this lane and in the one being moved into
-  for (const l of new Set([here, M.want])) { const o = ahead(l); if (o) target = Math.min(target, Math.max(0, o.v + ((o.fw - CAR) - 2.4 * v) * 0.25)); }
+  // two seconds and a little behind whoever is ahead; under two, no faster than now and below its speed until the gap opens
+  const follow = (o) => Math.max(0, Math.min(o.v + ((o.fw - CAR) - 2.4 * v) * 0.25, (o.fw - CAR) / v < 2.1 ? Math.min(o.v - 1, pl.v) : Infinity));
+  for (const l of new Set([here, M.want])) { const o = ahead(l); if (o) target = Math.min(target, follow(o)); }
+  // traffic about to merge from a slip road ahead will be in lane 1: ease off for it now, not once it is in
+  if (here === 0) for (const o of f.others) if (o.lane === -1 && o.fw > 10 && o.fw < 120) target = Math.min(target, follow(o));
   // never pass on the left at speed
   for (const o of f.others) if (o.lane > here && o.fw > 0 && o.fw < 80 && o.v < pl.v && pl.v > 13.4) target = Math.min(target, o.v - 0.3);
   // the exit, from the left-hand lane: mirror, a glance over the shoulder and a left signal by the 300-yard
@@ -286,7 +290,8 @@ function joinPlan(api, st, t, pl, tr) {
   const k = R.steps.findIndex(x => x.e === nr.e); if (k < 0 || R.steps[k + 1]?.e.way.cls !== 'motorway') return null;
   const mergeIn = R.stepS[k] + nr.e.len - t.sRoute, CAR = 4.6, v = Math.max(pl.v, 1);
   const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr, net: api.A.net });
-  const lane0 = f.others.filter(o => o.lane === 0).sort((a, b) => a.fw - b.fw), near = lane0.filter(o => Math.abs(o.fw) < 250);
+  // lane 1, and anyone signalling to move into it
+  const lane0 = f.others.filter(o => o.lane === 0 || o.into === 0).sort((a, b) => a.fw - b.fw), near = lane0.filter(o => Math.abs(o.fw) < 250);
   const flow = near.length ? near.reduce((a, o) => a + o.v, 0) / near.length : 27;
   let target = Math.min(29, Math.max(18, flow));
   if (mergeIn < 320) {
@@ -295,18 +300,31 @@ function joinPlan(api, st, t, pl, tr) {
   }
   if (f.joining) {
     const safe = lane0.every(o => { if (Math.abs(o.fw) < 7) return false;
-      if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > 1.7 && (close <= 0.3 || d / close > 6); }
-      return (o.fw - CAR) / v > 1.6 || o.v > pl.v + 1; });
+      if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > 1.4 && (close <= 0.3 || d / close > 4.5); }
+      return (o.fw - CAR) / v > 1.7 || (o.v > pl.v + 1 && (o.fw - CAR) / v > 1.2); });
     if (!safe) {
       const gaps = [];
       for (let g = 0; g <= lane0.length; g++) {
-        const b = lane0[g - 1], a = lane0[g], lo = b ? b.fw + CAR + 1.9 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
+        const b = lane0[g - 1], a = lane0[g], lo = b ? b.fw + CAR + 1.6 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.8 * v : Infinity;
         if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? flow });
       }
       const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
       if (best) { const d = at(best); target = Math.min(30.5, Math.max(4, best.v + Math.max(-5, Math.min(5, d * 0.15)) + Math.sign(d) * 0.6)); }
       // the taper starts 80 m before the merge: never into it without a gap
       if (mergeIn < 110) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 3 * (mergeIn - 85))));
+    }
+    // alongside the carriageway, up to speed and with a safe gap: move across now, as a person would,
+    // rather than following the slip road to its end and finding the gap gone
+    if (safe && f.laneF != null && f.laneF > -1.6 && pl.v > flow - 4) st.joinAcross = true;
+  } else if (f.laneF == null || f.laneF < -1.6) st.joinAcross = false;
+  if (st.joinAcross) {
+    const m = nearestWhere(api.A.net, pl.x, pl.z, e => e.way.cls === 'motorway');
+    if (m && m.d < 15) {
+      const fx = -Math.sin(pl.th), fz = -Math.cos(pl.th), along = m.tx * fx + m.tz * fz > 0 ? 1 : -1;
+      const c = posAt(m.e, Math.max(0, Math.min(m.e.len, m.s + 25 * along))), lat = (m.e.way.w / 2 - 3.65 * 0.5) * along;
+      // keep two seconds behind whoever is ahead in lane 1
+      const a = lane0.filter(o => o.fw > 0)[0]; if (a) target = Math.min(target, Math.max(0, a.v + (a.fw - CAR - 2.3 * v) * 0.4));
+      return { p: { x: c.x + c.tz * lat, z: c.z - c.tx * lat }, target };
     }
   }
   // and never faster than the vehicle ahead on the slip road allows: other traffic joins here too

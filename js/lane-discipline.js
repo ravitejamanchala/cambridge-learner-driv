@@ -22,7 +22,7 @@ export const LANE = {
   closeFor: 5,        // s continuously under two seconds before it is marked
   tailgate: 0.8,      // s: dangerously close ...
   tailgateFor: 2,     // ... for this long
-  grace: 4,           // s after a lane change before the gap ahead is judged: someone may have cut in
+  grace: 4,           // s after a lane change, yours or someone cutting in ahead, before the gap ahead is judged
   between: 2,         // s settled in a lane before moving on across the next (no sweeping across two in one go)
   lastMoment: 91,     // m (100 yards): moving left this close to the exit, then straight onto the slip, is cutting across
   exitBy: MW.countdown[0].at, // m: in the left-hand lane by the 300-yard countdown marker (Rule 272)
@@ -67,7 +67,7 @@ export function overtaking(f, lane) {
 // fault(kind, cat, text, key) is the examiner's own.
 export function createLaneAssessor({ fault = () => {} } = {}) {
   const st = { lane: null, move: null, lastDone: -1e9, lastDir: 0, indOn: null, indSince: 0, hog: 0, hogFlag: false, hogLane: null,
-    close: 0, closeFlag: false, clear: 0, tail: 0, tailFlag: false, seen: new Map(), exitChecked: false };
+    close: 0, closeFlag: false, clear: 0, tail: 0, tailFlag: false, aheadId: null, cutIn: -1e9, seen: new Map(), exitChecked: false };
   const out = { events: [], stats: { measured: 0, under2: 0, minGap: Infinity, hogTime: 0, outTime: 0, justifiedTime: 0, lanesTime: [] } };
   const mark = (kind, cat, text, key) => { out.events.push({ type: 'fault', kind, cat, text }); fault(kind, cat, text, key); };
 
@@ -203,7 +203,11 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
 
     // ---- following distance (Rule 126) ----
     const own = gaps(f, Math.round(f.laneF)).ahead;
-    if (own && f.v > 8 && t - st.lastDone > LANE.grace) {
+    // someone moving into the gap ahead (from the next lane or a slip road) is not following too close:
+    // the learner gets the same grace to drop back as after a lane change of their own, then it counts
+    if (own && own.id !== st.aheadId) { const was = st.seen.get(own.id); if (was && was.lane !== Math.round(f.laneF) && t - was.t < 1) st.cutIn = t; }
+    st.aheadId = own ? own.id : null;
+    if (own && f.v > 8 && t - st.lastDone > LANE.grace && t - st.cutIn > LANE.grace) {
       const gapS = (own.fw - LANE.carLen) / f.v;
       if (own.fw < f.v * 6) { out.stats.measured += dt; out.stats.minGap = Math.min(out.stats.minGap, gapS); }
       if (gapS < LANE.gap) { out.stats.under2 += dt; st.close += dt; st.clear = 0; } else { st.close = 0; st.clear += dt; }

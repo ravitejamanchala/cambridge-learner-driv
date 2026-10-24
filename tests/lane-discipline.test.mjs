@@ -103,6 +103,15 @@ test('staying out with nothing to pass is marked once; passing a queue of slower
   assert.ok(passing.stats.justifiedTime > 30);
 });
 
+test('cut in on: dropping back is not marked, sitting on their tail afterwards is', () => {
+  // a car in the next lane, a second ahead, moves in front of the learner at 60 mph
+  const cutIn = (dropBack) => run({ v: 60 * MPH, others: [{ lane: 1, s: 60 * MPH + LANE.carLen, mph: 60 }], seconds: 30,
+    script: (t, me, cars) => { if (t === 3) cars[0].lane = 0;
+      if (dropBack && t > 3) return { v: (cars[0].s - me.s - LANE.carLen) / me.v < 2.1 ? 50 * MPH : 60 * MPH }; } });
+  assert.deepEqual(cats(cutIn(true)), []);
+  assert.deepEqual(cutIn(false).faults.map(f => f.cat), ['Following distance']);
+});
+
 test('middle-lane hogging in three lanes: the left lane busy does not excuse the middle lane being clear', () => {
   const r = run({ v: 68 * MPH, lane: 2, others: [{ lane: 0, s: 30, mph: 68 }, { lane: 0, s: -20, mph: 68 }], seconds: 30 });
   assert.ok(r.faults.some(f => /right-hand lane with nothing to overtake/.test(f.text)), cats(r).join('\n'));

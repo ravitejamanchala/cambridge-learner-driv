@@ -263,6 +263,8 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
   brake (closing within 3 s, under half a second behind, or under a second and not falling back), not
   for the gap alone: moving in a second ahead of a slower vehicle you are pulling away from makes nobody do
   anything. Moving left and straight off at an exit is cutting across only inside the last 100 yards.
+  Someone moving into the gap ahead starts the same grace as a lane change of the learner's own: the
+  learner is judged on dropping back, not on having been cut in on.
 - **AI joiners obey the same priority.** A vehicle on an entry slip fits into lane 1 only where the
   vehicle behind keeps 1.5 s and is not closing within 4 s; otherwise it drops back behind, and with no
   gap it waits at the end of the acceleration lane, before the taper, because the taper is in the lane
