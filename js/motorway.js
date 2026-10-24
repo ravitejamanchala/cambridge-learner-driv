@@ -22,10 +22,14 @@ export const MW = {
   edgeLen: 400,         // carriageways are cut into edges about this long, so traffic and scenery stream
   slipW: 4.0,           // single-lane slip road
   ring: 28,             // junction roundabout radius
-  sideOffset: 260,      // how far the junction roundabout sits from its carriageway
+  sideOffset: 160,      // how far the junction roundabout sits from its carriageway
   // diverge to merge, metres along the carriageway: exit slip, roundabout, entry slip
-  junction: { decel: 220, out: 380, len: 1250, accel: 220 },
+  junction: { decel: 220, out: 620, len: 1250, accel: 220 }, // slip roads sweep away gently: no bend under about 130 m radius
   taper: 80,            // a slip road eases into or out of the left-hand lane over this length
+  // signs before each exit, metres before the slip road leaves: advance direction signs at 1 mile and
+  // ½ mile, and countdown markers at 300, 200 and 100 yards (three, two and one bars)
+  advance: [{ at: 1609, text: '1 mile' }, { at: 805, text: '½ mile' }],
+  countdown: [{ at: 274, n: 3 }, { at: 183, n: 2 }, { at: 91, n: 1 }],
 };
 
 // Junctions, by where they sit along the A carriageway's centre line. Each has an exit and an entry on

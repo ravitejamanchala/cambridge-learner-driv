@@ -1,9 +1,11 @@
-// Motorway lessons (issues #7 and #8): keeping left, overtaking into a safe gap, following distance at
-// speed, getting across in good time for an exit, joining from a slip road, and traffic joining beside you. They run on the motorway worlds (js/motorway.js) with
+// Motorway lessons (issues #7, #8 and #9): keeping left, overtaking into a safe gap, following distance at
+// speed, getting across in good time for an exit, joining from a slip road, traffic joining beside you,
+// leaving by a slip road, and what to do when you miss your exit. They run on the motorway worlds (js/motorway.js) with
 // background traffic switched off and every vehicle that matters placed by the lesson, so a drive is
 // the same every time and the assessment (js/lane-discipline.js) judges the same situation.
 import { MW, JUNCTIONS, centreLine, onCarriageway, junctionSpan } from './motorway.js';
 import { createLaneAssessor, senseMotorway, laneName } from './lane-discipline.js';
+import { buildRoute, snapWaypoint, posAt } from './net.js';
 
 // a node on the A carriageway at centre-line distance s (always a multiple of 400 m, where the layout
 // cuts the carriageway, so the waypoint lands exactly on a node of the right carriageway)
@@ -27,7 +29,9 @@ const OVERTAKE = { n: 'Rule 267', t: 'Check your mirrors, take time to judge the
 const FOLLOW = { n: 'Rule 126', t: 'Allow at least a two-second gap between you and the vehicle in front on roads carrying faster-moving traffic. The gap should be at least doubled on wet roads.' };
 const LEAVE = { n: 'Rule 272', t: 'Watch for the signs letting you know you are getting near your exit, move into the left-hand lane well before reaching it, signal left in good time and reduce speed on the slip road as necessary.' };
 const JOIN = { n: 'Rule 259', t: 'When you join the motorway you should give priority to traffic already on the motorway, check the traffic and match your speed to fit safely into the traffic flow in the left-hand lane, not cross solid white lines that separate lanes or use the hard shoulder, and remain in the left-hand lane long enough to adjust to the speed of traffic before considering overtaking.' };
+const MISSED = { n: 'Rule 263', t: 'You MUST NOT reverse, cross the central reservation, or drive against the traffic flow. If you have missed your exit, or have taken the wrong route, carry on to the next exit.' };
 const FOCUS = ['Positioning – lane discipline', 'Mirrors – change direction', 'Signals – necessary', 'Following distance'];
+const EXIT_FOCUS = [...FOCUS, 'Use of speed', 'Response to road markings', 'Positioning – normal driving'];
 // background traffic off: every vehicle that matters is placed by the lesson, so each run is the same
 const SCRIPTED = [{ id: 'scripted', title: 'The lesson\'s own traffic', trafficDensity: 'none' }];
 
@@ -61,7 +65,17 @@ export const MOTORWAY_LESSONS = [
     goal: 'Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.',
     steps: ['Spot the traffic on the slip road early', 'Check your mirrors before you decide: the middle lane may be busy', 'Keep your lane, ease off, or move over only into a safe gap'],
     rule: JOIN, waypoints: [M(3, 6400), M(3, 9200)], scenario: 'motorway', setup: 'merging', merge: 2,
-    startAt: 260, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
+    startAt: 500, startLane: 0, startMph: 60, endAtSpeed: true, scenarioVariants: SCRIPTED, focus: FOCUS, maxD: 2 },
+  { id: 'mw-exit', unit: 'motorway', area: 'm2', title: 'Leaving the motorway', road: 'M100 → J3 Kingsmere · two lanes',
+    goal: 'Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.',
+    steps: ['Signs at 1 mile and ½ mile, then countdown markers at 300, 200 and 100 yards', 'Mirror and signal left by the 300-yard marker; leave where the slip road starts', 'Slow down on the slip road, not before it, and give way at the roundabout'],
+    rule: LEAVE, waypoints: [M(2, 12400), localRoad(2, 3)], scenario: 'motorway', setup: 'exit', exit: 3,
+    startAt: 200, startLane: 0, startMph: 64, scenarioVariants: SCRIPTED, focus: EXIT_FOCUS, maxD: 2 },
+  { id: 'mw-missed-exit', unit: 'motorway', area: 'm3', title: 'If you miss your exit', road: 'M100 · junction 3 · three lanes',
+    goal: 'You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.',
+    steps: ['Look for a safe gap in the left-hand lane, but do not force one', 'If the exit goes by, let it go: there is always another junction', 'No stopping, no reversing, and no crossing the hatched area'],
+    rule: MISSED, waypoints: [M(3, 13200), localRoad(3, 3)], scenario: 'motorway', setup: 'missed', exit: 3,
+    startAt: 300, startLane: 1, startMph: 58, scenarioVariants: SCRIPTED, focus: EXIT_FOCUS, maxD: 2 },
 ];
 
 const MPH = 0.44704;
@@ -83,9 +97,13 @@ export const SETUPS = {
   // nobody on the motorway could move over for you even if they wanted to
   join: [{ main: 905, lane: 0, mph: 60 }, { main: 950, lane: 0, mph: 60 }, { main: 1130, lane: 0, mph: 59 }, { main: 700, lane: 0, mph: 61 }, { main: 1330, lane: 0, mph: 60 },
     { main: 850, lane: 1, mph: 66 }, { main: 980, lane: 1, mph: 66 }, { main: 1040, lane: 1, mph: 66 }, { main: 1200, lane: 2, mph: 70 }],
+  // a slower car ahead to catch before the exit, and faster traffic in the right-hand lane
+  exit: [{ at: 300, lane: 0, mph: 55 }, { at: 0, lane: 1, mph: 68 }, { at: -150, lane: 1, mph: 70 }],
+  // a solid line of lorries in the left-hand lane, a second apart: there is no safe gap to the exit
+  missed: [-283, -255, -227, -199, -171, -143, -115, -87, -59, -31, -3, 25, 53, 81, 109].map(at => ({ at, lane: 0, mph: 56 })).concat([{ at: -100, lane: 2, mph: 70 }]),
   // two vehicles on the slip road timed to arrive as you do, and a car alongside you in the middle lane
   // that draws ahead within ten seconds or so, so moving over becomes possible (but is never required)
-  merging: [{ slip: 750, mph: 48, role: 'joiner' }, { slip: 800, mph: 48, role: 'joiner' }, { at: 120, lane: 0, mph: 60 },
+  merging: [{ slip: 520, mph: 48, role: 'joiner' }, { slip: 570, mph: 48, role: 'joiner' }, { at: 120, lane: 0, mph: 60 },
     { at: 0, lane: 1, mph: 66 }, { at: -250, lane: 1, mph: 68 }, { at: -120, lane: 2, mph: 70 }],
 };
 // the traffic wave in the following lesson: speed as a share of where each vehicle started, by time
@@ -96,7 +114,8 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
   const A = createLaneAssessor({ fault: (kind, cat, text, key) => test.fault(kind, cat, text, key, 30) });
   const route = () => test.route;
   const R0 = route(), exitS = lesson.exit ? R0.stepS[R0.steps.findIndex(st => st.e.way.cls === 'motorway_link')] : null;
-  let t0 = null, missed = false, tookExit = false, finished = false;
+  let t0 = null, missed = false, tookExit = false, finished = false, continuing = false;
+  let slipFast = 0, slipFlag = false; const slipBend = [];
   // the motorway is no place to pull up: these lessons end as you drive past the end of the stretch
   if (lesson.endAtSpeed) { const fin = R0.instructions.find(i => i.final); if (fin) Object.assign(fin, { icon: 'straight', text: 'Carry on: the exercise ends ahead', short: '' }); }
   // the exit: the instruction box counts down to the junction by number and destination, as signs do
@@ -106,6 +125,28 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     R0.instructions.sort((a, b) => (a.final ? 1 : 0) - (b.final ? 1 : 0) || a.s - b.s);
   }
 
+  // the curve of a road at distance s along an edge: radius through points 12 m either side
+  function bendRadius(e, s) {
+    const a = posAt(e, Math.max(0, s - 12)), b = posAt(e, Math.min(e.len, s)), c = posAt(e, Math.min(e.len, s + 12));
+    const ab = Math.hypot(b.x - a.x, b.z - a.z), bc = Math.hypot(c.x - b.x, c.z - b.z), ca = Math.hypot(a.x - c.x, a.z - c.z);
+    const area2 = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+    return area2 > 1e-6 ? ab * bc * ca / (2 * area2) : 1e6;
+  }
+  // after a missed exit: a route on along the motorway to a kilometre past the junction, and the
+  // instruction box pointing on to the next junction
+  function continueToNext(nr) {
+    const lanes = net.motorway.lanes, j = JUNCTIONS.find(q => q.n === lesson.exit), next = JUNCTIONS[(JUNCTIONS.indexOf(j) + 1) % JUNCTIONS.length];
+    const special = JUNCTIONS.flatMap(q => { const sp = junctionSpan(q, 'A'); return [sp.diverge, sp.merge]; });
+    let s = Math.ceil((junctionSpan(j, 'A').diverge + 1000) / MW.edgeLen) * MW.edgeLen; while (special.some(x => Math.abs(x - s) < 61)) s += MW.edgeLen;
+    try {
+      const nodes = [nr.e.a, snapWaypoint(net, M(lanes, s))], r = buildRoute(net, nodes, { name: route().name });
+      const fin = r.instructions.find(i => i.final); if (fin) Object.assign(fin, { icon: 'straight', text: 'Carry on: the exercise ends ahead', short: '' });
+      r.instructions.unshift({ s: Math.max(0, r.len - 60), kind: 'straight', icon: 'straight', text: `Exit missed: carry on to junction ${next.n}`, short: `Junction ${next.n}`, signal: null, road: 'M100', junction: next.n, to: next.to });
+      r.instructions.sort((a, b) => (a.final ? 1 : 0) - (b.final ? 1 : 0) || a.s - b.s);
+      Object.assign(test, { idx: 0, sRoute: 0, step: 0, offT: 0, offRoute: false, wpIndex: 1 }); test.setRoute(r, nodes); test.snapProgress(3000);
+      continuing = true;
+    } catch (_) { test.finish(); } // nowhere to go (cannot happen on the circuit): end rather than send them somewhere impossible
+  }
   // the lesson junction's merge point: where its entry slip road meets the carriageway
   const mergeNode = lesson.merge ? (() => { const j = JUNCTIONS.find(q => q.n === lesson.merge), at = junctionSpan(j, 'A').merge, p = onCarriageway(centreLine(), net.motorway.lanes, 'A', at);
     let best = -1, bd = Infinity; for (const e of net.edges) if (e.way.cls === 'motorway_link') { const d = Math.hypot(net.nx[e.b] - p.x, net.nz[e.b] - p.z); if (d < bd) { bd = d; best = e.b; } } return best; })() : null;
@@ -145,7 +186,10 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     }
     const nr = test.ctx;
     if (exitS != null && nr && nr.way.cls === 'motorway_link' && test.sRoute > exitS) tookExit = true;
-    const f = senseMotorway({ t: clock, dt, player, test, traffic, net, exitIn: exitS != null && !tookExit ? exitS - test.sRoute : null });
+    // distance to the exit, and past it (negative) all along the deceleration lane, where crossing the
+    // hatching from the carriageway is judged
+    const exitIn = exitS != null && test.sRoute < exitS + MW.junction.decel + 60 ? exitS - test.sRoute : null;
+    const f = senseMotorway({ t: clock, dt, player, test, traffic, net, exitIn });
     A.step(f);
     test.laneGuide = A.guide(f);
     // traffic joining beside you: when each vehicle on the slip road reaches the motorway, is it ahead of
@@ -166,11 +210,21 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
       const here = f.laneF == null ? -1 : Math.round(f.laneF), ahead = f.others.filter(o => o.lane === here && o.fw > 4.6 && o.fw < 200).sort((a, b) => a.fw - b.fw)[0];
       test.basicStatus = { value: ahead && f.v > 3 ? `${((ahead.fw - 4.6) / f.v).toFixed(1)} s` : '–' };
     }
-    // carried on past the exit: the lesson is over (what to do after a missed exit is in the exits lesson)
+    // carried on past the exit: the right thing to do (Rule 263), so the route carries on too, towards the
+    // next junction, and the lesson ends a kilometre on. No impossible "turn round" instruction.
     if (exitS != null && !tookExit && !missed && nr && nr.way.cls === 'motorway' && test.offRoute) {
-      missed = true; events.push({ type: 'missed-exit', at: clock }); test.finish(); return;
+      missed = true; events.push({ type: 'missed-exit', at: clock }); continueToNext(nr); return;
     }
-    if (lesson.endAtSpeed && !finished && test.sRoute > route().len - 40) { finished = true; test.finish(); }
+    // on the exit slip road: take its bend at a speed that suits it (Rule 272: reduce speed as necessary)
+    if (tookExit && nr && nr.way.cls === 'motorway_link' && nr.s > MW.junction.decel - 40 && nr.e.len - nr.s > 40) {
+      const r = bendRadius(nr.e, nr.s + 15), a = player.v * player.v / r;
+      slipBend.push(r);
+      slipFast = a > 3.5 ? slipFast + dt : 0;
+      if (slipFast > 0.6 && !slipFlag) { slipFlag = true; const suits = Math.floor(Math.sqrt(3 * r) / MPH / 5) * 5;
+        test.fault('D', 'Use of speed', `Took the bend on the slip road at ${Math.round(player.v / MPH)} mph: it suits about ${suits} mph (Rule 272)`, 'mwslipbend', 30);
+        events.push({ type: 'slip-bend', mph: Math.round(player.v / MPH), suits }); }
+    }
+    if ((lesson.endAtSpeed || continuing) && !finished && test.sRoute > route().len - 40) { finished = true; test.finish(); }
   };
   S.stop = () => { test.laneGuide = null; test.basicStatus = null; for (const p of placed) Object.assign(p.car, { pinned: 0, scripted: false, keepTo: null }); };
 
@@ -198,8 +252,19 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
       const lines = events.filter(e => e.type === 'joined-beside').map(e => `one joined ${e.ahead ? 'ahead of' : 'behind'} you as ${said[e.response]}${e.response === 'eased' ? ` from ${e.fromMph} to ${e.toMph} mph` : ''}`);
       return { ok: true, why: lines.length ? `Traffic joined from the slip road: ${lines.join('; ')}. Any of those is right when it is safe.` : '' };
     }
+    if (lesson.setup === 'missed') {
+      if (tookExit) return { ok: true, why: 'You found a safe gap and took the exit.' };
+      if (!missed) return { ok: false, why: 'The drive ended before you reached the exit.' };
+      return { ok: true, why: 'There was no safe gap, so you let the exit go and carried on: exactly right. The next junction is never far away.' };
+    }
+    if (lesson.setup === 'exit') {
+      if (missed) return { ok: false, why: 'You carried on past the exit, which was the safe thing to do once it was too late. Next time be in the left-hand lane by the 300-yard marker.' };
+      if (!tookExit) return { ok: false, why: 'The drive ended before you reached the exit.' };
+      const leave = A.events.find(e => e.type === 'leave'), bend = slipBend.length ? Math.floor(Math.sqrt(3 * Math.min(...slipBend)) / MPH / 5) * 5 : null;
+      return { ok: true, why: `Left the motorway at ${leave ? leave.mph : '?'} mph${leave && leave.signalFor > 0 ? `, signalling ${leave.signalFor.toFixed(1)} s before` : ''}${bend ? `; the slip road's bend suits about ${bend} mph` : ''}.` };
+    }
     if (lesson.setup === 'exit-prep') {
-      if (missed) return { ok: false, why: 'You carried on past the exit. Start moving left earlier, one lane at a time.' };
+      if (missed) return { ok: false, why: 'You carried on past the exit, which was the safe thing to do once it was too late. Start moving left earlier, one lane at a time.' };
       if (!tookExit) return { ok: false, why: 'The drive ended before you reached the exit.' };
       const at = A.events.find(e => e.type === 'exit-lane');
       return { ok: true, why: `Took the exit after ${moves.length} lane change${moves.length === 1 ? '' : 's'}${at ? `, in the ${laneName(at.lane, at.lanes)} lane at the 300-yard point` : ''}.` };

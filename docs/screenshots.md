@@ -326,6 +326,18 @@ Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic
 
 Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.
 
+### Leaving the motorway
+
+![Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.](screenshots/lesson-mw-exit.jpg)
+
+Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.
+
+### If you miss your exit
+
+![If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.](screenshots/lesson-mw-missed-exit.jpg)
+
+If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.
+
 ### Parallel parking at the kerb
 
 ![Parallel parking at the kerb — Elm Road · 20 mph. Park at the kerb between two cars: pull up alongside the front one, then reverse in.](screenshots/lesson-parallel-park.jpg)

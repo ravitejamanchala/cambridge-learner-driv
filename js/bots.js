@@ -1,5 +1,6 @@
 import { createParkingDriver } from './parking-driver.js';
 import { senseMotorway, overtaking } from './lane-discipline.js';
+import { posAt } from './net.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -77,7 +78,7 @@ export function makeDriver(api) {
     const follow = nearMini ? 6 : 10;
     const p = api.lanePoint(t.sRoute + follow), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
     // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
-    const mw = joinPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
+    const mw = joinPlan(api, st, t, pl, tr) || exitPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
     if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
       return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: Math.max(-1, Math.min(1, dm * 2)) }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
@@ -196,8 +197,10 @@ function motorwayPlan(api, st, t, pl, tr) {
   const R = t.route, here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), v = Math.max(pl.v, 1);
   // a new drive (or a new route) starts afresh: the driver is reused from one drive to the next
   // ... and settles for a few seconds before changing lane: just joined, or just started (Rule 259)
-  if (!st.mw || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: tr.clock + 6 };
-  const M = st.mw;
+  // (a new drive shows as the traffic clock starting again; a new route mid-drive keeps the settle time)
+  const fresh = !st.mw || tr.clock < st.mw.clock;
+  if (fresh || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: fresh ? tr.clock + 6 : st.mw.settle };
+  const M = st.mw; M.clock = tr.clock;
   const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
   const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
   const inLane = l => f.others.filter(o => o.lane === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
@@ -214,14 +217,16 @@ function motorwayPlan(api, st, t, pl, tr) {
   let target = cruise;
   if (!M.moving && tr.clock > M.settle) {
     let want = here; const lead = ahead(here), next = ahead(here + 1);
-    if (exitIn != null && exitIn < 2400) { if (here > 0) want = here - 1; }
+    // for an exit, move left one lane at a time; once the 300-yard marker has gone by out of the left-hand
+    // lane it is too late: let the exit go and carry on (Rule 263), never cut across
+    if (exitIn != null && exitIn < 2400) { if (here > 0 && exitIn > 280) want = here - 1; }
     // overtake only when the next lane is actually moving faster than this one
     else if (lead && lead.v < cruise - 2 && (lead.fw - CAR) / v < 7 && here < f.lanes - 1 && (!next || next.fw > 150 || next.v > lead.v + 2)) want = here + 1;
     else if (here > 0 && !overtaking(f, here)) want = here - 1;
     if (want !== here && safeInto(want, want < here)) {
       const dir = want > here ? 1 : -1; Object.assign(M, { want, from: here, moving: true, go: tr.clock + 1.8 });
       look(dir); indicate(dir > 0 ? 'R' : 'L');
-    } else if (want < here && exitIn != null) {
+    } else if (want < here && exitIn != null && exitIn > 280) {
       // getting across for an exit: pick the gap in the lane you need and match its speed to drop into it
       const cars = inLane(want), gaps = [];
       for (let g = 0; g <= cars.length; g++) {
@@ -230,9 +235,12 @@ function motorwayPlan(api, st, t, pl, tr) {
       }
       const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
       // the gap ahead of you: speed up into it; behind you: drop back into it
-      if (best) { const d = at(best); target = Math.min(30.5, Math.max(10, best.v + Math.max(-4, Math.min(4, d * 0.12)) + Math.sign(d) * 0.6)); }
+      // (never below about 45 mph on the motorway: with no gap, let the exit go rather than crawl)
+      if (best) { const d = at(best); target = Math.min(30.5, Math.max(20, best.v + Math.max(-4, Math.min(4, d * 0.12)) + Math.sign(d) * 0.6)); }
     }
   }
+  // still waiting to move left for an exit as the 300-yard marker goes by: too late, let it go
+  if (M.moving && exitIn != null && exitIn < 280 && M.want < M.from && Math.abs(M.lat - M.from) < 0.01) { M.moving = false; M.want = M.from; cancel(); }
   if (M.moving && tr.clock >= M.go) {
     const dir = M.want > M.from ? 1 : -1;
     if (Math.abs(M.lat - M.from) < 0.01) {
@@ -247,10 +255,23 @@ function motorwayPlan(api, st, t, pl, tr) {
   for (const l of new Set([here, M.want])) { const o = ahead(l); if (o) target = Math.min(target, Math.max(0, o.v + ((o.fw - CAR) - 2.4 * v) * 0.25)); }
   // never pass on the left at speed
   for (const o of f.others) if (o.lane > here && o.fw > 0 && o.fw < 80 && o.v < pl.v && pl.v > 13.4) target = Math.min(target, o.v - 0.3);
-  // signal left for the exit once in the left-hand lane, and slow down along the slip road
-  if (exitIn != null && exitIn < 300 && here === 0 && !M.moving) indicate('L');
+  // the exit, from the left-hand lane: mirror, a glance over the shoulder and a left signal by the 300-yard
+  // marker, the mirror again as the slip road starts, and the speed of the traffic kept until on it
+  if (exitIn != null && exitIn < 300 && exitIn > -20 && here === 0 && !M.moving) {
+    if (pl.indicator !== 'L') { for (const view of ['left', 'left-blindspot']) api.look(view); indicate('L'); st.exitV = pl.v; }
+    if (exitIn < 40 && !pl.observations.some(e => e.view === 'left' && tr.clock - e.at < 3)) api.look('left');
+  }
+  // an exit let go: the route still turns up the slip road, so steer by the motorway itself, in this lane,
+  // until the lesson routes on to the next junction
+  if (exitIn != null && exitIn < 280 && here > 0) M.letGo = true;
+  if (M.letGo && exitIn != null && t.ctx.way.cls === 'motorway') {
+    let e = t.ctx.e, s2 = t.ctx.s + 25;
+    if (s2 > e.len) { const o = api.A.net.out[e.b].find(x => x.e.way.cls === 'motorway'); if (o) { s2 -= e.len; e = o.e; } else s2 = e.len; }
+    const c = posAt(e, Math.min(e.len, s2)), lat = e.way.w / 2 - 3.65 * (M.lat + 0.5);
+    return { p: { x: c.x + c.tz * lat, z: c.z - c.tx * lat }, target };
+  }
   const q = api.lanePoint(t.sRoute + 25), off = M.lat * 3.65;
-  return { p: { x: q.x - q.tz * off, z: q.z + q.tx * off }, target: exitIn != null && exitIn < 120 && here === 0 ? Math.min(target, 22) : target };
+  return { p: { x: q.x - q.tz * off, z: q.z + q.tx * off }, target };
 }
 
 // Joining from an entry slip road (Rule 259): build up to the speed of the left-hand lane, look right and
@@ -286,6 +307,28 @@ function joinPlan(api, st, t, pl, tr) {
     }
   }
   return { p: api.lanePoint(t.sRoute + 25), target };
+}
+
+// Leaving by an exit slip road (Rule 272): keep up with the traffic while still beside the carriageway,
+// then slow down on the slip road for its bend and the roundabout at the end. Near the roundabout the
+// ordinary driver takes over, to give way.
+const bendAt = (e, s) => { const a = posAt(e, Math.max(0, s - 12)), b = posAt(e, Math.min(e.len, s)), c = posAt(e, Math.min(e.len, s + 12));
+  const ab = Math.hypot(b.x - a.x, b.z - a.z), bc = Math.hypot(c.x - b.x, c.z - b.z), ca = Math.hypot(a.x - c.x, a.z - c.z), k = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+  return k > 1e-6 ? ab * bc * ca / (2 * k) : 1e6; };
+function exitPlan(api, st, t, pl, tr) {
+  const nr = t.ctx, R = t.route; if (!nr || nr.way.cls !== 'motorway_link') return null;
+  const k = R.steps.findIndex(x => x.e === nr.e); if (k < 1 || R.steps[k - 1].e.way.cls !== 'motorway') return null;
+  if (nr.e.len - nr.s < 70) return null;
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr, net: api.A.net });
+  let target;
+  if (f.laneF != null && f.laneF > -0.8) target = Math.max(st.exitV ?? pl.v, 20); // still beside the carriageway: keep up
+  else {
+    let suit = 30; for (let d = 0; d <= 150; d += 10) suit = Math.min(suit, Math.sqrt(2.6 * bendAt(nr.e, nr.s + d)) + d * 0.09);
+    target = Math.min(suit, Math.sqrt(64 + 2 * 2.4 * Math.max(0, nr.e.len - nr.s - 60)));
+  }
+  if (pl.indicator !== 'L' && nr.s < 120) pl.signal('L');
+  if (nr.s > 120 && pl.indicator === 'L') pl.signal('L'); // cancel once clear of the motorway
+  return { p: api.lanePoint(t.sRoute + 20), target };
 }
 
 // ---------- results store ----------

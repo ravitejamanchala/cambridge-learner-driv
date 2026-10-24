@@ -53,6 +53,14 @@ export function runDetail({ kind = 'lesson', lesson = null, test, scenario = nul
     if (e.behindS != null) checks.push(`${e.behindS.toFixed(1)} s ahead of the vehicle behind`);
     lines.push(`Joined the motorway at ${e.mph} mph${e.trafficMph ? ` (the traffic was doing about ${e.trafficMph})` : ''}: ${checks.join(', ')}.`);
   }
+  for (const e of events.filter(e => e.type === 'leave')) {
+    const checks = [e.mirror ? 'left mirror checked' : 'no left mirror check', e.signalFor > 0 ? `signalled ${e.signalFor.toFixed(1)} s before` : 'no signal'];
+    if (e.slowedBy > 0) checks.push(`${e.slowedBy} mph slower than at the 300-yard marker`);
+    if (e.gore) checks.push('across the hatched area');
+    lines.push(`Left the motorway at ${e.mph} mph: ${checks.join(', ')}.`);
+  }
+  if (events.some(e => e.type === 'exit-lane' && e.boxed)) lines.push('Boxed in by traffic in the left-hand lane all the way to the exit: carrying on past it was the right call.');
+  for (const e of events.filter(e => e.type === 'slip-bend')) lines.push(`Took the slip road's bend at ${e.mph} mph; it suits about ${e.suits}.`);
   for (const e of events.filter(e => e.type === 'lane')) {
     const names = lanesN(e), checks = [e.mirror ? `${side(e.from, e.to)} mirror checked` : `no ${side(e.from, e.to)} mirror check`, e.blind ? 'a look over the shoulder' : 'no shoulder check',
       e.signalFor > 0 ? `signalled ${e.signalFor.toFixed(1)} s before` : 'no signal'];

@@ -10,6 +10,7 @@
 // only for what the learner chose to do — moved without looking or signalling, pulled into a gap that
 // made someone brake, cut in, stayed out with nothing to pass, sat too close, passed on the left.
 import { laneInfo, nearestWhere } from './net.js';
+import { MW } from './motorway.js';
 
 export const LANE = {
   start: 0.25,        // lane widths off the centre of your lane: a lane change has begun
@@ -23,7 +24,9 @@ export const LANE = {
   tailgateFor: 2,     // ... for this long
   grace: 4,           // s after a lane change before the gap ahead is judged: someone may have cut in
   between: 3,         // s settled in a lane before moving on across the next (no sweeping across two)
-  exitBy: 270,        // m: in the left-hand lane by the 300-yard marker for an exit (Rule 272)
+  exitBy: MW.countdown[0].at, // m: in the left-hand lane by the 300-yard countdown marker (Rule 272)
+  slowedBefore: 8.9,  // m/s (20 mph): slowing this much on the carriageway before the slip road (Rule 272)
+  stopFor: 2,         // s at walking pace on the carriageway, with nothing stopped ahead, is stopping (Rule 270)
   congested: 13.4,    // m/s (30 mph): below this lanes are queues, and lane rules relax (Rule 268)
   settleJoin: 5,      // s in the left-hand lane after joining before moving out (Rule 259)
   joinSlower: 8.9,    // m/s (20 mph): joining this much slower than the traffic is too slow (Rule 259)
@@ -56,7 +59,8 @@ export function overtaking(f, lane) {
 //   laneF: continuous lane position, 0 = the centre of the left-hand lane, 1 the next, …; null off the motorway.
 //     On an entry slip road it is measured from the carriageway being joined, so the acceleration lane is
 //     about -1 and joining is a move from "lane -1" into the left-hand lane, judged like any lane change.
-//   joining: on an entry slip road, alongside the carriageway
+//   joining: on an entry slip road, alongside the carriageway; leaving: on an exit slip road, alongside it
+//   vSigned: speed with its sign (negative is reversing)
 //   others: vehicles on this carriageway; fw = metres ahead of you along the road (negative behind)
 //   exitIn: metres to where your exit leaves (null if there is none)
 // fault(kind, cat, text, key) is the examiner's own.
@@ -86,36 +90,63 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
   function step(f) {
     const { t, dt } = f;
     if (f.indicator !== st.indOn) { st.indOn = f.indicator; st.indSince = t; }
-    // the exit: in the left-hand lane by the 300-yard marker
+    // the exit: in the left-hand lane by the 300-yard marker. Only a fault if there was a real chance to
+    // get there: a usable gap in the lane to the left, within reach by easing off or speeding up, for a few
+    // seconds after the 1-mile sign. Boxed in all the way by traffic, carrying on is right, and not marked.
+    if (f.exitIn != null && f.exitIn > LANE.exitBy && f.exitIn < MW.advance[0].at + 50 && f.laneF != null && Math.round(f.laneF) > 0) {
+      // within reach: how far you could drop back or draw ahead (about 4 m/s) before the 300-yard marker
+      const l = Math.round(f.laneF) - 1, need = 2.8 * Math.max(f.v, 10) + 2 * LANE.carLen, R = Math.min(150, 4 * (f.exitIn - LANE.exitBy) / Math.max(f.v, 10));
+      const at = [-Infinity, ...f.others.filter(o => o.lane === l).map(o => o.fw).sort((a, b) => a - b), Infinity];
+      let gap = false; for (let i = 1; i < at.length; i++) { const lo = Math.max(at[i - 1], -R - need), hi = Math.min(at[i], R + need); if (hi - lo >= need && at[i] > -R && at[i - 1] < R) gap = true; }
+      st.leftClear = gap ? (st.leftClear || 0) + dt : 0; if (st.leftClear > 3) st.hadChance = true;
+    }
     if (f.exitIn != null && !st.exitChecked && f.exitIn <= LANE.exitBy && f.laneF != null) {
-      st.exitChecked = true;
-      const here = Math.round(f.laneF);
-      out.events.push({ type: 'exit-lane', t, lane: here, lanes: f.lanes });
-      if (here > 0) mark('D', 'Positioning – lane discipline', `Was still in the ${laneName(here, f.lanes)} lane ${Math.round(LANE.exitBy / 0.9144 / 10) * 10} yards before the exit: move left in good time (Rule 272)`, 'mwexit');
+      st.exitChecked = true; st.exitV = f.v;
+      const here = Math.round(f.laneF), boxed = here > 0 && !st.hadChance;
+      out.events.push({ type: 'exit-lane', t, lane: here, lanes: f.lanes, boxed });
+      if (here > 0 && !boxed) mark('D', 'Positioning – lane discipline', `Was still in the ${laneName(here, f.lanes)} lane ${Math.round(LANE.exitBy / 0.9144 / 10) * 10} yards before the exit: move left in good time (Rule 272)`, 'mwexit');
     }
     if (f.laneF == null) { st.lane = null; st.move = null; return; }
-    if (st.lane == null) st.lane = Math.max(f.joining ? -1 : 0, Math.min(f.lanes - 1, Math.round(f.laneF)));
+    if (st.lane == null) st.lane = Math.max(f.joining || f.leaving ? -1 : 0, Math.min(f.lanes - 1, Math.round(f.laneF)));
+    // never stop or reverse on the motorway: a missed exit means carrying on to the next one
+    const onCarriageway = !f.joining && !f.leaving && f.laneF > -0.5, vs = f.vSigned ?? f.v;
+    const queue = f.others.some(o => o.lane === Math.round(f.laneF) && o.fw > 0 && o.fw < 30 && o.v < 4);
+    st.stopT = onCarriageway && vs < 2.2 && vs > -0.5 && !queue ? (st.stopT || 0) + dt : 0;
+    if (st.stopT > LANE.stopFor && !st.stopFlag) { st.stopFlag = true; mark('S', 'Positioning – normal driving', 'Stopped on the motorway (Rule 270): if you miss your exit, carry on to the next one (Rule 263)', 'mwstop'); }
+    st.revT = vs < -0.5 ? (st.revT || 0) + dt : 0;
+    if (st.revT > 0.5 && !st.revFlag) { st.revFlag = true; mark('S', 'Positioning – normal driving', 'Reversed on the motorway: never reverse on a motorway, even to reach an exit you have missed (Rule 263)', 'mwrev'); }
     out.stats.lanesTime[st.lane] = (out.stats.lanesTime[st.lane] || 0) + dt;
     const off = f.laneF - st.lane;
 
     // ---- lane changes ----
     if (!st.move && Math.abs(off) > LANE.start) {
-      const dir = Math.sign(off), to = st.lane + dir;
-      if (to >= 0 && to < f.lanes) {
+      const dir = Math.sign(off), to = st.lane + dir, leave = to === -1 && st.lane === 0 && (f.leaving || (f.exitIn != null && f.exitIn < 150));
+      if ((to >= 0 && to < f.lanes) || leave) {
         const want = dir > 0 ? 'R' : 'L', signalled = st.indOn === want, lk = looked(f, dir), join = st.lane < 0;
         const afterJoin = !join && dir > 0 && st.lastFrom === -1 && t - st.lastDone < LANE.settleJoin;
-        st.move = { dir, from: st.lane, to, t0: t, mph: f.v * MPH, signalFor: signalled ? t - st.indSince : 0, ...lk, judged: false, join,
-          sweep: !afterJoin && dir === st.lastDir && t - st.lastDone < LANE.between };
-        const what = join ? 'Joined the motorway' : `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane`;
+        // straight across to the slip road from the lane you have only just moved into
+        const cutAcross = leave && st.lastDir < 0 && t - st.lastDone < LANE.between;
+        st.move = { dir, from: st.lane, to, t0: t, mph: f.v * MPH, signalFor: signalled ? t - st.indSince : 0, ...lk, judged: false, join, leave,
+          sweep: !afterJoin && !cutAcross && dir === st.lastDir && t - st.lastDone < LANE.between };
+        const what = join ? 'Joined the motorway' : leave ? 'Left the motorway' : `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane`;
         if (!lk.mirror) mark('D', 'Mirrors – change direction', `${what} without checking the ${side(dir)} mirror first`, 'mwmir');
-        if (!signalled) mark('D', 'Signals – necessary', `${what} without signalling${join ? ' right' : ''}`, 'mwsig');
+        if (!signalled) mark('D', 'Signals – necessary', `${what} without signalling${join ? ' right' : leave ? ' left (Rule 272)' : ''}`, 'mwsig');
         if (st.move.sweep) mark('D', 'Positioning – lane discipline', `Swept across two lanes in one go: settle in each lane, then check and signal again`, 'mwsweep');
         if (afterJoin) mark('D', 'Positioning – lane discipline', `Moved out of the left-hand lane straight after joining: settle into the traffic first (Rule 259)`, 'mwjoinout');
+        if (cutAcross) mark('S', 'Positioning – lane discipline', `Cut across to the exit at the last moment: be in the left-hand lane by the 300-yard marker (Rule 272)`, 'mwcutexit');
+        // keep up with the traffic until you are on the slip road, then slow down on it
+        if (leave && st.exitV != null && st.exitV - f.v > LANE.slowedBefore) { st.move.slowedBy = Math.round((st.exitV - f.v) * MPH);
+          mark('D', 'Use of speed', `Slowed by ${st.move.slowedBy} mph on the motorway before the slip road: keep up with the traffic until you are on it, then slow down (Rule 272)`, 'mwslowexit'); }
       }
     }
     if (st.move) {
       const m = st.move, into = f.laneF - m.from;
       // the moment the car's centre crosses the line: who is in the lane being joined?
+      if (!m.judged && into * m.dir >= 0.5 && m.leave) {
+        m.judged = true;
+        // past the taper the slip road is separated from the carriageway by hatching: never cross it
+        if (f.exitIn != null && -f.exitIn > MW.taper + 15) { m.gore = true; mark('S', 'Response to road markings', 'Crossed the hatched area to reach the slip road at the last moment (Rule 130): if you are too late, carry on to the next exit', 'mwgore'); }
+      }
       if (!m.judged && into * m.dir >= 0.5) {
         m.judged = true;
         const g = gaps(f, m.to);
@@ -139,7 +170,7 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
         }
       }
       if (Math.abs(f.laneF - m.to) < LANE.settle) {
-        out.events.push({ type: m.join ? 'join' : 'lane', t, from: m.from, to: m.to, lanes: f.lanes, mph: Math.round(m.join ? f.v * MPH : m.mph), signalFor: +m.signalFor.toFixed(1), mirror: m.mirror, blind: m.blind, interior: m.interior,
+        out.events.push({ type: m.join ? 'join' : m.leave ? 'leave' : 'lane', t, from: m.from, to: m.to, lanes: f.lanes, mph: Math.round(m.join ? f.v * MPH : m.mph), slowedBy: m.slowedBy ?? 0, gore: !!m.gore, signalFor: +m.signalFor.toFixed(1), mirror: m.mirror, blind: m.blind, interior: m.interior,
           behindS: m.behindS != null ? +m.behindS.toFixed(1) : null, aheadS: m.ahead && f.v > 1 ? +(m.ahead.d / f.v).toFixed(1) : null, trafficMph: m.trafficMph ?? null });
         st.lane = m.to; st.lastDone = t; st.lastDir = m.dir; st.lastFrom = m.from; st.move = null;
         if (m.dir < 0 || st.lane !== st.hogLane) { st.hog = 0; st.hogFlag = false; }
@@ -196,13 +227,15 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
 // A frame from the live simulation. Only vehicles on the same carriageway, going the same way, within
 // 300 m count.
 export function senseMotorway({ t, dt, player, test, traffic, net = null, exitIn = null }) {
-  let nr = test.ctx, on = nr && nr.way.cls === 'motorway', joining = false, mergeIn = null;
-  // on an entry slip road alongside the carriageway: measure from the carriageway being joined
-  if (!on && net && nr && nr.way.cls === 'motorway_link' && net.out[nr.e.b]?.some(o => o.e.way.cls === 'motorway')) {
-    mergeIn = nr.e.len - nr.s;
+  let nr = test.ctx, on = nr && nr.way.cls === 'motorway', joining = false, leaving = false, mergeIn = null;
+  // on a slip road alongside the carriageway: measure from the carriageway being joined or left
+  const entry = !on && net && nr && nr.way.cls === 'motorway_link' && net.out[nr.e.b]?.some(o => o.e.way.cls === 'motorway');
+  const exit = !on && net && nr && nr.way.cls === 'motorway_link' && !entry && net.out[nr.e.a]?.some(o => o.e.way.cls === 'motorway');
+  if (entry || exit) {
+    if (entry) mergeIn = nr.e.len - nr.s;
     const fx = -Math.sin(player.th), fz = -Math.cos(player.th);
     const m = nearestWhere(net, player.x, player.z, e => e.way.cls === 'motorway');
-    if (m && m.d < m.way.w / 2 + 7 && m.tx * fx + m.tz * fz > 0.9) { nr = m; on = true; joining = true; }
+    if (m && m.d < m.way.w / 2 + 7 && m.tx * fx + m.tz * fz > 0.9) { nr = m; on = true; joining = entry; leaving = exit; }
   }
   let laneF = null, lanes = 0;
   if (on) { const L = laneInfo(nr.e, 1); lanes = L.n; laneF = (L.outer - nr.lat) / L.laneW - 0.5; }
@@ -216,5 +249,5 @@ export function senseMotorway({ t, dt, player, test, traffic, net = null, exitIn
     if (Math.abs(fw) > 300 || Math.abs(dx * fz - dz * fx) > lanes * 3.65 + (slip ? 12 : 2)) return;
     others.push({ id, lane: slip ? -1 : c.lane, fw, v: c.v });
   });
-  return { t, dt, v: Math.max(0, player.v), laneF, lanes, indicator: player.indicator || null, looks: player.observations || [], others, exitIn, joining, mergeIn };
+  return { t, dt, v: Math.max(0, player.v), vSigned: player.v, laneF, lanes, indicator: player.indicator || null, looks: player.observations || [], others, exitIn, joining, leaving, mergeIn };
 }
