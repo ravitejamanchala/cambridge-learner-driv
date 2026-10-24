@@ -43,6 +43,7 @@ export function createHub({ meta, onPick, onStart }) {
   const pick = () => { render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); };
 
   // ---------- sheets ----------
+  const SHEET_KIND = { courseSheet: 'lesson', puzzleSheet: 'puzzle', mockSheet: 'mock', freeSheet: 'free' };
   let afterProfile = null;
   const protectedSheets = new Set(['mockSheet','puzzleSheet','freeSheet']);
   const SIGN_IN_NOTICE='Sign in to start. Lessons, puzzles and mock tests need an account, and your progress is saved to it.';
@@ -67,7 +68,8 @@ export function createHub({ meta, onPick, onStart }) {
     const o = e.target.closest('[data-open]'); if (o) { openSheet(o.dataset.open); return; }
     const c = e.target.closest('[data-close]'); if (c) { const s = c.closest('.sheet'); if (s) s.hidden = true; return; }
     if (e.target.classList && e.target.classList.contains('sheet') && !modal(e.target)) e.target.hidden = true; // tap the dim backdrop
-    if (e.target.closest('[data-start]')) play();
+    // a Start button starts what its own sheet shows, whatever was chosen before the sheet opened
+    const go = e.target.closest('[data-start]'); if (go) { const k = SHEET_KIND[go.closest('.sheet')?.id]; if (k && k !== st.kind) { st.kind = k; st.scenarioId = null; } play(); }
   });
   $('whoBtn').addEventListener('click', () => openSheet('profileSheet'));
   $('setBtn').addEventListener('click', () => openSheet('settingsSheet'));

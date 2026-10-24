@@ -144,8 +144,10 @@ async function boot() {
     const lapRoute = buildRoute(A.net, pl.drive.lap.map(w => snapWaypoint(A.net, w)));
     const lapAt = (r) => r.len - lapRoute.len * 1.25; // where the full lap starts on a route ending a lap and a quarter on
     const M = A.net.motorway, line = centreLine();
-    const junctionsOn = (r) => { // one countdown instruction per junction passed, in place of "pull up on the left"
-      const ins = [];
+    // on the carriageway, one countdown instruction per junction passed, in place of "pull up on the left";
+    // off it (leaving at a junction, and the way back on), the route's own directions at each turn
+    const junctionsOn = (r) => {
+      const ins = r.instructions.filter(i => !i.final && i.approach && i.approach.e.way.cls !== 'motorway');
       for (const j of (M?.junctions || []).filter(j => j.side === 'A')) {
         const p = onCarriageway(line, M.lanes, 'A', j.diverge);
         for (let i = 1; i < r.xs.length - 1; i++) {
