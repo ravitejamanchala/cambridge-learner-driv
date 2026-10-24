@@ -67,7 +67,7 @@ test('free-drive summary: measured, and honest about speed', () => {
   const lines = freeSummaryLines(st, st.seconds / 60);
   assert.match(lines[0], /^3\.\d miles in 3 min, averaging 6\d mph$/);
   assert.ok(lines.some(l => /Longest stretch at or under the limit: 2\.2 miles/.test(l)), lines.join(' | '));
-  assert.ok(lines.some(l => /Top speed 76 mph — over the 70 limit/.test(l)), 'an over-limit drive must say so');
+  assert.ok(lines.some(l => /^Over the limit for 10 s, at worst 76 mph in a 70 limit; top speed 76 mph$/.test(l)), 'an over-limit drive must say so: ' + lines.join(' | '));
   assert.ok(!lines.some(l => /Never over the limit/.test(l)));
   assert.deepEqual(freeSummaryLines(createFreeStats(), 0).length, 1, 'too short a drive gets no figures');
 });
@@ -77,4 +77,16 @@ for (const l of MOTORWAY_LESSONS) test(`${l.id}: every scripted vehicle is place
   for (const v of SETUPS[l.setup]) { const s = l.startAt + v.at; assert.ok(s >= 1 && s <= r.len - 5, `${l.setup}: a vehicle at ${v.at} m lands at ${s} m of ${Math.round(r.len)}`); }
   assert.ok(r.steps.slice(0, 3).every(st => st.e.way.cls === 'motorway'), 'the lesson starts on the motorway');
   if (l.exit) assert.ok(r.steps.some(st => st.e.way.cls === 'motorway_link'), 'an exit lesson leaves by the slip road');
+});
+test('free-drive summary: speeding under a lower limit is not "never over the limit"', () => {
+  const st = createFreeStats();
+  for (let i = 0; i < 20 * 120; i++) stepFreeStats(st, 0.05, 30, 67, 70); // 2 min at 67 on the motorway
+  for (let i = 0; i < 20 * 8; i++) stepFreeStats(st, 0.05, 25, 55, 40);   // 8 s at 55 mph on a 40 mph roundabout road
+  const lines = freeSummaryLines(st, st.seconds / 60);
+  assert.ok(!lines.some(l => /Never over the limit/.test(l)), lines.join(' | '));
+  assert.ok(lines.some(l => /Over the limit for 8 s, at worst 55 mph in a 40 limit/.test(l)), lines.join(' | '));
+  const ok = createFreeStats();
+  for (let i = 0; i < 20 * 120; i++) stepFreeStats(ok, 0.05, 30, 67, 70);
+  for (let i = 0; i < 20 * 8; i++) stepFreeStats(ok, 0.05, 17, 38, 40);
+  assert.ok(freeSummaryLines(ok, ok.seconds / 60).some(l => /^Never over the limit: top speed 67 mph$/.test(l)));
 });
