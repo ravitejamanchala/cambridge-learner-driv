@@ -26,11 +26,13 @@ export const freeDrive = (id) => FREE_DRIVES.find(d => d.id === id);
 // What a free drive measured, for the summary at the end. Only things the sim recorded: distance,
 // time, laps, junctions passed, and the longest stretch kept at or under the limit.
 export function createFreeStats() {
-  return { distance: 0, seconds: 0, laps: 0, junctions: 0, legalRun: 0, bestLegalRun: 0, topMph: 0, overSeconds: 0, worst: null };
+  return { distance: 0, seconds: 0, laps: 0, junctions: 0, legalRun: 0, bestLegalRun: 0, topMph: 0, overSeconds: 0, worst: null, offRoad: 0 };
 }
-export function stepFreeStats(st, dt, v, mph, limit) {
+// offWheels: how many wheels were off the road this step (js/test.js wheelsOff)
+export function stepFreeStats(st, dt, v, mph, limit, offWheels = 0) {
   const d = Math.abs(v) * dt;
   st.distance += d; st.seconds += dt; st.topMph = Math.max(st.topMph, mph);
+  if (offWheels && Math.abs(v) > 1.2) st.offRoad += dt;
   if (mph <= limit + 0.5) { st.legalRun += d; st.bestLegalRun = Math.max(st.bestLegalRun, st.legalRun); return; }
   // over the limit of the road the car is on, whatever that limit is: the worst moment is the furthest over
   st.legalRun = 0; st.overSeconds += dt;
@@ -47,6 +49,7 @@ export function freeSummaryLines(st, minutes) {
   if (st.laps) out.push(`${st.laps} full lap${st.laps > 1 ? 's' : ''} of the circuit`);
   if (st.junctions) out.push(`Drove past ${st.junctions} junction${st.junctions > 1 ? 's' : ''}`);
   out.push(`Longest stretch at or under the limit: ${mi(st.bestLegalRun)} miles`);
+  if (st.offRoad >= 0.5) out.push(`Wheels off the road for ${Math.round(st.offRoad)} s`);
   if (!st.worst) out.push(`Never over the limit: top speed ${Math.round(st.topMph)} mph`);
   else out.push(`Over the limit for ${Math.max(1, Math.round(st.overSeconds))} s, at worst ${Math.round(st.worst.mph)} mph in a ${st.worst.limit} limit; top speed ${Math.round(st.topMph)} mph`);
   return out;

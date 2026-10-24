@@ -1,6 +1,7 @@
 import { createParkingDriver } from './parking-driver.js';
 import { senseMotorway, overtaking } from './lane-discipline.js';
 import { posAt } from './net.js';
+import { steerFor, steerLock, HANDLING } from './config.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -81,7 +82,7 @@ export function makeDriver(api) {
     // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
     const mw = joinPlan(api, st, t, pl, tr) || exitPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
     if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
-      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: Math.max(-1, Math.min(1, dm * 2)) }; }
+      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: steerFor(dm, 2, pl.v), aim: dm }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
     if(nearMini)target=Math.min(target,3.5);
     if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
@@ -183,7 +184,7 @@ export function makeDriver(api) {
     if (api.scenarioPhase?.() === 'coming') target = Math.min(target, 1.6);
     if (ins.signal && ahead < 80 && ahead > 3 && pl.indicator !== ins.signal && !(ins.kind === 'rb' && t.sRoute > ins.prevExitS - 0.3)) pl.signal(ins.signal);
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
-    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
+    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: steerFor(d, 2.4, pl.v), aim: d };
   };
 }
 
@@ -307,6 +308,9 @@ function joinPlan(api, st, t, pl, tr) {
       if (mergeIn < 110) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 3 * (mergeIn - 85))));
     }
   }
+  // and never faster than the vehicle ahead on the slip road allows: other traffic joins here too
+  const ahead = tr.cars.filter(c => c.alive && c.e === nr.e).map(c => ({ c, d: (c.s - nr.s) * (nr.dir ?? 1) })).filter(o => o.d > 0).sort((a, b) => a.d - b.d)[0];
+  if (ahead) target = Math.min(target, Math.max(0, ahead.c.v + (ahead.d - CAR - 2 - 2.2 * v) * 0.4)); // two seconds and a little
   return { p: api.lanePoint(t.sRoute + 25), target };
 }
 
@@ -345,6 +349,47 @@ function download(name, text, type, url) { const a = document.createElement('a')
 
 
 // ---------- runner + panel ----------
+// A person at the controls. The reference driver above always knows the right steering angle, applies it
+// exactly and at once, twenty times a second. A person sees the road a moment late, decides a few times a
+// second, and on a keyboard or the touch buttons can only press left, right, accelerator or brake all the
+// way. This wraps the reference driver's intentions in those limits, so the Bot lab can show how hard a
+// drive is for someone driving it by hand: how often they leave the road, and how much steering it takes.
+//   device 'keys'  on/off steering and pedals, as the keyboard and touch buttons are
+//   device 'stick' an analog stick or wheel, with a little unsteadiness in the hand
+export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, clock, speed: api_v = () => 0, seed = 7 } = {}) {
+  const seen = []; let next = -1, key = 0, stick = 0, pedal = { throttle: 0, brake: 0 }, r = seed >>> 0;
+  const acc = { steer: 0, throttle: 0, brake: 0 }, out = { steer: 0, throttle: 0, brake: 0 };
+  const rand = () => { r = (r + 0x6D2B79F5) >>> 0; let x = Math.imul(r ^ (r >>> 15), 1 | r); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  const stats = { presses: 0, steerTravel: 0 };
+  const human = () => {
+    const now = clock(), o = drive(); if (!o) return o;
+    if (seen.length && now < seen[seen.length - 1][0]) { seen.length = 0; next = -1; } // a new drive: the clock started again
+    seen.push([now, o]); while (seen.length > 2 && seen[1][0] <= now - reaction) seen.shift();
+    if (now < next && now >= next - 1) return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+    next = now + 1 / rate;
+    const late = { ...seen[0][1] }; // what the driver had seen `reaction` seconds ago
+    // A person steers only as firmly as their reaction time allows without weaving (McRuer's crossover
+    // model): the wheel angle per radian of heading error is capped at about 0.8 × wheelbase / (speed ×
+    // reaction time). The reference driver, reacting at once, can afford to steer harder.
+    const v = Math.max(3, Math.abs(api_v())), lock = steerLock(v);
+    if (typeof late.aim === 'number' && late.aim) { const wheel = late.steer * lock, cap = 0.8 * HANDLING.wheelbase / (v * reaction) * Math.abs(late.aim);
+      late.steer = Math.max(-1, Math.min(1, Math.sign(wheel) * Math.min(Math.abs(wheel), cap) / lock)); }
+    if (device === 'keys') {
+      // keys are on or off, so a person taps: a gentle turn or a light throttle is a key pressed some of
+      // the time, more often the more is wanted (each decision makes up for what the last ones fell short by)
+      const tapped = (want, k) => { acc[k] += want - out[k]; out[k] = Math.abs(acc[k]) >= 0.5 ? Math.sign(acc[k]) : 0; return out[k]; };
+      const was = key; key = tapped(late.steer, 'steer'); if (key && key !== was) stats.presses++;
+      pedal = { throttle: Math.max(0, tapped(late.throttle, 'throttle')), brake: Math.max(0, tapped(late.brake, 'brake')) };
+    } else {
+      const was = stick; stick = Math.max(-1, Math.min(1, late.steer + (rand() - 0.5) * 0.08)); stats.steerTravel += Math.abs(stick - was);
+      pedal = { throttle: late.throttle, brake: late.brake };
+    }
+    return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+  };
+  human.stats = stats;
+  return human;
+}
+
 export function createBotLab(api) {
   const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const f = q.shift(); f && f(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
   const drive = makeDriver(api);
@@ -362,6 +407,8 @@ export function createBotLab(api) {
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
+<div class="row"><label>Traffic <select id="blTraffic" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="lesson">The lesson's own</option><option value="random">Add random traffic</option></select></label></div>
+<div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
 <div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
 <div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
@@ -427,11 +474,12 @@ export function createBotLab(api) {
 
   async function runOne(p, label, iteration) {
     const base=$("blSeed").value,seed=base===""?crypto.getRandomValues(new Uint32Array(1))[0]:(Number(base)+iteration)>>>0;
-    await api.start(p.kind, p.id,seed);
+    await api.start(p.kind, p.id, seed, { traffic: $('blTraffic').value });
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
-    api.setInput(drive);
+    const who = $('blDriver').value, input = who === 'reference' ? drive : humanize(drive, { device: who, clock: () => A.traffic.clock, speed: () => api.player.v, seed });
+    api.setInput(input);
     while (!t.done) {
       if (stopReq) { end = 'stopped'; break; }
       if (paused) { await new Promise(r => requestAnimationFrame(r)); api.frame(0); continue; }
@@ -456,7 +504,8 @@ export function createBotLab(api) {
     const pl = api.player;
     saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
-      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)] });
+      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)],
+      traffic: $('blTraffic').value, driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
     render();
   }
 

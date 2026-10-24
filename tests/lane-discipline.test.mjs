@@ -76,14 +76,21 @@ test('pulling out in front of faster traffic in the next lane is marked; waiting
 });
 
 test('cutting in after an overtake is marked, and so is a dangerous one as serious', () => {
-  // a careless overtake: straight back across the moment the car is past, with no wait
-  const cut = (gapAfter) => run({ v: 70 * MPH, others: [{ lane: 0, s: 120, mph: 50 }], seconds: 40, script: (t, me, cars) => {
+  // a careless overtake: straight back across the moment the car is past, with no wait. Only 5 mph faster,
+  // so moving back 0.6 s ahead is a cut-in the vehicle passed has to drop back from (Rule 163)
+  const cut = (gapAfter) => run({ v: 55 * MPH, others: [{ lane: 0, s: 40, mph: 50 }], seconds: 70, script: (t, me, cars) => {
     if (t < 6) return MSM(t, 0.5, 1, 1);
     if (!me.back && me.laneF === 1 && me.s - cars[0].s - LANE.carLen > gapAfter) { me.back = t; return { look: 'left', signal: 'L', target: 0 }; }
   } });
-  const near = cut(5), close = cut(-2);
+  const near = cut(12), close = cut(-2);
   assert.ok(near.faults.some(f => /Cut in/.test(f.text) && f.kind === 'D'), cats(near).join('\n'));
   assert.ok(close.faults.some(f => /Cut in/.test(f.text) && f.kind === 'S'), cats(close).join('\n'));
+  // well past and pulling away (the overtake at 70 mph, back in 14 m ahead of a car at 50): nobody brakes
+  const away = run({ v: 70 * MPH, others: [{ lane: 0, s: 120, mph: 50 }], seconds: 40, script: (t, me, cars) => {
+    if (t < 6) return MSM(t, 0.5, 1, 1);
+    if (!me.back && me.laneF === 1 && me.s - cars[0].s - LANE.carLen > 5) { me.back = t; return { look: 'left', signal: 'L', target: 0 }; }
+  } });
+  assert.ok(!away.faults.some(f => /Cut in/.test(f.text)), cats(away).join('\n'));
 });
 
 test('staying out with nothing to pass is marked once; passing a queue of slower traffic is not', () => {
@@ -243,4 +250,30 @@ test('boxed in all the way to an exit: not being in lane is not your fault, and 
   // with a clear left-hand lane all the way, staying out is yours to own
   const clear = run({ v: 58 * MPH, lane: 1, exitAt: 900, others: [], seconds: 30 });
   assert.ok(clear.faults.some(f => /middle lane 300 yards before the exit/.test(f.text)), cats(clear).join('\n'));
+});
+
+// ---------- feedback from driving it: finding a gap late for the exit, and moving in ahead of slower traffic ----------
+test('found a gap late, past the 300-yard marker but well before the slip road, then straight off: not cutting across', () => {
+  // in the middle lane, a gap appears at about 160 m to go: move left, then leave at the slip road
+  const r = run({ v: 62 * MPH, lane: 1, exitAt: 700, seconds: 30, script: (t, me) => {
+    if (!me.a && me.s > 700 - 175) { me.a = true; return { look: 'left', signal: 'L', target: 0 }; }
+    if (me.a && !me.b && me.laneF === 0) { me.b = true; return { target: -1, look: 'left' }; } } });
+  assert.ok(!r.faults.some(f => f.kind === 'S'), 'no serious fault: ' + cats(r).join('\n'));
+  assert.ok(!r.faults.some(f => /Cut across/.test(f.text)), cats(r).join('\n'));
+});
+test('moving left in front of slower traffic you are pulling away from is not "too small a gap"', () => {
+  // 0.8 s ahead of a car in the left-hand lane, but 10 mph faster: it never has to brake
+  const r = run({ v: 66 * MPH, lane: 1, others: [{ lane: 0, s: -25, mph: 56 }], seconds: 20, script: (t, me, cars) => {
+    if (!me.a && me.s - cars[0].s - LANE.carLen > 18) { me.a = true; return { look: 'left', signal: 'L', target: 0 }; } } });
+  assert.ok(!r.faults.some(f => /too small a gap|Cut in/.test(f.text)), cats(r).join('\n'));
+});
+test('a wobble towards the lane line that comes back is not a lane change: nothing marked', () => {
+  const r = run({ v: 66 * MPH, lane: 0, seconds: 20, script: (t) => (t === 2 ? { target: 0.4 } : t === 4 ? { target: 0 } : null) });
+  assert.deepEqual(cats(r), []);
+});
+test('joining slowly because traffic joining ahead of you was waiting is not marked as too slow', () => {
+  const A = createLaneAssessor({ fault: (k, c, text) => { throw new Error(text); } });
+  // on the slip road at walking pace behind another joiner, then into a clear left-hand lane
+  for (let t = 0; t < 4; t += 0.1) A.step({ t, dt: 0.1, v: 2, laneF: -1 + Math.min(1, t / 3), lanes: 3, indicator: 'R', joining: true, looks: [{ view: 'right', at: 0 }, { view: 'blindspot', at: 0.2 }],
+    others: [{ id: 1, lane: -1, fw: 25, v: 3 }, { id: 2, lane: 0, fw: 200, v: 26 }, { id: 3, lane: 0, fw: -240, v: 26 }] });
 });

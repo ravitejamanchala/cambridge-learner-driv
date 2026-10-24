@@ -4,16 +4,17 @@ import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
-import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
+import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor } from './config.js';
 import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
-import { attachLamps, setLamps } from './evening.js';
+import { attachLamps, setLamps, attachIndicators, setIndicators } from './evening.js';
 import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './car.js';
 import { createGarage } from './garage.js';
 import { createPedestrianFactory } from './pedestrian-models.js';
-import { createTest } from './test.js';
+import { createTest, wheelsOff } from './test.js';
+import { getMode, modeOf, judgeMock } from './assessment.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
 import { createScenario, evaluate } from './course.js';
@@ -76,7 +77,7 @@ async function boot() {
   const dressCar = (slot, index) => {
     const body = trafficModels.length ? trafficModels[index % trafficModels.length].clone(true) : shadowed(makeBoxCar(slot.userData.colour, false));
     slot.userData.model = trafficModels.length ? index % trafficModels.length : -1;
-    slot.remove(...slot.children); slot.add(body); attachLamps(body); setLamps(body, dusk);
+    slot.remove(...slot.children); slot.add(body); attachLamps(body); attachIndicators(body); setLamps(body, dusk);
   };
   const makeCar = (c) => {
     let m = carPool[carI];
@@ -181,7 +182,7 @@ async function boot() {
   function stepFreeDrive(dt) {
     if (!freeStats || !A.test?.running) return;
     const nr = A.test.ctx, limit = nr ? nr.way.mph : 70;
-    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit);
+    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit, wheelsOff(A.net, player).wheels);
     for (const j of freeJunctions) if (A.traffic.clock - j.at > 60 && Math.hypot(j.x - player.x, j.z - player.z) < 30) { j.at = A.traffic.clock; freeStats.junctions++; }
   }
   // the payoff for an ungraded drive: what it measured, said plainly, and nothing written to the record
@@ -217,6 +218,7 @@ async function boot() {
     test.ctx = nearest(A.net,player.x,player.z);
     test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
     // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
+    test.marking = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
     test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
     applyTimeOfDay(test.timeOfDay); setHeadlights(false);
     if (test.ungraded) startFreeDrive(pl, test);
@@ -425,12 +427,28 @@ async function boot() {
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
-    get freeStats() { return freeStats; } };
+    get freeStats() { return freeStats; }, steerFor };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
-    return { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    const k = { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    if (k.throttle || k.brake || k.steer) return k; // keys and touch always win
+    return readPad() || k;
+  }
+  // A game controller or a USB wheel (the browser's standard mapping): the left stick or the wheel steers,
+  // the right trigger accelerates and the left brakes; LB and RB indicate, Y checks the mirrors. It takes
+  // over only once it has been touched, so a controller left plugged in never fights the keyboard.
+  let padUsed = false; const padWas = [];
+  function readPad() {
+    const g = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null; if (!g) return null;
+    const b = (i) => (g.buttons[i] ? g.buttons[i].value : 0), tap = (i) => { const on = b(i) > 0.5, was = padWas[i]; padWas[i] = on; return on && !was; };
+    if (tap(4)) { player.signal('L'); sigBtns(); } if (tap(5)) { player.signal('R'); sigBtns(); } if (tap(3)) look('interior');
+    // a small dead zone, then a gentle curve so small movements of the stick make small corrections
+    const ax = g.axes[0] || 0, dz = 0.08, x = Math.abs(ax) < dz ? 0 : Math.sign(ax) * ((Math.abs(ax) - dz) / (1 - dz)) ** 1.6;
+    const thr = b(7), brk = b(6);
+    if (x || thr > 0.05 || brk > 0.05) padUsed = true;
+    return padUsed ? { throttle: thr, brake: brk, steer: -x, analog: true } : null;
   }
 
   // ---------- drive flow ----------
@@ -452,22 +470,24 @@ async function boot() {
       const report = buildReport({ lessonId: plan.lesson.id, scenarioId: plan.scenarioDefinition?.id, pass: res.pass, faults: test.faults, duration: test.elapsed, objectives: plan.lesson.objectives || plan.lesson.steps, evidence: { observations: player.observations.map(e => ({ ...e })), controls: player.operation.events.map(e => ({ ...e })), scenarioEvents: scenario?.events || [], objectiveResult: scenario?.result ? scenario.result() : null } });
       $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
       showRunDetail({ kind: plan.kind, lesson: plan.lesson, test, scenario });
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report }); // bot runs never touch a learner's progress
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
-      const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
-      $('rNote').innerHTML = (pz ? `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` : '') + plan.lesson.title.replace(/[<>&]/g, '');
+      // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
+      const n = res.stars || 0, mode = modeOf(res.mode);
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
-      const pass = test.passed();
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
+      const j = judgeMock(test.marking, test), pass = j.pass, mode = modeOf(j.mode);
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
-      $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
-        : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
+      const real = mode.id === 'hard' ? '' : ` Marked on ${mode.title}; the real test is Hard (15 driving faults, no serious).`;
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+        : (test.S > j.maxS ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : j.collision ? 'A collision is never forgiven. The marking sheet shows what to work on.' : `More than ${j.maxD} driving faults means a fail. The marking sheet shows what to work on.`)) + real;
       $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       showRunDetail({ kind: 'mock', lesson: null, test, scenario });
       reasons.innerHTML = ''; next.hidden = true;
@@ -493,7 +513,7 @@ async function boot() {
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
-    stats.distance = 0; stats.topSpeed = 0;
+    stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
     $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
@@ -707,6 +727,21 @@ async function boot() {
   setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
+  // In the chase view the mirrors are always on screen, and the car's surroundings with them, so there is
+  // nothing to check by pressing a key: mirror and shoulder checks count as made the whole time and are not
+  // marked. The result says so. The mirror-practice lesson, whose whole point is the routine, still asks for
+  // it; the Bot lab and the browser checks make their own looks.
+  let chaseAuto = -1;
+  function chaseMirrors(dt, now) {
+    if (cam !== 0 || botMode || plan?.lesson?.scenario === 'mirrors') return;
+    stats.chaseSeconds = (stats.chaseSeconds || 0) + dt;
+    if (now - chaseAuto < 0.4 && now >= chaseAuto) return;
+    chaseAuto = now;
+    const obs = player.observations, keepFrom = now - 15;
+    for (let i = obs.length - 1; i >= 0; i--) if (obs[i].auto && obs[i].at < keepFrom) obs.splice(i, 1);
+    for (const view of ['interior', 'left', 'right', 'blindspot']) obs.push({ view, at: now, x: player.x, z: player.z, auto: true });
+    player.lookAt = now;
+  }
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
@@ -716,6 +751,7 @@ async function boot() {
       const nr = nearest(net, player.x, player.z);
       const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
       player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      chaseMirrors(dt, traffic.clock);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);
@@ -747,6 +783,7 @@ async function boot() {
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
     // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
     setLamps(player.mesh, dusk, !!player.headlights);
+    { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's
     headBeam.visible = dusk && !!player.headlights && !lowPower;
     if (headBeam.visible) { const fx = -Math.sin(player.th), fz = -Math.cos(player.th); headBeam.position.set(player.x + fx * 2, 0.8, player.z + fz * 2); headBeam.target.position.set(player.x + fx * 32, 0, player.z + fz * 32); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
@@ -780,10 +817,13 @@ async function boot() {
     estopBanner: () => A.test?.alert?.tone === 'stop',
     setInput: (fn) => { botInput = fn; },
     botMode: (on) => { botMode = on; manual = on; },
-    async start(kind, id, seed) {
+    async start(kind, id, seed, { traffic = 'lesson' } = {}) {
       botSeed=seed;
       const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
       await pickPlan(pl, true); await areaChain;
+      // random traffic on top of whatever the lesson places, from this run's seed: a lesson with its own
+      // scripted traffic otherwise meets exactly the same drive every time
+      if (traffic === 'random') { A.traffic.setDensity('normal'); A.traffic.reset(player.x, player.z, seed); }
     },
     result: () => plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
     plans: [...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]

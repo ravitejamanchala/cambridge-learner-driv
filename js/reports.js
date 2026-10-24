@@ -36,8 +36,9 @@ export function runDetail({ kind = 'lesson', lesson = null, test, scenario = nul
     }
     if (Number.isFinite(stats.topSpeed)) lines.push(`Fastest point of the manoeuvre ${mph(stats.topSpeed || 0)}; keep it to walking pace.`);
   }
-  const during = observations.length;
-  lines.push(during ? `Looked round ${times(during)}.` : 'No look-round input recorded on this run.');
+  const during = observations.filter(o => !o.auto).length;
+  if (stats.chaseSeconds >= 1) lines.push(`Driven in the chase view for ${Math.round(stats.chaseSeconds)} s: the mirrors were always in sight there, so mirror and shoulder checks were not marked.`);
+  else lines.push(during ? `Looked round ${times(during)}.` : 'No look-round input recorded on this run.');
   const emergency = events.filter(e => e.type === 'emergency-approach');
   if (emergency.length) {
     const passedBy = events.find(e => e.type === 'emergency-passed');

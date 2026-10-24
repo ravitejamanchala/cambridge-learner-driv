@@ -1,5 +1,5 @@
 // Player car: physics, glTF model loading (with steering/rolling wheels), L-plates, indicators, and simple box cars for traffic.
-import { CAR, HANDLING } from './config.js';
+import { CAR, HANDLING, steerLock } from './config.js';
 import { createVehicleState, canDrive } from './vehicle-state.js';
 import { automaticVelocity } from './automatic.js';
 
@@ -164,8 +164,10 @@ export function createPlayer(scene) {
     if (blocked) inp = { ...inp, throttle: 0, brake: Math.abs(p.v) > 0.3 ? 1 : 0 };
     p.inp = inp;
     const H = HANDLING, st = clamp(inp.steer, -1, 1) * H.steerSensitivity;
-    const rate = Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
-    const delta = p.steer * H.maxSteer / (1 + Math.max(0, Math.abs(p.v) - 4) * 0.08); p.delta = delta; // full lock at walking pace; less lock as speed builds
+    // keys and touch buttons are all-or-nothing, so the wheel winds on gradually while one is held and
+    // comes back when it is let go; a controller's stick or a wheel is followed closely
+    const rate = inp.analog ? 8 : Math.abs(st) < 0.01 ? 4.5 : 2.6; p.steer += clamp(st - p.steer, -dt * rate, dt * rate);
+    const delta = p.steer * steerLock(Math.abs(p.v)); p.delta = delta;
     if (p.operation.transmission === 'automatic') {
       p.v = automaticVelocity(p.v, p.rawInput, p.operation, dt, H, surface); p.hold = 0;
     } else {

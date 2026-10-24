@@ -23,7 +23,8 @@ export const LANE = {
   tailgate: 0.8,      // s: dangerously close ...
   tailgateFor: 2,     // ... for this long
   grace: 4,           // s after a lane change before the gap ahead is judged: someone may have cut in
-  between: 3,         // s settled in a lane before moving on across the next (no sweeping across two)
+  between: 2,         // s settled in a lane before moving on across the next (no sweeping across two in one go)
+  lastMoment: 91,     // m (100 yards): moving left this close to the exit, then straight onto the slip, is cutting across
   exitBy: MW.countdown[0].at, // m: in the left-hand lane by the 300-yard countdown marker (Rule 272)
   slowedBefore: 8.9,  // m/s (20 mph): slowing this much on the carriageway before the slip road (Rule 272)
   stopFor: 2,         // s at walking pace on the carriageway, with nothing stopped ahead, is stopping (Rule 270)
@@ -125,19 +126,26 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
         const want = dir > 0 ? 'R' : 'L', signalled = st.indOn === want, lk = looked(f, dir), join = st.lane < 0;
         const afterJoin = !join && dir > 0 && st.lastFrom === -1 && t - st.lastDone < LANE.settleJoin;
         // straight across to the slip road from the lane you have only just moved into
-        const cutAcross = leave && st.lastDir < 0 && t - st.lastDone < LANE.between;
+        // (only at the last moment: into the left-hand lane by the 100-yard marker and then off is what the signs are for)
+        const cutAcross = leave && st.lastDir < 0 && t - st.lastDone < 3 && st.lastExitIn != null && st.lastExitIn < LANE.lastMoment;
         st.move = { dir, from: st.lane, to, t0: t, mph: f.v * MPH, signalFor: signalled ? t - st.indSince : 0, ...lk, judged: false, join, leave,
           sweep: !afterJoin && !cutAcross && dir === st.lastDir && t - st.lastDone < LANE.between };
-        const what = join ? 'Joined the motorway' : leave ? 'Left the motorway' : `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane`;
-        if (!lk.mirror) mark('D', 'Mirrors – change direction', `${what} without checking the ${side(dir)} mirror first`, 'mwmir');
-        if (!signalled) mark('D', 'Signals – necessary', `${what} without signalling${join ? ' right' : leave ? ' left (Rule 272)' : ''}`, 'mwsig');
-        if (st.move.sweep) mark('D', 'Positioning – lane discipline', `Swept across two lanes in one go: settle in each lane, then check and signal again`, 'mwsweep');
-        if (afterJoin) mark('D', 'Positioning – lane discipline', `Moved out of the left-hand lane straight after joining: settle into the traffic first (Rule 259)`, 'mwjoinout');
-        if (cutAcross) mark('S', 'Positioning – lane discipline', `Cut across to the exit at the last moment: be in the left-hand lane by the 300-yard marker (Rule 272)`, 'mwcutexit');
-        // keep up with the traffic until you are on the slip road, then slow down on it
-        if (leave && st.exitV != null && st.exitV - f.v > LANE.slowedBefore) { st.move.slowedBy = Math.round((st.exitV - f.v) * MPH);
-          mark('D', 'Use of speed', `Slowed by ${st.move.slowedBy} mph on the motorway before the slip road: keep up with the traffic until you are on it, then slow down (Rule 272)`, 'mwslowexit'); }
+        // what was done before moving is recorded now, and marked only once the car is really changing lane
+        // (below, as it crosses the line): a wobble towards the line that comes back is not a lane change
+        st.move.what = join ? 'Joined the motorway' : leave ? 'Left the motorway' : `Moved ${side(dir)} into the ${laneName(to, f.lanes)} lane`;
+        Object.assign(st.move, { signalled, afterJoin, cutAcross, exitSlowedBy: leave && st.exitV != null && st.exitV - f.v > LANE.slowedBefore ? Math.round((st.exitV - f.v) * MPH) : 0 });
       }
+    }
+    // committed: the car's centre is across the line. Now the checks before it count.
+    if (st.move && !st.move.committed && (f.laneF - st.move.from) * st.move.dir >= 0.5) {
+      const m = st.move, dir = m.dir; m.committed = true;
+      if (!m.mirror) mark('D', 'Mirrors – change direction', `${m.what} without checking the ${side(dir)} mirror first`, 'mwmir');
+      if (!m.signalled) mark('D', 'Signals – necessary', `${m.what} without signalling${m.join ? ' right' : m.leave ? ' left (Rule 272)' : ''}`, 'mwsig');
+      if (m.sweep) mark('D', 'Positioning – lane discipline', `Swept across two lanes in one go: settle in each lane, then check and signal again`, 'mwsweep');
+      if (m.afterJoin) mark('D', 'Positioning – lane discipline', `Moved out of the left-hand lane straight after joining: settle into the traffic first (Rule 259)`, 'mwjoinout');
+      if (m.cutAcross) mark('S', 'Positioning – lane discipline', `Cut across to the exit at the last moment: be in the left-hand lane by the 300-yard marker (Rule 272)`, 'mwcutexit');
+      // keep up with the traffic until you are on the slip road, then slow down on it
+      if (m.exitSlowedBy) { m.slowedBy = m.exitSlowedBy; mark('D', 'Use of speed', `Slowed by ${m.slowedBy} mph on the motorway before the slip road: keep up with the traffic until you are on it, then slow down (Rule 272)`, 'mwslowexit'); }
     }
     if (st.move) {
       const m = st.move, into = f.laneF - m.from;
@@ -156,23 +164,27 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
         else if (m.behind) {
           const b = m.behind, behindS = b.d / Math.max(b.v, 1), close = b.v - f.v, ttc = close > 0.3 ? b.d / close : Infinity;
           m.behindS = behindS;
-          if (m.dir < 0 && behindS < 1) mark(behindS < 0.5 ? 'S' : 'D', 'Positioning – lane discipline', `Cut in after overtaking: the vehicle you passed was only ${sec(behindS)} behind when you moved back (Rule 163)`, 'mwcut');
-          // it would have to brake for you (Rule 133: never force anyone to change speed or course)
-          else if (ttc < 4 || behindS < 1 || (behindS < 1.5 && close > 0.5)) mark(ttc < 1.5 || behindS < 0.5 ? 'S' : 'D', 'Mirrors – change direction', `${m.join ? 'Joined the motorway' : `Moved ${side(m.dir)}`} into too small a gap: a vehicle ${Math.round(b.d)} m behind${close > 0.3 ? ` was closing at ${Math.round(close * MPH)} mph faster than you` : ` was only ${sec(behindS)} away`}`, 'mwgap');
+          // Judged by whether the vehicle behind has to brake for you (Rule 133), not by the gap alone: moving
+          // in a second ahead of a slower vehicle you are pulling away from forces nobody to do anything.
+          if (m.dir < 0 && (behindS < 0.5 || (behindS < 1 && close > -4))) mark(behindS < 0.5 ? 'S' : 'D', 'Positioning – lane discipline', `Cut in after overtaking: the vehicle you passed was only ${sec(behindS)} behind when you moved back (Rule 163)`, 'mwcut');
+          else if (ttc < 3 || behindS < 0.5 || (behindS < 1 && close > -1)) mark(ttc < 1.5 || behindS < 0.5 ? 'S' : 'D', 'Mirrors – change direction', `${m.join ? 'Joined the motorway' : `Moved ${side(m.dir)}`} into too small a gap: a vehicle ${Math.round(b.d)} m behind${close > 0.3 ? ` was closing at ${Math.round(close * MPH)} mph faster than you` : ` was only ${sec(behindS)} away`}`, 'mwgap');
         }
         if (m.ahead && f.v > 8 && m.ahead.d / f.v < LANE.tailgate) mark('D', 'Following distance', `${m.join ? 'Joined' : 'Moved into the lane'} only ${sec(m.ahead.d / f.v)} behind the vehicle ahead`, 'mwgapA');
         // joining: match the speed of the traffic in the left-hand lane (Rule 259)
         if (m.join) {
           const near = inLane(f, 0).filter(o => o.fw > -150 && o.fw < 100);
           m.trafficMph = near.length ? Math.round(near.reduce((a, o) => a + o.v, 0) / near.length * MPH) : null;
-          if (near.length && f.v < near.reduce((a, o) => a + o.v, 0) / near.length - LANE.joinSlower)
+          // held up by traffic joining ahead of you on the slip road is not joining too slowly: you could go
+          // no faster than it, and it was waiting for its own gap
+          const heldUp = f.others.some(o => o.lane === -1 && o.fw > 0 && o.fw < 80);
+          if (near.length && !heldUp && f.v < near.reduce((a, o) => a + o.v, 0) / near.length - LANE.joinSlower)
             mark('D', 'Use of speed', `Joined at ${Math.round(f.v * MPH)} mph into traffic doing about ${m.trafficMph} mph: build up your speed on the slip road (Rule 259)`, 'mwjoinslow');
         }
       }
       if (Math.abs(f.laneF - m.to) < LANE.settle) {
         out.events.push({ type: m.join ? 'join' : m.leave ? 'leave' : 'lane', t, from: m.from, to: m.to, lanes: f.lanes, mph: Math.round(m.join ? f.v * MPH : m.mph), slowedBy: m.slowedBy ?? 0, gore: !!m.gore, signalFor: +m.signalFor.toFixed(1), mirror: m.mirror, blind: m.blind, interior: m.interior,
           behindS: m.behindS != null ? +m.behindS.toFixed(1) : null, aheadS: m.ahead && f.v > 1 ? +(m.ahead.d / f.v).toFixed(1) : null, trafficMph: m.trafficMph ?? null });
-        st.lane = m.to; st.lastDone = t; st.lastDir = m.dir; st.lastFrom = m.from; st.move = null;
+        st.lane = m.to; st.lastDone = t; st.lastDir = m.dir; st.lastFrom = m.from; st.lastExitIn = f.exitIn; st.move = null;
         if (m.dir < 0 || st.lane !== st.hogLane) { st.hog = 0; st.hogFlag = false; }
       } else if (Math.abs(f.laneF - m.from) < LANE.settle * 0.6) st.move = null; // thought better of it
     }

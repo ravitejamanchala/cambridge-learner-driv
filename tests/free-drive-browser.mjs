@@ -46,7 +46,7 @@ try {
     for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
       if (f > 0 && f < Math.max(20, p.v * 2.2) && Math.abs(dx * fz - dz * fx) < 2.2) want = Math.min(want, c.v - (f < p.v * 1.6 ? 2 : 0)); }
     let ang = Math.atan2(-(q.x - p.x), -(q.z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
-    return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1.0 ? Math.min(1, (p.v - want) / 6) : 0, steer: Math.max(-1, Math.min(1, ang * 3)) }; }); });
+    return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1.0 ? Math.min(1, (p.v - want) / 6) : 0, steer: a.steerFor(ang, 3, p.v) }; }); });
   const frames = (n) => page.evaluate(k => { for (let i = 0; i < k; i++) window.cambridgeDrive.frame(0.05); }, n);
   const state = () => page.evaluate(() => {
     const a = window.cambridgeDrive, t = a.test, p = a.player, cars = a.traffic.cars.filter(c => c.alive);
@@ -69,6 +69,48 @@ try {
     assert.equal(s.wrongWay, 0, `${id}: ${s.wrongWay} cars travelling the wrong way down a carriageway`);
     assert.ok(s.finite, `${id}: a position went non-finite`);
     console.log(`${id}: ${Math.round(s.sRoute)} m in 30 s (${Math.round(s.sRoute / 30 * 2.23694)} mph average), ${s.cars} cars, all going the right way`);
+  }
+
+  // ---------- slower traffic keeps left (Rule 264): nobody sits in an outer lane with nothing to pass ----------
+  {
+    await start('m3'); await page.evaluate(() => { window.__target = 31; }); await frames(200);
+    const hog = await page.evaluate(() => { const a = window.cambridgeDrive, out = new Map();
+      for (let t = 0; t < 90; t++) { a.step(20);
+        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway' || c.lane === 0) { out.delete(c); continue; }
+          const fx = -Math.sin(c.th), fz = -Math.cos(c.th);
+          const passing = a.traffic.cars.some(o => o !== c && o.alive && o.e === c.e && o.dir === c.dir && o.lane < c.lane && (() => { const f = (o.x - c.x) * fx + (o.z - c.z) * fz; return f > -10 && f < 120; })());
+          out.set(c, passing ? 0 : (out.get(c) || 0) + 1); } }
+      const worst = Math.max(0, ...out.values()), lanes = [0, 0, 0]; for (const c of a.traffic.cars) if (c.alive && c.e.way.cls === 'motorway') lanes[Math.min(2, c.lane)]++;
+      return { worst, lanes }; });
+    assert.ok(hog.worst <= 15, `a car sat ${hog.worst} s in an outer lane with nothing to pass`);
+    console.log(`Keep left: the longest any car sat in an outer lane with nothing to pass was ${hog.worst} s; cars by lane ${hog.lanes.join(' / ')}.`);
+  }
+
+  // ---------- traffic signals what it is about to do, and some drivers make room for the learner ----------
+  {
+    await start('m3'); await page.evaluate(() => { window.__target = 31; }); await frames(100);
+    const sig = await page.evaluate(() => { const a = window.cambridgeDrive, seen = new Map(); let changes = 0, signalled = 0, indicating = 0, flashing = 0;
+      for (let t = 0; t < 1200; t++) { a.frame(0.05);
+        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway') continue; const was = seen.get(c);
+          // the same vehicle carrying on along the same road (not one recycled and placed afresh), the few who never signal aside
+          if (was && was.lane !== c.lane && was.e === c.e && c.s >= was.s && c.s - was.s < 5 && c.traits?.signals) { changes++; if (was.ind) signalled++; }
+          seen.set(c, { lane: c.lane, e: c.e, s: c.s, ind: c.ind });
+          if (c.ind) { indicating++; const g = c.mesh.getObjectByName('indicators'); if (g && (g.userData.L.visible || g.userData.R.visible)) flashing++; } } }
+      return { changes, signalled, indicating, flashing }; });
+    assert.ok(sig.changes > 0, 'no traffic changed lane in a minute');
+    assert.equal(sig.signalled, sig.changes, `${sig.signalled} of ${sig.changes} lane changes by drivers who signal were signalled first`);
+    assert.ok(sig.flashing > 0 && sig.flashing < sig.indicating, 'indicators should flash, on and off');
+    // the learner signals right with a courteous driver just behind in the next lane: it drops back
+    const room = await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player;
+      const c = a.traffic.cars.find(c => c.alive && c.traits && c.e.way.cls === 'motorway'); if (!c) return null;
+      c.traits.courtesy = true; c.traits.signals = true;
+      const fx = -Math.sin(c.th), fz = -Math.cos(c.th), lx = fz, lz = -fx; // c's left
+      // put the learner one lane to the car's left, 12 m ahead, at the car's speed, signalling right
+      p.place(c.x + fx * 12 + lx * 3.65, c.z + fz * 12 + lz * 3.65, c.th); p.v = c.v; if (p.indicator !== 'R') p.signal('R');
+      const v0 = c.v; window.__target = c.v; for (let i = 0; i < 60; i++) a.step(1);
+      const r = { v0, v1: c.v, yielding: !!c.yielding }; p.signal('R'); return r; });
+    assert.ok(room && room.yielding && room.v1 < room.v0 - 1.5, 'a courteous driver should drop back for a learner signalling into its lane: ' + JSON.stringify(room));
+    console.log(`Signals: ${sig.signalled} of ${sig.changes} lane changes signalled first; a courteous driver dropped from ${(room.v0 * 2.237).toFixed(0)} to ${(room.v1 * 2.237).toFixed(0)} mph to let the learner in.`);
   }
 
   // ---------- leaving at a junction: a route back onto the circuit is built from wherever you are ----------
