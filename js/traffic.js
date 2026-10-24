@@ -11,6 +11,9 @@ const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a
 export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestrianMesh = null) {
   let clock = 0;
   let random=Math.random;
+  // drivers' traits come from a stream of their own, so adding them left the traffic itself (where each
+  // vehicle starts, its speed, its turns) exactly as each seeded lesson was tuned against
+  let traitRandom=Math.random;
   // lessons can script a junction: { group, t0 } holds `group` on green until t0, then runs amber, red, red-and-amber, green
   const overrides = new Map();
   // UK sequence: red, red+amber, green, amber, red. Junctions alternate two groups; stand-alone crossings get a pedestrian phase.
@@ -153,7 +156,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       // every driver a little different, from the drive's own seed: how close they follow, how big a gap
       // they want before changing lane, how long they signal first, whether they make room for others,
       // and the few who never signal
-      if (a.kind === 'car') a.traits = { headway: 1.1 + random() * 1.4, gap: 0.8 + random() * 0.6, wait: 1.5 + random() * 1.5, courtesy: random() < 0.55, signals: random() > 0.05 };
+      if (a.kind === 'car') a.traits = { headway: 1.1 + traitRandom() * 1.4, gap: 0.8 + traitRandom() * 0.6, wait: 1.5 + traitRandom() * 1.5, courtesy: traitRandom() < 0.55, signals: traitRandom() > 0.05 };
       a.intent = null; a.ind = null;
       // Motorway traffic is not all one speed: lane 1 carries the slower vehicles (lorries are limited to
       // 56 mph), the outer lanes the faster ones, so there is always something to catch up with.
@@ -439,7 +442,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   let density = 'normal';
   function setDensity(value) { if (!['normal', 'light', 'none'].includes(value)) throw new Error('Unsupported traffic density'); density = value; all.forEach(a => a.scripted = false); }
   function reset(px,pz,seed) {
-    random=seededRandom(seed);clock=0;overrides.clear();
+    random=seededRandom(seed);traitRandom=seededRandom((seed^0x9e3779b9)>>>0);clock=0;overrides.clear();
     all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;a.emergency=false;});
     all.forEach(a=>spawn(a,px,pz,true));
     net.zebras.forEach(z=>Object.assign(z.ped,{state:'idle',t:2+(z.id*7.1)%9,p:0,dir:1}));
