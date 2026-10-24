@@ -1,6 +1,6 @@
 // The examiner: follows progress along the route, re-routes when you go off it, and marks faults DVSA-style.
 import { MARKING, RULES } from './config.js';
-import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet } from './net.js';
+import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet, paved } from './net.js';
 
 const MPH = 2.23694;
 export function approachLane(nr,approach,heading) {
@@ -17,14 +17,14 @@ export function createTest(net, traffic, player) {
   };
   t.setRoute = (route, nodes) => { t.route = route; t.waypoints = nodes; };
   t.fault = (kind, cat, text, key, cd = 8) => {
-    if (!t.running) return; const now = traffic.clock;
+    if (!t.running || t.ungraded) return; const now = traffic.clock; // free drive is never marked
     if (key) { if (t.cool[key] && now < t.cool[key]) return; t.cool[key] = now + cd; }
     t.faults.unshift({ kind, cat, text, key: key || null, context: t.context || null, elapsed: Math.max(0, now - (t.startedAt ?? now)), at: now, x: Math.round(player.x * 10) / 10, z: Math.round(player.z * 10) / 10 }); if (kind === 'S') t.S++; else t.D++;
     t.onFault && t.onFault();
   };
   t.reset = () => {
     t.basicStatus = null; t.alert = null; t.coach = null;
-    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [] });
+    Object.assign(t, { lap: null, done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [] });
     for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
   t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
@@ -47,7 +47,7 @@ export function createTest(net, traffic, player) {
     const dist = Math.sqrt(bd);
     t.offRoute = dist > 22;
     if (!t.offRoute) { t.idx = best; t.sRoute = Math.max(t.sRoute, s); t.offT = 0; }
-    else { t.offT += dt; if (t.offT > 2.5) reroute(); }
+    else { t.offT += dt; if (t.offT > 2.5) (t.ungraded && t.onOffRoute ? rejoin() : reroute()); }
     // current instruction (a roundabout stays current until you leave it at your exit)
     const ins = R.instructions; while (t.step < ins.length - 1 && t.sRoute > (ins[t.step].exitS ?? ins[t.step].s) + 6) t.step++;
   }
@@ -66,12 +66,40 @@ export function createTest(net, traffic, player) {
     } catch (e) { t.offT = 0; }
   }
 
+  // Free drive: off the circuit (out at a junction, say), the drive owner builds a route back onto it.
+  // The route starts at the beginning of the road the car is on and runs along it, so the car is on the
+  // route from the first moment; starting at the far end left it "off route" for the whole slip road.
+  function rejoin() {
+    const nr = nearest(net, player.x, player.z); t.offT = 0; if (!nr || nr.d > 30) return;
+    const fwd = (-Math.sin(player.th)) * nr.tx + (-Math.cos(player.th)) * nr.tz, d = nr.e.way.oneway ? 1 : (fwd >= 0 ? 1 : -1);
+    t.onOffRoute(d > 0 ? nr.e.a : nr.e.b, d > 0 ? nr.e.b : nr.e.a);
+  }
+  // put progress where the car actually is on a freshly built route (its first stretch, not just 45 m)
+  t.snapProgress = (reach = 1500) => {
+    const R = t.route; let best = 0, bd = 1e18, bs = 0;
+    for (let j = 0; j < R.xs.length - 1 && R.cum[j] < reach; j++) {
+      const ax = R.xs[j], az = R.zs[j], dx = R.xs[j + 1] - ax, dz = R.zs[j + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      const u = Math.max(0, Math.min(1, ((player.x - ax) * dx + (player.z - az) * dz) / L2)), d = (player.x - ax - dx * u) ** 2 + (player.z - az - dz * u) ** 2;
+      if (d < bd) { bd = d; best = j; bs = R.cum[j] + u * Math.sqrt(L2); }
+    }
+    t.idx = best; t.sRoute = bs; t.offRoute = false; t.offT = 0;
+  };
+  // Free drive: a lap route carries on a quarter-lap past its own start, and once the car is round,
+  // progress steps back one lap. The road under the car is the same either way, so nothing jumps.
+  t.useLap = (route, start, len) => { t.route = route; t.lap = { start, len }; t.idx = 0; t.sRoute = 0; t.step = 0; t.offT = 0; };
+  function rollLap() {
+    const L = t.lap; if (!L || t.sRoute < L.start + L.len + 30) return false;
+    t.sRoute -= L.len; let i = Math.min(t.idx, t.route.cum.length - 2); while (i > 0 && t.route.cum[i] > t.sRoute) i--; t.idx = i; t.step = 0;
+    return true;
+  }
+
   t.update = (dt, inputSteer) => {
     if (!t.running) return;
     if (t.mode === 'manoeuvre') { t.ctx = nearest(net, player.x, player.z); if (Math.abs(player.v) > 0.3) t.parked = false; return; }
     const v = player.v, mph = Math.abs(v) * MPH, fx = -Math.sin(player.th), fz = -Math.cos(player.th);
     const nr = nearest(net, player.x, player.z); t.ctx = nr;
     progress(dt);
+    if (t.ungraded && rollLap() && t.onLap) t.onLap();
     // waypoints passed (for re-routing)
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;
@@ -104,7 +132,7 @@ export function createTest(net, traffic, player) {
       if (timer('pos', v > 2 && offL < -0.5, dt) > 1.4) t.fault('D', 'Positioning – normal driving', 'Drove on the right-hand side of the road', 'pos', 8);
     } else timer('pos', false, dt);
     // kerb
-    if (nr.d > way.w / 2 + 0.8 && !inFillet(net, player.x, player.z)) { if (!t.flags.kerb && Math.abs(v) > 1.2) { t.flags.kerb = true; t.fault('D', 'Control – steering', 'Mounted the kerb', 'kerb', 4); } }
+    if (nr.d > paved(way) + 0.8 && !inFillet(net, player.x, player.z)) { if (!t.flags.kerb && Math.abs(v) > 1.2) { t.flags.kerb = true; t.fault('D', 'Control – steering', 'Mounted the kerb', 'kerb', 4); } }
     else if (nr.d < way.w / 2) t.flags.kerb = false;
     // roundabout entry
     if (way.rb && !t.onRb && v > 3.2) {
@@ -263,7 +291,7 @@ export function createTest(net, traffic, player) {
     }
     // finish: near the end, stopped, on the left
     const last = t.route.instructions[t.route.instructions.length - 1];
-    if (t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 35 && Math.abs(v) < 0.3) {
+    if (!t.ungraded && t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 35 && Math.abs(v) < 0.3) {
       const offL = nr.lat * (way.oneway ? 1 : (Math.sign(along) || 1));
       if (offL > (way.oneway ? -0.5 : 0.3)) finish();
     }

@@ -1,8 +1,9 @@
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
 import { WORLD } from './config.js';
-import { posAt, laneInfo, nearest } from './net.js';
-import { buildChunkContent } from './city.js';
+import { posAt, laneInfo, nearest, paved } from './net.js';
+import { MW } from './motorway.js';
+import { buildChunkContent, kitResources } from './city.js';
 import { buildSigns } from './signs.js';
 import { createRoadsideParkingView } from './roadside-parking-view.js';
 
@@ -54,7 +55,38 @@ export function buildWorld(scene, net, traffic) {
     if (!a) roadChunks.set(key, a = { pave: new Acc(), road: new Acc(), cyc: new Acc(), white: new Acc(), meshes: [] }); return a;
   };
   const bikeMarks = [];
+  // Motorways: no footway, a hard shoulder on the nearside and a hard strip by the central reservation,
+  // solid edge lines, and lane lines to diagram 1005.1 (2 m mark, 7 m gap, 150 mm wide: the over-40 mph
+  // module in Traffic Signs Manual chapter 5). Where a slip road runs alongside, the nearside edge line
+  // becomes a short broken line instead (diagram 1010; its exact module is approximated here).
+  const isMway = (wy) => wy.cls === 'motorway' || wy.cls === 'motorway_link';
+  const slipOut = (v) => net.out[v].some(o => o.e.way.cls === 'motorway_link') && net.out[v].some(o => o.e.way.cls === 'motorway');
+  const slipIn = (v) => net.inc[v].some(o => o.dir < 0 && o.e.way.cls === 'motorway_link') && net.inc[v].some(o => o.dir < 0 && o.e.way.cls === 'motorway');
+  const line = (acc, e, off, s0, s1, half = 0.1) => ribbon(acc, e, off - half, off + half, 0.07, Math.max(0, s0), Math.min(e.len, s1));
+  const broken = (acc, e, off, s0, s1, mark, gap, half) => { for (let s = Math.max(0, s0); s < Math.min(e.len, s1) - 0.2; s += mark + gap) dash(acc, e, s, Math.min(mark, s1 - s), off, 0.07, half); };
+  function motorwayEdge(e) {
+    const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), J = MW.junction;
+    if (wy.cls === 'motorway') {
+      ribbon(A.road, e, -(w / 2 + MW.hardStrip), w / 2 + (wy.hs || 0), 0.04);
+      line(A.white, e, -w / 2, 0, e.len); // offside edge, by the central reservation
+      const L = laneInfo(e, 1);
+      for (let k = 1; k < L.n; k++) broken(A.white, e, L.outer - L.laneW * k, 4, e.len - 2, 2, 7, 0.075);
+      // nearside edge: broken where a slip road runs alongside lane 1, solid everywhere else
+      const dec = slipOut(e.a) ? J.decel : 0, acc = slipIn(e.b) ? J.accel : 0;
+      if (dec) broken(A.white, e, w / 2, 0, dec, 1, 1, 0.15);
+      if (acc) broken(A.white, e, w / 2, e.len - acc, e.len, 1, 1, 0.15);
+      line(A.white, e, w / 2, dec, e.len - acc);
+      return;
+    }
+    // slip road: one lane between solid edge lines, except where it runs alongside the carriageway
+    const exit = slipOut(e.a), entry = slipIn(e.b);
+    ribbon(A.road, e, -(w / 2 + 0.6), w / 2 + 0.6, 0.041);
+    line(A.white, e, w / 2, exit ? 80 : 0, entry ? e.len - 80 : e.len);
+    line(A.white, e, -w / 2, exit ? J.decel : 0, entry ? e.len - J.accel : e.len);
+  }
+
   for (const e of net.edges) {
+    if (isMway(e.way)) { motorwayEdge(e); continue; }
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
     ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
     ribbon(road, e, -w / 2, w / 2, 0.04);
@@ -191,7 +223,7 @@ export function buildWorld(scene, net, traffic) {
   const heads = new T.InstancedMesh(headG, new T.MeshLambertMaterial({ color: 0x15181a }), nS);
   const lamps = [0, 1, 2].map(() => new T.InstancedMesh(lampG, new T.MeshBasicMaterial({ color: 0xffffff }), nS));
   // a pole must stand on the pavement or an island, never in a carriageway or on a cycle track
-  const clear = (x, z) => { const nr = nearest(net, x, z); if (nr && nr.d < nr.way.w / 2 + 0.6) return false; return !net.cycleRings.some(r => Math.abs(Math.hypot(x - r.x, z - r.z) - r.r) < 1.8); };
+  const clear = (x, z) => { const nr = nearest(net, x, z); if (nr && nr.d < paved(nr.way) + 0.6) return false; return !net.cycleRings.some(r => Math.abs(Math.hypot(x - r.x, z - r.z) - r.r) < 1.8); };
   S.forEach((st, i) => {
     const nx = st.tz, nz = -st.tx; // left of travel
     let px = st.x + nx * (st.w / 2 + 1.0), pz = st.z + nz * (st.w / 2 + 1.0);
@@ -221,6 +253,20 @@ export function buildWorld(scene, net, traffic) {
 
   buildSigns(scene, net);
 
+  // Central reservation: a concrete step barrier along the motorway's centre line, one instance per
+  // segment so the whole circuit is a single draw call.
+  const segs = []; for (const b of net.barriers) for (let i = 0; i < b.length - 1; i++) segs.push([b[i], b[i + 1]]);
+  if (segs.length) {
+    const bar = new T.InstancedMesh(new T.BoxGeometry(0.6, 1.0, 1).translate(0, 0.5, 0), new T.MeshLambertMaterial({ color: 0xd2d0c8 }), segs.length); // concrete step barrier, about 1 m
+    const q = new T.Quaternion(), e = new T.Euler(), v = new T.Vector3(), sc = new T.Vector3();
+    segs.forEach(([p, r], i) => {
+      const dx = r[0] - p[0], dz = r[1] - p[1], len = Math.hypot(dx, dz);
+      e.set(0, Math.atan2(dx, dz), 0); q.setFromEuler(e);
+      M4.compose(v.set((p[0] + r[0]) / 2, 0, (p[1] + r[1]) / 2), q, sc.set(1, 1, len + 0.05)); bar.setMatrixAt(i, M4);
+    });
+    bar.frustumCulled = false; bar.receiveShadow = true; scene.add(bar);
+  }
+
   // lazy chunks of buildings, roofs, awnings, lamps and trees (see city.js)
   const chunks = new Map(), queue = [];
   const C = net.chunkSize;
@@ -228,6 +274,17 @@ export function buildWorld(scene, net, traffic) {
     const edges = net.chunks.get(key);
     const grp = edges ? buildChunkContent(net, edges, cx, cz, C, rng(key)) : new T.Group();
     chunks.set(key, grp); scene.add(grp);
+  }
+  // Geometry and materials shared by every chunk (the city kit) must survive; everything else the chunk
+  // made for itself goes, including the per-chunk instance buffers.
+  function freeChunk(g) {
+    const keep = new Set(kitResources());
+    g.traverse(o => {
+      if (o.isInstancedMesh) o.dispose();
+      if (o.geometry && !keep.has(o.geometry)) o.geometry.dispose();
+      for (const m of [].concat(o.material || [])) if (!keep.has(m)) { if (m.map && !keep.has(m.map)) m.map.dispose(); m.dispose(); }
+    });
+    scene.remove(g);
   }
   function updateChunks(px, pz, budget) {
     const r = Math.ceil(WORLD.buildRadius / C), pcx = Math.floor(px / C), pcz = Math.floor(pz / C);
@@ -240,12 +297,21 @@ export function buildWorld(scene, net, traffic) {
     queue.sort((a, b) => a[3] - b[3]);
     for (let n = 0; n < budget && queue.length; n++) { const [k, cx, cz] = queue.shift(); buildChunk(k, cx, cz); }
     for (const [k, g] of chunks) {
-      const cx = Math.floor(k / 8192) - 4000, cz = (k % 8192) - 4000;
-      g.visible = Math.hypot((cx + 0.5) * C - px, (cz + 0.5) * C - pz) < WORLD.hideRadius;
+      const cx = Math.floor(k / 8192) - 4000, cz = (k % 8192) - 4000, d = Math.hypot((cx + 0.5) * C - px, (cz + 0.5) * C - pz);
+      g.visible = d < WORLD.hideRadius;
+      // Far behind: free it. A chunk that was only hidden stayed in memory for the rest of the drive,
+      // so a long motorway drive kept every building and tree it had ever passed. It is rebuilt, the
+      // same as before (the scenery is seeded by chunk), if the driver comes back.
+      if (d > WORLD.freeRadius) { freeChunk(g); chunks.delete(k); }
     }
     for (const A of roadChunks.values()) {
-      const vis = Math.hypot((A.cx + 0.5) * C - px, (A.cz + 0.5) * C - pz) < WORLD.hideRadius + 200;
+      const d = Math.hypot((A.cx + 0.5) * C - px, (A.cz + 0.5) * C - pz), vis = d < WORLD.hideRadius + 200;
       for (const m of A.meshes) m.visible = vis;
+      // The road itself is built once for the whole map, but a hidden mesh keeps its GPU buffers from
+      // the last time it was drawn, so a lap of the motorway left every section it had passed on the
+      // GPU. Far behind, give the buffers back; the geometry stays here and uploads again on return.
+      if (d > WORLD.freeRadius && A.onGpu) { for (const m of A.meshes) m.geometry.dispose(); A.onGpu = false; }
+      else if (vis) A.onGpu = true;
     }
   }
 
@@ -266,10 +332,10 @@ export function buildWorld(scene, net, traffic) {
   return { updateChunks, updateSignals, updateSun, setShadows, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
 }
 
-function dash(acc, e, s, len, off, y) {
+function dash(acc, e, s, len, off, y, half = 0.07) {
   const a = posAt(e, s), b = posAt(e, Math.min(e.len, s + len));
   const ax = a.x + a.tz * off, az = a.z - a.tx * off, bx = b.x + b.tz * off, bz = b.z - b.tx * off;
-  const nx = a.tz * 0.07, nz = -a.tx * 0.07;
+  const nx = a.tz * half, nz = -a.tx * half;
   acc.quad(ax + nx, az + nz, ax - nx, az - nz, bx - nx, bz - nz, bx + nx, bz + nz, y);
 }
 function bikeTexture() {

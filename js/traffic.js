@@ -100,7 +100,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     let tot = 0; const w = use.map(o => {
       const q = along(o.e, Math.min(5, o.e.len / 2), o.dir);
       const ang = Math.abs(Math.atan2(p.tx * q.tz - p.tz * q.tx, p.tx * q.tx + p.tz * q.tz));
-      let rank = isMain(o.e.way.cls) ? 2.2 : /tertiary/.test(o.e.way.cls) ? 1.6 : o.e.way.rb ? 3 : 0.7;
+      // on a motorway most traffic carries on past a junction; about one car in eight takes the slip road
+      let rank = o.e.way.cls === 'motorway' ? 7 : o.e.way.cls === 'motorway_link' ? 1 : isMain(o.e.way.cls) ? 2.2 : /tertiary/.test(o.e.way.cls) ? 1.6 : o.e.way.rb ? 3 : 0.7;
       if (a.kind === 'bike' && (o.e.way.cl || o.e.way.cr)) rank *= 2.5;
       const x = rank * (ang < 0.5 ? 3 : 1); tot += x; return x;
     });
@@ -131,8 +132,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (e.len < 25) continue;
       const mid = posAt(e, e.len / 2), d = Math.hypot(mid.x - px, mid.z - pz);
       if (d < (first ? 40 : TRAFFIC.spawnMin) || d > TRAFFIC.spawnMax) continue;
-      if (a.kind === 'bike') { if (/trunk/.test(e.way.cls)) continue; if (!(e.way.cl || e.way.cr) && random() < 0.7) continue; }
-      else if (!/^(trunk|primary|secondary|tertiary|unclassified|residential)/.test(e.way.cls) && random() < 0.6) continue;
+      if (a.kind === 'bike') { if (/^(trunk|motorway)/.test(e.way.cls)) continue; if (!(e.way.cl || e.way.cr) && random() < 0.7) continue; }
+      else if (!/^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)/.test(e.way.cls) && random() < 0.6) continue;
       const dir = e.way.oneway ? 1 : (random() < 0.5 ? 1 : -1);
       const lane = a.kind === 'car' ? Math.floor(random() * laneInfo(e, dir).n) : 0;
       const s = 8 + random() * Math.max(1, e.len - 20);
@@ -142,6 +143,10 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       if (all.some(o => o !== a && o.alive && Math.hypot(o.x - p.x, o.z - p.z) < (a.kind === 'bike' ? 10 : 18))) continue;
       Object.assign(a, { v: a.kind === 'bike' ? 4 : 5, x: p.x, z: p.z, th: Math.atan2(-p.tx, -p.tz), stuck: 0, ghost: 0, alive: true });
       a.next = chooseNext(a); a.cruise = a.kind === 'bike' ? 4.4 + random() * 2.2 : 0.88 + random() * 0.12;
+      // Motorway traffic is not all one speed: lane 1 carries the slower vehicles (lorries are limited to
+      // 56 mph), the outer lanes the faster ones, so there is always something to catch up with.
+      if (a.kind === 'car' && e.way.cls === 'motorway') a.cruise = [0.76, 0.9, 0.95][Math.min(lane, 2)] + random() * 0.07;
+      a.v = a.kind === 'car' && e.way.cls === 'motorway' ? e.way.mph * 0.447 * a.cruise * 0.9 : a.v; // join the flow already moving
       a.mesh.position.set(a.x,0,a.z);a.mesh.rotation.y=a.th;a.mesh.visible = true; return true;
     }
     a.alive = false; a.mesh.visible = false; a.x = a.z = 1e6; return false;

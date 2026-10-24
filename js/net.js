@@ -11,8 +11,11 @@ export async function loadNet(url) {
 
 export function buildNet(d) {
   const net = { origin: d.origin, kx: d.kx, kz: d.kz, names: d.names, chunkSize: 400 };
+  // motorway extras: the central reservation barrier, the blue junction signs, and the junction list
+  net.barriers = (d.barriers || []).map(f => { const out = []; for (let i = 0; i < f.length; i += 2) out.push([f[i] / 10, f[i + 1] / 10]); return out; });
+  net.mwSigns = d.mwSigns || []; net.motorway = d.motorway || null;
   // cl/cr: cycle lane on the left/right of the way's direction (0 none, 1 advisory, 2 mandatory, 3 separate track); cw: lane width
-  const ways = d.ways.map(w => ({ name: d.names[w[0]], cls: d.classes[w[1]], mph: w[2], assumed: !!w[3], oneway: w[4], w: w[5], rb: !!w[6], lanes: w[7], cl: w[8] || 0, cr: w[9] || 0, cw: (w[10] || 15) / 10 }));
+  const ways = d.ways.map(w => ({ name: d.names[w[0]], cls: d.classes[w[1]], mph: w[2], assumed: !!w[3], oneway: w[4], w: w[5], rb: !!w[6], lanes: w[7], cl: w[8] || 0, cr: w[9] || 0, cw: (w[10] || 15) / 10, hs: (w[11] || 0) / 10 }));
   const nN = d.nodes.length / 2;
   const nx = new Float32Array(nN), nz = new Float32Array(nN);
   for (let i = 0; i < nN; i++) { nx[i] = d.nodes[2 * i] / 10; nz[i] = d.nodes[2 * i + 1] / 10; }
@@ -164,6 +167,9 @@ export function laneCentre(e, dir, i = 0) {
   const L = laneInfo(e, dir); i = Math.min(i, L.n - 1);
   return L.outer - L.laneW * (i + 0.5);
 }
+// How far paved road reaches from a way's centre line on its widest side: the hard shoulder on a
+// motorway is road surface, not verge, so stopping on it is not "mounting the kerb".
+export const paved = (w) => w.w / 2 + Math.max(w.hs || 0, w.cls === 'motorway' ? 1 : 0);
 export const laneOffset = (w) => w.oneway ? (w.w > 7.6 && !w.rb ? w.w / 4 : (w.rb ? 0.8 : 0)) : Math.min(w.w / 4, 2.2);
 export const endNode = (st) => st.dir > 0 ? st.e.b : st.e.a;
 export const startNode = (st) => st.dir > 0 ? st.e.a : st.e.b;

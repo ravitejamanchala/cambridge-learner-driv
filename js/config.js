@@ -44,7 +44,8 @@ export const RULES = { cyclistGap: 1.5 };
 export const MARKING = { maxDrivingFaults: 15 };
 
 export const WORLD = {
-  chunk: 400, buildRadius: 820, hideRadius: 1050, fogNear: 260, fogFar: 880,
+  chunk: 400, buildRadius: 820, hideRadius: 1050, freeRadius: 1500, // scenery chunks further than freeRadius are freed, not just hidden
+  fogNear: 260, fogFar: 880,
   sky: 0xb7c8d4, ground: 0x9aa585, road: 0x464b51, pave: 0xc9c3b6, line: 0xf2f1ea, cycle: 0x8a4a40,
   shadowBox: 90, shadowMap: (typeof window !== 'undefined' && window.innerWidth < 700) ? 1024 : 2048,
   brick: [0xdccfae, 0xd3c39c, 0xa96c52, 0xb8826a, 0xe7e2d6, 0xc9b48d, 0x9b6a55, 0xe0d7c3],

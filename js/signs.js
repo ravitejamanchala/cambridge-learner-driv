@@ -5,7 +5,7 @@
 import { along, laneInfo, laneCentre, stopsNear, nearest, laneArrows } from './net.js';
 
 const T = THREE;
-const RANK = { trunk: 6, trunk_link: 5.5, primary: 5, primary_link: 4.5, secondary: 4, secondary_link: 3.5, tertiary: 3, tertiary_link: 2.5, unclassified: 2, residential: 1, living_street: 0 };
+const RANK = { motorway: 7, motorway_link: 6.5, trunk: 6, trunk_link: 5.5, primary: 5, primary_link: 4.5, secondary: 4, secondary_link: 3.5, tertiary: 3, tertiary_link: 2.5, unclassified: 2, residential: 1, living_street: 0 };
 const rank = (e) => e.way.rb ? 10 : (RANK[e.way.cls] ?? 1);
 
 function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); t.anisotropy = 4; return t; }
@@ -107,6 +107,9 @@ export function buildSigns(scene, net) {
   for (let v = 0; v < net.nx.length; v++) {
     const inc = net.inc[v]; if (inc.length < 2) continue;
     const signals = sigAt(v), mini = miniAt(v), hasRb = inc.some(o => o.e.way.rb);
+    // A motorway diverge or merge is not a junction you give way at: slip roads leave and join with
+    // their own markings (world.js), and nothing is painted across the running lanes.
+    if (!hasRb && inc.some(o => o.e.way.cls === 'motorway')) continue;
     // --- give way, SLOW, lane arrows on approaches ---
     if (inc.length >= 3 || hasRb) for (const o of inc) {
       if (o.e.way.rb || !canArrive(o)) continue;
@@ -165,4 +168,39 @@ export function buildSigns(scene, net) {
   const lm = new T.MeshBasicMaterial({ color: 0xf2f1ea, side: T.DoubleSide }); lm.depthWrite = false;
   const lmesh = new T.Mesh(g, lm); lmesh.renderOrder = 4; lmesh.frustumCulled = false; scene.add(lmesh);
   for (const b of [B.tri, B.slow, B.gwSign, B.noEntry, B.discBack, B.triBack, B.poles, ...Object.values(B.arrows), ...Object.values(B.roundel), ...Object.values(B.speed)]) b.build(scene);
+  for (const sg of net.mwSigns || []) scene.add(motorwaySign(sg));
+}
+
+// ---- motorway signs ----
+// Blue with white lettering; the junction number in white on a black panel, as on UK motorways.
+export const MWAY_BLUE = '#0b4ea2';
+export function motorwaySignTex({ j, to, kind = 'exit', distance = null }) {
+  return canvasTex(512, 320, (g, W, H) => {
+    g.fillStyle = MWAY_BLUE; g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#fff'; g.lineWidth = 10; g.strokeRect(12, 12, W - 24, H - 24);
+    g.fillStyle = '#111'; g.fillRect(36, 36, 120, 70); g.fillStyle = '#fff';
+    g.font = '700 50px Geist, ui-sans-serif, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(j), 96, 73);
+    g.textAlign = 'left'; g.font = '700 58px Geist, ui-sans-serif, system-ui, sans-serif';
+    g.fillText(to, 50, 190);
+    if (distance) { g.font = '600 40px Geist, ui-sans-serif, system-ui, sans-serif'; g.fillText(distance, 50, 262); }
+    if (kind === 'exit') { // arrow pointing up and to the left: leave here
+      g.save(); g.translate(W - 110, H - 110); g.rotate(-Math.PI / 4); g.lineWidth = 16; g.lineCap = 'butt';
+      g.beginPath(); g.moveTo(0, 60); g.lineTo(0, -30); g.stroke();
+      g.beginPath(); g.moveTo(-34, -20); g.lineTo(0, -66); g.lineTo(34, -20); g.closePath(); g.fill(); g.restore();
+    }
+  });
+}
+// a board on two legs on the verge, facing the traffic it is for
+export function motorwaySign(sg) {
+  const grp = new T.Group(), w = 6.4, h = 4.0, base = 1.5; // big enough to read at 70 mph
+  const board = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: motorwaySignTex(sg) }));
+  board.position.y = base + h / 2; grp.add(board);
+  const back = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ color: 0x8a9096 }));
+  back.position.set(0, base + h / 2, -0.03); back.rotation.y = Math.PI; grp.add(back);
+  const legG = new T.CylinderGeometry(0.08, 0.08, base + h - 0.2, 8).translate(0, (base + h - 0.2) / 2, 0), legM = new T.MeshLambertMaterial({ color: 0x8a9096 });
+  for (const x of [-w / 2 + 0.5, w / 2 - 0.5]) { const leg = new T.Mesh(legG, legM); leg.position.set(x, 0, -0.08); grp.add(leg); }
+  grp.position.set(sg.x, 0, sg.z); grp.rotation.y = Math.atan2(-sg.tx, -sg.tz); // the face looks back at approaching drivers
+  grp.userData.motorwaySign = sg;
+  return grp;
 }
