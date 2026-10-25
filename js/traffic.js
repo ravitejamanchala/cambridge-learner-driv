@@ -285,6 +285,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // roads where vehicles change lane freely: motorways and fast dual carriageways, never a roundabout
   const laneRoad = (a) => { const w = a.e.way; return !w.rb && laneInfo(a.e, a.dir).n >= 2 && (w.cls === 'motorway' || (w.cls === 'trunk' && w.mph >= 50)); };
   function signalFor(a, rem) {
+    if (a.hazard) { a.ind = 'H'; return; } // broken down: hazard lights
     if (a.traits && !a.traits.signals) { a.ind = null; return; }
     let ind = null;
     if (a.intent) ind = a.intent.to < a.lane ? 'L' : 'R';
@@ -321,7 +322,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     // and side-road traffic joins across them, so there a vehicle keeps the lane it chose
     if (n < 2 || a.pinned || a.keepTo || !laneRoad(a)) return;
     const mw = w.cls === 'motorway', exiting = mw && a.next && a.next.e.way.cls === 'motorway_link';
-    if (!exiting && (rem < 50 || a.s < 10)) return; // near a junction the lane says where it is going
+    // a lane closed ahead (a red X on a gantry, roadworks): move out of it in good time, and never into one;
+    // where it is about to end, a smaller gap will do (merging in turn)
+    const rs = mw && restrict ? restrict.sOf(a) : null, shut = (l) => rs != null && restrict.closesAt(l, rs, 450) != null;
+    const closing = shut(a.lane), late = closing && restrict.closesAt(a.lane, rs, 120) != null;
+    if (!exiting && !closing && (rem < 50 || a.s < 10)) return; // near a junction the lane says where it is going
     const here = offsetFor(a, a.e, a.dir), want = w.mph * 0.447 * a.cruise;
     // what is in lane `l`, between `back` metres behind and `ahead` metres in front
     const inLane = (l, back, ahead) => { const d = laneCentre(a.e, a.dir, l) - here, hits = [];
@@ -330,7 +335,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
         if (Math.cos((o.th || 0) - a.th) < 0.8) continue; // not going this way
         if (Math.abs(rx * fz - rz * fx - d) < 2) hits.push({ o, fwd }); }
       return hits; };
-    const g = a.traits?.gap ?? 1, clear = (l) => inLane(l, 20 * g, 25 * g).length === 0 && !inLane(l, 60, 0).some(h => h.o.isPlayer && -h.fwd < Math.max(15, Math.abs(h.o.v) * 2.5));
+    const g = (a.traits?.gap ?? 1) * (late ? 0.6 : 1), clear = (l) => inLane(l, 20 * g, 25 * g).length === 0 && !inLane(l, 60, 0).some(h => h.o.isPlayer && -h.fwd < Math.max(15, Math.abs(h.o.v) * 2.5));
     const slowerAhead = (l, within) => inLane(l, 0, within).some(h => h.fwd > 4 && Math.abs(h.o.v) < want - 2.5);
     // A driver signals first and moves only when the signal has been on a moment (1.5 to 3 s, by driver)
     // and the gap is still there: so the learner can see what the vehicle is about to do.
@@ -340,10 +345,12 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       a.intent = { to, at: clock + (a.traits?.wait ?? 2) }; };
     // courtesy: a learner coming down a slip road beside the left-hand lane, and the next lane clear
     const makeRoom = mw && a.lane === 0 && a.traits?.courtesy && playerOnSlip && player && (() => { const f = (player.x - a.x) * fx + (player.z - a.z) * fz; return f > -30 && f < 140; })();
-    const wants = [];
+    let wants = [];
+    if (closing) wants.push(a.lane - 1, a.lane + 1); // out of the closing lane first, to the left by choice
     if (makeRoom) wants.push(1);
     if (a.lane > 0 && (exiting || !slowerAhead(a.lane - 1, 70))) wants.push(a.lane - 1);
     if (!exiting && a.lane < n - 1 && slowerAhead(a.lane, 45)) wants.push(a.lane + 1);
+    wants = wants.filter(l => l >= 0 && l < n && !shut(l));
     if (a.intent && wants.includes(a.intent.to)) { intend(a.intent.to); return; }
     const to = wants.find(l => clear(l)); if (to != null) { intend(to); return; }
     if (a.intent && !a.intent.keep) a.intent = null; // nothing to do after all: signal off
@@ -416,6 +423,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
+    // a lower limit on the gantries or at roadworks, and a closed lane never driven into: a vehicle that has
+    // not got out of it in time stops short and waits for a gap
+    if (restrict && w.cls === 'motorway' && !bike) { const rs = restrict.sOf(a);
+      if (rs != null) { const lim = restrict.limitAt(rs); if (lim) vmax = Math.min(vmax, lim * 0.447 * Math.min(1, 0.92 + (a.cruise - 0.76) * 0.4));
+        const at = restrict.closesAt(a.lane, rs, 200); if (at != null) vmax = Math.min(vmax, brakeTo(0, at - rs - 6)); } }
     // Box junctions and KEEP CLEAR (Rule 174): wait before the area until there is room beyond it for this
     // vehicle, so a queue never blocks the junction. (A blue-light vehicle and cyclists filter as they would.)
     a.areaHold = false;
@@ -497,6 +509,9 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     updateRingBikes(0);
   }
   let playerOnSlip = false;
+  // temporary restrictions set by a lesson (js/mw-restrictions.js): { sOf, limitAt, closedAt, closesAt }
+  let restrict = null;
+  const setRestrictions = (r) => { restrict = r; };
   function update(dt, pl) {
     clock += dt; player = pl;
     { const n = nearestWhere(net, pl.x, pl.z, e => /^motorway/.test(e.way.cls)); playerOnSlip = !!n && n.d < 8 && n.way.cls === 'motorway_link'; }
@@ -527,5 +542,5 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     Object.assign(c, { scripted: true, traits: null, intent: null, ind: null, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), laneF: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false, held: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
-  return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };
+  return { setDensity, setRestrictions, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };
 }

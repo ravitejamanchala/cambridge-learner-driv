@@ -53,10 +53,10 @@ export function attachIndicators(body) {
   L.visible = R.visible = false; g.add(L, R); g.userData = { L, R }; body.add(g);
   return g;
 }
-// flash a vehicle's indicators: `dir` 'L', 'R' or null, `on` the flash phase
+// flash a vehicle's indicators: `dir` 'L', 'R', 'H' (hazard lights) or null, `on` the flash phase
 export function setIndicators(holder, dir, on) {
   let g = holder.userData.ind; if (!g || g.parent?.parent !== holder) g = holder.userData.ind = holder.getObjectByName('indicators');
-  if (!g) return; g.userData.L.visible = on && dir === 'L'; g.userData.R.visible = on && dir === 'R';
+  if (!g) return; g.userData.L.visible = on && (dir === 'L' || dir === 'H'); g.userData.R.visible = on && (dir === 'R' || dir === 'H'); // H: hazard lights
 }
 // switch a vehicle's lamps: all of them at dusk, and the front ones only if its headlights are on
 export function setLamps(body, dusk, headlights = true) {

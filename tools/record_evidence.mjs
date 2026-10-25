@@ -308,6 +308,27 @@ GROUPS.handling = {
         return async t => { await at(t, 0.5, signal); await at(t, 5, move); await at(t, 10, off); }; } },
   ],
 };
+// Temporary restrictions (the lessons in js/mw-restrictions.js): limits and a red X on the gantries, and
+// roadworks. Route metres: the gantries lesson's route starts at centre line 15200, the roadworks at 4000.
+GROUPS.restrictions = {
+  dir: 'docs/evidence/11-motorway-restrictions',
+  title: 'Speed limits on the gantries, a closed lane, and roadworks',
+  driverNote: 'Driven by the Bot lab\'s reference driver (`js/bots.js`, the one `npm run test:bots` checks every lesson with), which reads the same plan as the examiner: the limit ahead, and lanes about to close. The careless drives are checked by `npm run test:motorway`.',
+  clips: [
+    { name: '01-limits-on-the-gantries', driver: 'bot', lesson: { id: 'mw-smart-limits', scenario: 'motorway' }, seconds: 34,
+      caption: 'From the driver\'s seat: the first gantry shows 60 over every lane, so the driver is down to 60 by the time it gets there; the next shows 50, and an arrow over the left-hand lane. The speed display shows the limit the gantry set.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-smart-limits'); await camera(p, 1); await ffUntil(p, 'a => a.test.sRoute > 520', 60); } },
+    { name: '02-red-x-and-the-broken-down-car', driver: 'bot', lesson: { id: 'mw-smart-limits', scenario: 'motorway' }, seconds: 34,
+      caption: 'Out of the left-hand lane after the arrow, the driver passes under the red X over that lane, the amber lamps flashing beside it, and then the reason for it: a broken-down car with its hazard lights on. The driver keeps to the middle lane, which the examiner does not call hogging with the lane to its left closed.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-smart-limits'); await camera(p, 0); await ffUntil(p, 'a => a.test.sRoute > 1560', 120); } },
+    { name: '03-roadworks-lane-closed', driver: 'bot', lesson: { id: 'mw-roadworks', scenario: 'motorway' }, seconds: 38, speed: 2,
+      caption: 'Roadworks: the half-mile and lane-closed signs, the 50 limit on both sides, then Merge in turn. Overtaking in the right-hand lane when it closes, the driver signals and moves left into a gap in the middle lane before the cones, and keeps to 50 past the works to the end of the roadworks.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-roadworks'); await camera(p, 0); await ffUntil(p, 'a => a.test.sRoute > 330', 60); } },
+    { name: '04-feedback-gantry-by-gantry', driver: 'bot', lesson: { id: 'mw-smart-limits', scenario: 'motorway' }, seconds: 8,
+      caption: 'The result after a careful run: passed, and the feedback says what the gantry above your lane showed at each one and how fast you passed it.',
+      async setup(p) { await startDrive(p, 'lesson', 'mw-smart-limits'); await ffUntil(p, 'a => a.test.done', 400); } },
+  ],
+};
 // Approach a junction along one road: the steady driver follows the lane towards node `at` (x, z) on the road
 // named `road`, starting `from` metres out, and pulls up just short of the line it meets there.
 // With `through`, the path carries straight on along the same road past the junction for that many metres

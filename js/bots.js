@@ -206,13 +206,18 @@ function motorwayPlan(api, st, t, pl, tr) {
   const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr });
   if (f.laneF == null) { st.mw = null; return null; }
   const R = t.route, here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), v = Math.max(pl.v, 1);
+  // temporary restrictions (gantry signals, roadworks): the limit ahead, and lanes about to close
+  const RS = t.restriction, shutIn = (l, d) => RS?.closesIn?.(l, d) ?? null, shut = (l, d = 600) => shutIn(l, d) != null;
+  if (RS) f.closed = Array.from({ length: f.lanes }, (_, l) => l).filter(l => shut(l, 300));
   // a new drive (or a new route) starts afresh: the driver is reused from one drive to the next
   // ... and settles for a few seconds before changing lane: just joined, or just started (Rule 259)
   // (a new drive shows as the traffic clock starting again; a new route mid-drive keeps the settle time)
   const fresh = !st.mw || tr.clock < st.mw.clock;
   if (fresh || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: fresh ? tr.clock + 6 : st.mw.settle };
   const M = st.mw; M.clock = tr.clock;
-  const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
+  let cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30); const CAR = 4.6;
+  // down to a lower limit by its sign: look far enough ahead to slow gently
+  if (RS) { const lim = RS.limitAhead(v * v / 2 + 120); if (lim) cruise = Math.min(cruise, lim / MPH * 0.96); }
   const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
   // a vehicle signalling to move into a lane counts as in it: a careful driver waits for it rather than meeting it there
   const inLane = l => f.others.filter(o => o.lane === l || o.into === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
@@ -235,11 +240,14 @@ function motorwayPlan(api, st, t, pl, tr) {
     // overtake only when the next lane is actually moving faster than this one
     else if (lead && lead.v < cruise - 2 && (lead.fw - CAR) / v < 7 && here < f.lanes - 1 && (!next || next.fw > 150 || next.v > lead.v + 2)) want = here + 1;
     else if (here > 0 && !overtaking(f, here)) want = here - 1;
+    // out of a lane that closes ahead (to the left if that lane is open), and never into one
+    if (RS) { if (shut(here)) want = here > 0 && !shut(here - 1) ? here - 1 : here + 1; else if (want !== here && shut(want)) want = here; }
     if (want !== here && safeInto(want, want < here)) {
       const dir = want > here ? 1 : -1; Object.assign(M, { want, from: here, moving: true, go: tr.clock + 1.8 });
       look(dir); indicate(dir > 0 ? 'R' : 'L');
-    } else if (want < here && exitIn != null && exitIn > 280) {
-      // getting across for an exit: pick the gap in the lane you need and match its speed to drop into it
+    } else if (want < here && ((exitIn != null && exitIn > 280) || (RS && shut(here)))) {
+      // getting across for an exit, or out of a closing lane: pick the gap in the lane you need and match its
+      // speed to drop into it
       const cars = inLane(want), gaps = [];
       for (let g = 0; g <= cars.length; g++) {
         const b = cars[g - 1], a = cars[g], lo = b ? b.fw + CAR + 1.6 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
@@ -279,6 +287,11 @@ function motorwayPlan(api, st, t, pl, tr) {
   }
   // an exit let go: the route still turns up the slip road, so steer by the motorway itself, in this lane,
   // until the lesson routes on to the next junction
+  if (RS) {
+    target = Math.min(target, cruise);
+    // still in a lane about to close with no way out yet: stop short of it rather than drive into the cones
+    const cl = !M.moving || M.want === here ? shutIn(here, 250) : null; if (cl != null) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 2.5 * (cl - 12))));
+  }
   if (exitIn != null && exitIn < 280 && here > 0) M.letGo = true;
   if (M.letGo && exitIn != null && t.ctx.way.cls === 'motorway') {
     let e = t.ctx.e, s2 = t.ctx.s + 25;

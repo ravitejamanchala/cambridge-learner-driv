@@ -6,6 +6,7 @@
 import { MW, JUNCTIONS, centreLine, onCarriageway, junctionSpan } from './motorway.js';
 import { createLaneAssessor, senseMotorway, laneName } from './lane-discipline.js';
 import { buildRoute, snapWaypoint, posAt } from './net.js';
+import { PLANS, limitAt, limitAhead, closedAt, closesAt, inWorks, sOnA, buildRestriction, flashLamps } from './mw-restrictions.js';
 
 // a node on the A carriageway at centre-line distance s (always a multiple of 400 m, where the layout
 // cuts the carriageway, so the waypoint lands exactly on a node of the right carriageway)
@@ -30,6 +31,9 @@ const FOLLOW = { n: 'Rule 126', t: 'Allow at least a two-second gap between you 
 const LEAVE = { n: 'Rule 272', t: 'Watch for the signs letting you know you are getting near your exit, move into the left-hand lane well before reaching it, signal left in good time and reduce speed on the slip road as necessary.' };
 const JOIN = { n: 'Rule 259', t: 'When you join the motorway you should give priority to traffic already on the motorway, check the traffic and match your speed to fit safely into the traffic flow in the left-hand lane, not cross solid white lines that separate lanes or use the hard shoulder, and remain in the left-hand lane long enough to adjust to the speed of traffic before considering overtaking.' };
 const MISSED = { n: 'Rule 263', t: 'You MUST NOT reverse, cross the central reservation, or drive against the traffic flow. If you have missed your exit, or have taken the wrong route, carry on to the next exit.' };
+// the gantry signals and roadworks, in the Highway Code's terms (Rules 258, 261 and 288), not quoted
+const SIGNALS = { n: 'Rules 258 and 261', t: 'A red X above a lane means the lane is closed: you MUST NOT drive beyond it in that lane. A speed limit shown in a red ring above your lane is mandatory: you MUST NOT go faster than it.' };
+const WORKS = { n: 'Rule 288', t: 'You MUST NOT go faster than a temporary speed limit at roadworks. Use your mirrors and get into the correct lane in good time, merge in turn where lanes narrow, and do not switch lanes to overtake queuing traffic.' };
 const FOCUS = ['Positioning – lane discipline', 'Mirrors – change direction', 'Signals – necessary', 'Following distance'];
 const EXIT_FOCUS = [...FOCUS, 'Use of speed', 'Response to road markings', 'Positioning – normal driving'];
 const LIGHTS = { n: 'Rules 113 and 115', t: 'You MUST use headlights at night, except on a road which has lit street lighting. You should also use dipped headlights in dull daytime weather to make sure you can be seen. Make sure you can stop well within the distance you can see to be clear.' };
@@ -84,6 +88,18 @@ export const MOTORWAY_LESSONS = [
     steps: ['Look for a safe gap in the left-hand lane, but do not force one', 'If the exit goes by, let it go: there is always another junction', 'No stopping, no reversing, and no crossing the hatched area'],
     rule: MISSED, waypoints: [M(3, 13200), localRoad(3, 3)], scenario: 'motorway', setup: 'missed', exit: 3,
     startAt: 300, startLane: 1, startMph: 58, scenarioVariants: SCRIPTED, focus: EXIT_FOCUS, maxD: 2 },
+  { id: 'mw-smart-limits', unit: 'motorway', area: 'm3', title: 'Speed limits on the gantries, and a closed lane', road: 'M100 · smart motorway · three lanes',
+    goal: 'The signals on the gantries above each lane show the speed limit and which lanes you may use. Be down to each limit by its gantry and keep to it, and move out of a lane marked with an arrow before the red X: that lane is closed.',
+    steps: ['Read the signal above your lane: a red ring is a limit you must keep to', 'An arrow above your lane: move over in good time, with mirrors and a signal', 'A red X: never drive beyond it in that lane'],
+    rule: SIGNALS, waypoints: [M(3, 15200), M(3, 18400)], scenario: 'motorway', setup: 'gantries', restriction: 'gantries',
+    startAt: 250, startLane: 0, startMph: 66, endAtSpeed: true, scenarioVariants: [{ id: 'traffic', title: 'Light motorway traffic', trafficDensity: 'light' }],
+    focus: [...FOCUS, 'Use of speed', 'Response to signs'], maxD: 2 },
+  { id: 'mw-roadworks', unit: 'motorway', area: 'm3', title: 'Roadworks: a lane closed and a 50 limit', road: 'M100 · roadworks · three lanes',
+    goal: 'Roadworks ahead close the right-hand lane. Read the signs as they come, be down to 50 mph by the first 50 sign, move left in good time or merge in turn where the lane ends, and keep to 50 until the end of the roadworks.',
+    steps: ['Roadworks ½ mile, then the lane-closed sign: plan your move left', 'Down to 50 by the first 50 sign, and keep to it through the works', 'Merge in turn where the lane ends; never into the coned-off lane'],
+    rule: WORKS, waypoints: [M(3, 4000), M(3, 6400)], scenario: 'motorway', setup: 'roadworks', restriction: 'roadworks',
+    startAt: 80, startLane: 2, startMph: 62, endAtSpeed: true, scenarioVariants: SCRIPTED,
+    focus: [...FOCUS, 'Use of speed', 'Response to signs'], maxD: 2 },
 ];
 MOTORWAY_LESSONS.push(
   atDusk('mw-join', { id: 'mw-dusk-join', title: 'Joining at dusk', road: 'J1 slip road → M100 · dusk',
@@ -114,23 +130,29 @@ export const SETUPS = {
     { at: 40, lane: 0, mph: 56 }, { at: 260, lane: 0, mph: 56 }, { at: -120, lane: 0, mph: 57 }, { at: 520, lane: 0, mph: 55 }],
   // the first gap in the left-hand lane closes just as you reach it; the middle lane is busy too, so
   // nobody on the motorway could move over for you even if they wanted to
-  // (7 s further upstream than when the learner started at the roundabout: they now start 100 m down the
-  // slip road, out of its bend, and meet the same gaps)
-  join: [{ main: 1093, lane: 0, mph: 60 }, { main: 1138, lane: 0, mph: 60 }, { main: 1315, lane: 0, mph: 59 }, { main: 891, lane: 0, mph: 61 }, { main: 1518, lane: 0, mph: 60 },
-    { main: 1057, lane: 1, mph: 66 }, { main: 1187, lane: 1, mph: 66 }, { main: 1247, lane: 1, mph: 66 }, { main: 1419, lane: 2, mph: 70 }],
+  // (3.5 s nearer the merge than when the learner started at the roundabout: starting 100 m down the slip
+  // road, out of its bend, the learner reaches the merge 3.5 s sooner and meets the same gaps)
+  join: [{ main: 811, lane: 0, mph: 60 }, { main: 856, lane: 0, mph: 60 }, { main: 1038, lane: 0, mph: 59 }, { main: 605, lane: 0, mph: 61 }, { main: 1236, lane: 0, mph: 60 },
+    { main: 747, lane: 1, mph: 66 }, { main: 877, lane: 1, mph: 66 }, { main: 937, lane: 1, mph: 66 }, { main: 1090, lane: 2, mph: 70 }],
   // a slower car ahead to catch before the exit, and faster traffic in the right-hand lane
   exit: [{ at: 300, lane: 0, mph: 55 }, { at: 0, lane: 1, mph: 68 }, { at: -150, lane: 1, mph: 70 }],
   // a solid line of lorries in the left-hand lane, a second apart: there is no safe gap to the exit
   missed: [-283, -255, -227, -199, -171, -143, -115, -87, -59, -31, -3, 25, 53, 81, 109].map(at => ({ at, lane: 0, mph: 56 })).concat([{ at: -100, lane: 2, mph: 70 }]),
   // two vehicles on the slip road timed to arrive as you do, and a car alongside you in the middle lane
   // that draws ahead within ten seconds or so, so moving over becomes possible (but is never required)
+  // the broken-down car behind the red X, hazard lights on (centre-line 17450, from the start at 15450)
+  gantries: [{ at: 2000, lane: 0, mph: 0, role: 'incident' }],
+  // you are overtaking a line of slower traffic in the right-hand lane when the roadworks close it: the
+  // middle lane is busy, so you move left into a gap or merge in turn where the lane ends
+  roadworks: [{ at: 15, lane: 1, mph: 55 }, { at: 70, lane: 1, mph: 55 }, { at: 125, lane: 1, mph: 55 }, { at: 215, lane: 1, mph: 55 }, { at: 270, lane: 1, mph: 55 },
+    { at: 40, lane: 0, mph: 52, role: 'slow' }, { at: 180, lane: 0, mph: 52 }, { at: 330, lane: 0, mph: 52 }],
   merging: [{ slip: 520, mph: 48, role: 'joiner' }, { slip: 570, mph: 48, role: 'joiner' }, { at: 120, lane: 0, mph: 60 },
     { at: 0, lane: 1, mph: 66 }, { at: -250, lane: 1, mph: 68 }, { at: -120, lane: 2, mph: 70 }],
 };
 // the traffic wave in the following lesson: speed as a share of where each vehicle started, by time
 const wave = (t) => t < 20 ? 1 : t < 40 ? 1 - (t - 20) / 20 * 0.3 : t < 70 ? 0.7 : t < 90 ? 0.7 + (t - 70) / 20 * 0.35 : 1.05;
 
-export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
+export function createMotorwayScenario(lesson, { net, traffic, test, player, scene }) {
   const events = [], placed = [];
   const A = createLaneAssessor({ fault: (kind, cat, text, key) => test.fault(kind, cat, text, key, 30) });
   const route = () => test.route;
@@ -193,9 +215,22 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     if (!free) return;
     traffic.placeCar(free, st.e, st.dir, Math.min(st.e.len - 1, s - R.stepS[k]), spec.mph * MPH, spec.mph / 70, null, spec.lane, 'motorway');
     free.pinned = 1e9; // stays with the lesson, wherever it gets to
+    if (spec.role === 'incident') free.hazard = true; // broken down, hazard lights on
     placed.push({ car: free, spec, passed: false });
   }
   const S = { notes: [], laneStats: A.stats, lane: A };
+  // Temporary restrictions (gantry signals, roadworks): the furniture, and one plan read by the examiner's
+  // speed check and the HUD (test.restriction), the background traffic and the Bot lab's driver
+  const P = lesson.restriction ? PLANS[lesson.restriction] : null;
+  let furniture = null, lastS = null, redX = false, coned = false;
+  const passed = [], works = { firstLimitMph: null, topMph: 0, laneAtTaper: null, mergedAt: null };
+  const where = () => sOnA(player.x, player.z, player.th);
+  if (P) {
+    if (scene) furniture = buildRestriction(scene, P);
+    const what = P.kind === 'gantries' ? 'limit shown on the gantries' : 'temporary limit at the roadworks';
+    test.restriction = { what, limit: () => limitAt(P, where()), limitAhead: (d) => limitAhead(P, where(), d), closed: () => closedAt(P, where()), closesIn: (lane, d) => { const s = where(), at = s == null ? null : closesAt(P, lane, s, d); return at == null ? null : at - s; } }; // how far ahead lane `lane` closes, if within d metres
+    traffic.setRestrictions?.({ sOf: (a) => sOnA(a.x, a.z, a.th), limitAt: (s) => limitAt(P, s), closedAt: (s) => closedAt(P, s), closesAt: (lane, s, d) => closesAt(P, lane, s, d) });
+  }
   // at dusk: dipped headlights before moving (Rules 113 and 115), and nothing else changes
   let darkT = 0, lightsOnAt = null, darkFlag = false, movedDark = false;
   S.update = (dt, clock) => {
@@ -218,6 +253,7 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     // hatching from the carriageway is judged
     const exitIn = exitS != null && test.sRoute < exitS + MW.junction.decel + 60 ? exitS - test.sRoute : null;
     const f = senseMotorway({ t: clock, dt, player, test, traffic, net, exitIn });
+    if (P) { restrictionStep(f); flashLamps(furniture, clock); }
     A.step(f);
     test.laneGuide = A.guide(f);
     // traffic joining beside you: when each vehicle on the slip road reaches the motorway, is it ahead of
@@ -254,7 +290,30 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
     }
     if ((lesson.endAtSpeed || continuing) && !finished && test.sRoute > route().len - 40) { finished = true; test.finish(); }
   };
-  S.stop = () => { test.laneGuide = null; test.basicStatus = null; for (const p of placed) Object.assign(p.car, { pinned: 0, scripted: false, keepTo: null }); };
+  // what the gantries and the roadworks ask of you, as you go: the lanes closed around you go to the lane
+  // assessor (staying out of a closed lane is not hogging), each gantry you pass is noted with your speed and
+  // lane, and driving past a red X or into the coned-off lane is marked
+  function restrictionStep(f) {
+    const s = where(), lane = f.laneF == null ? null : Math.round(f.laneF), mph = player.v / MPH;
+    f.closed = s == null ? [] : [...new Set([0, 100, 200, 300].flatMap(d => closedAt(P, s + d)))];
+    if (s != null && lastS != null && lane != null && lane >= 0) {
+      if (P.kind === 'gantries') for (const g of P.gantries) if (lastS < g.at && s >= g.at) {
+        passed.push({ show: g.show, sign: g.show[lane], lane, lanes: f.lanes, mph: Math.round(mph) });
+        if (g.show[lane] === 'X' && !redX) { redX = true; test.fault('S', 'Response to signs', `Drove past a red X in the ${laneName(lane, f.lanes)} lane: that lane was closed (Rule 258)`, 'mwredx', 600); }
+      }
+      if (P.kind === 'roadworks') {
+        if (works.firstLimitMph == null && lastS < P.limit.from && s >= P.limit.from) works.firstLimitMph = Math.round(mph);
+        if (s >= P.limit.from && s < P.limit.to) works.topMph = Math.max(works.topMph, Math.round(mph));
+        if (works.laneAtTaper == null && lastS < P.taper[0] && s >= P.taper[0]) works.laneAtTaper = lane;
+        if (works.mergedAt == null && lane !== P.lane && s > P.taper[0] - 1300) works.mergedAt = Math.round(P.taper[0] - s);
+        if (lane === P.lane && s < P.taper[0]) works.mergedAt = null; // still in the closing lane
+        if (inWorks(P, s, f.laneF) && !coned) { coned = true; test.fault('S', 'Response to signs', 'Drove into the coned-off lane at the roadworks (Rule 288)', 'mwcones', 600); }
+      }
+    }
+    lastS = s;
+  }
+  S.stop = () => { test.laneGuide = null; test.basicStatus = null;
+    if (P) { test.restriction = null; traffic.setRestrictions?.(null); if (furniture) furniture.parent?.remove(furniture); } for (const p of placed) Object.assign(p.car, { pinned: 0, scripted: false, keepTo: null }); };
 
   // what the lesson itself asked for, measured; faults are judged by evaluate() as for every lesson
   S.result = () => {
@@ -290,6 +349,16 @@ export function createMotorwayScenario(lesson, { net, traffic, test, player }) {
       if (!tookExit) return { ok: false, why: 'The drive ended before you reached the exit.' };
       const leave = A.events.find(e => e.type === 'leave'), bend = slipBend.length ? Math.floor(Math.sqrt(3 * Math.min(...slipBend)) / MPH / 5) * 5 : null;
       return { ok: true, why: `Left the motorway at ${leave ? leave.mph : '?'} mph${leave && leave.signalFor > 0 ? `, signalling ${leave.signalFor.toFixed(1)} s before` : ''}${bend ? `; the slip road's bend suits about ${bend} mph` : ''}.` };
+    }
+    if (lesson.setup === 'gantries') {
+      if (!passed.length) return { ok: false, why: 'The drive ended before the first gantry.' };
+      const say = (p) => +p.sign > 0 ? `${p.sign}: passed at ${p.mph} mph` : p.sign === 'X' ? `red X: you were in that closed lane` : p.sign === 'end' ? `end of the restriction at ${p.mph} mph` : `arrow: moving out of the ${laneName(p.lane, p.lanes)} lane at ${p.mph} mph`;
+      return { ok: passed.length === P.gantries.length, why: `The gantry above your lane said: ${passed.map(say).join('; ')}.` };
+    }
+    if (lesson.setup === 'roadworks') {
+      if (works.laneAtTaper == null) return { ok: false, why: 'The drive ended before the roadworks.' };
+      const merged = works.mergedAt == null ? 'never moved out of the closing lane' : works.mergedAt > 30 ? `moved out of the closing lane ${Math.round(works.mergedAt * 1.0936)} yards before the cones` : 'merged in turn where the lane ended';
+      return { ok: true, why: `${works.firstLimitMph != null ? `${works.firstLimitMph} mph at the first 50 sign, ` : ''}at most ${works.topMph} mph through the works; you ${merged}.` };
     }
     if (lesson.setup === 'exit-prep') {
       if (missed) return { ok: false, why: 'You carried on past the exit, which was the safe thing to do once it was too late. Start moving left earlier, one lane at a time.' };

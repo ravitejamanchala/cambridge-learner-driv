@@ -2,6 +2,11 @@
 
 ## Unreleased: motorways, junction markings, box junctions and pull-request previews
 
+- **Two new motorway lessons: limits on the gantries, and roadworks.**
+  - *Speed limits on the gantries, and a closed lane*: gantries above each lane show 60, then 50 with an arrow telling you to move out of the left-hand lane, then a red X over it, with a broken-down car showing its hazard lights behind it, and finally the end of the restriction. Over the limit the gantry showed is speeding; driving past the red X is a serious fault (Rule 258). The result lists what the gantry above you showed at each one, and how fast you passed it.
+  - *Roadworks: a lane closed and a 50 limit*: Roadworks ½ mile, the lane-closed sign, 50 on both sides, Merge in turn, then cones closing the right-hand lane past a works van, to the end of the roadworks. Over the temporary limit is speeding; driving into the coned-off lane is a serious fault (Rule 288). You start overtaking in the right-hand lane, so you have to find your way left.
+  - The speed display shows the limit in force, the lane strip shows closed lanes shut, keeping out of a closed lane is never called hogging, and background traffic keeps to the limits and merges out of a closing lane in turn.
+- **Joining the motorway: the traffic meets you again.** Moving the lesson's start 100 m down the slip road (out of its bend) had put the motorway traffic nearly 300 m further back, so nobody was near as you joined. It is placed for the new start again: the gap closes as you reach it, as before.
 - **Yellow box junctions and KEEP CLEAR** (issue #5).
   - **A yellow box** over the Bridge Street / Station Road crossroads in the practice town: a yellow border and criss-cross lines from kerb to kerb, configured for that junction (never painted by rule) and kept in the map data, so it goes through the marking export and import like any other marking.
   - **What is marked (Rule 174)**: stopping inside a box because the road beyond it is blocked is a serious fault: you went in before there was room. Waiting inside to turn right, held only by oncoming traffic with your exit clear, is allowed and not marked. Stopping on KEEP CLEAR behind a queue is a driving fault: the marking is advisory. Judged on every drive, so mock tests mark it too.
