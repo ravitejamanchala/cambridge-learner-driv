@@ -4,7 +4,7 @@
 // towards .want), at .mph, or .gap seconds behind the car ahead in its lane. It looks and signals only
 // when told to, which is how the careless drives are made.
 //   .road    follow the motorway itself, whatever the route does (to carry on past an exit)
-//   .shadow  on a slip road, sit alongside the nearest car in the left-hand lane (to join into it)
+//   .shadow  on a slip road, sit alongside the nearest car within 100 m in the left-hand lane (to join into it)
 //   .reverse hold the brake down, which at a standstill reverses
 export async function installMwDriver(page) {
   await page.evaluate(() => {
@@ -22,7 +22,7 @@ export async function installMwDriver(page) {
       const x = q.x - q.tz * off, z = q.z + q.tx * off;
       let want = M.mph * 0.44704; const fx = -Math.sin(p.th), fz = -Math.cos(p.th);
       if (M.shadow && nr && nr.way.cls === 'motorway_link') { let best = null;
-        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway' || c.lane !== 0) continue; const f = (c.x - p.x) * fx + (c.z - p.z) * fz; if (Math.abs(f) < 60 && (!best || Math.abs(f) < Math.abs(best.f))) best = { f, v: c.v }; }
+        for (const c of a.traffic.cars) { if (!c.alive || c.e.way.cls !== 'motorway' || c.lane !== 0) continue; const f = (c.x - p.x) * fx + (c.z - p.z) * fz; if (Math.abs(f) < 100 && (!best || Math.abs(f) < Math.abs(best.f))) best = { f, v: c.v }; }
         if (best) want = Math.max(5, best.v + best.f * 0.3); }
       if (M.gap != null) for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
         if (f > 0 && f < 150 && Math.abs(dx * fz - dz * fx) < 1.8) want = Math.min(want, c.v + ((f - 4.6) - M.gap * p.v) * 0.4); }

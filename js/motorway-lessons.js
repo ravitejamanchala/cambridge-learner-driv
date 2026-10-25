@@ -130,10 +130,10 @@ export const SETUPS = {
     { at: 40, lane: 0, mph: 56 }, { at: 260, lane: 0, mph: 56 }, { at: -120, lane: 0, mph: 57 }, { at: 520, lane: 0, mph: 55 }],
   // the first gap in the left-hand lane closes just as you reach it; the middle lane is busy too, so
   // nobody on the motorway could move over for you even if they wanted to
-  // (7 s further upstream than when the learner started at the roundabout: they now start 100 m down the
-  // slip road, out of its bend, and meet the same gaps)
-  join: [{ main: 1093, lane: 0, mph: 60 }, { main: 1138, lane: 0, mph: 60 }, { main: 1315, lane: 0, mph: 59 }, { main: 891, lane: 0, mph: 61 }, { main: 1518, lane: 0, mph: 60 },
-    { main: 1057, lane: 1, mph: 66 }, { main: 1187, lane: 1, mph: 66 }, { main: 1247, lane: 1, mph: 66 }, { main: 1419, lane: 2, mph: 70 }],
+  // (3.5 s nearer the merge than when the learner started at the roundabout: starting 100 m down the slip
+  // road, out of its bend, the learner reaches the merge 3.5 s sooner and meets the same gaps)
+  join: [{ main: 811, lane: 0, mph: 60 }, { main: 856, lane: 0, mph: 60 }, { main: 1038, lane: 0, mph: 59 }, { main: 605, lane: 0, mph: 61 }, { main: 1236, lane: 0, mph: 60 },
+    { main: 747, lane: 1, mph: 66 }, { main: 877, lane: 1, mph: 66 }, { main: 937, lane: 1, mph: 66 }, { main: 1090, lane: 2, mph: 70 }],
   // a slower car ahead to catch before the exit, and faster traffic in the right-hand lane
   exit: [{ at: 300, lane: 0, mph: 55 }, { at: 0, lane: 1, mph: 68 }, { at: -150, lane: 1, mph: 70 }],
   // a solid line of lorries in the left-hand lane, a second apart: there is no safe gap to the exit

@@ -106,9 +106,12 @@ try {
       // wait for the car alongside in the middle lane to get clear, then mirror, shoulder, signal, over
       for (let i = 0; i < 400 && !(await laneClear(1, 60, 30)); i++) await steps(5);
       await look('right'); await look('blindspot'); await signal('R'); await steps(40); await set({ want: 1 }); await steps(70); await signal('R');
-      // once the joiners are in and the left-hand lane is clear around you, back left the same way (30 m clear
-      // behind is well over a second ahead of joiners doing 48 mph, and you are pulling away from them)
-      for (let i = 0; i < 600 && !((await joinersIn()) && (await laneClear(0, 30, 80))); i++) await steps(5);
+      // once no joiner is beside you or ahead on the slip road (the examiner's own window for making room) and
+      // the left-hand lane is clear around you, back left the same way: joiners already falling behind on the
+      // slip road are no reason to stay out (Rule 264), and waiting for them to merge was marked as hogging
+      const slipClear = () => page.evaluate(() => { const d = window.cambridgeDrive, p = d.player, fx = -Math.sin(p.th), fz = -Math.cos(p.th);
+        return !d.traffic.cars.some(c => c.alive && c.scripted && c.e.way.cls === 'motorway_link' && (c.x - p.x) * fx + (c.z - p.z) * fz > -60); });
+      for (let i = 0; i < 600 && !((await slipClear()) && (await laneClear(0, 30, 80))); i++) await steps(5);
       await look('left'); await look('left-blindspot'); await signal('L'); await steps(40); await set({ want: 0 }); await steps(70); await signal('L');
     }
     await untilDone(); const r = await outcome();
@@ -242,5 +245,24 @@ try {
   }
 
   assert.deepEqual(errors, []);
-  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes; exits signed, careless exits and recovery marked, a missed exit carried on safely passes; at dusk only the lighting changes.');
+  // ---------- temporary restrictions: limits on the gantries, a red X, and roadworks ----------
+  // (the careful drives are the Bot lab's: npm run test:bots passes both lessons with no faults)
+  {
+    // ignoring the gantries' limits: marked against the limit they showed, not the road's 70
+    await start('mw-smart-limits', 1); await set({ mph: 68 }); await untilDone(); const fast = await outcome();
+    assert.ok(fast.faults.some(f => /^S Use of speed: Drove well over the 50 mph limit shown on the gantries/.test(f)), show(fast));
+    assert.ok(fast.reasons.some(r => /The gantry above your lane said: 60: passed at 6\d mph/.test(r)), fast.reasons.join(' | '));
+    // into the left-hand lane after the arrow, properly (mirror, signal), and on past the red X: the red X is the fault
+    await start('mw-smart-limits', 1); await set({ mph: 46 }); await steps(20 * 15);
+    await look('left'); await look('left-blindspot'); await signal('L'); await steps(40); await set({ want: 0 }); await steps(80); await signal('L');
+    await untilDone(); const redX = await outcome();
+    assert.ok(redX.faults.some(f => /^S Response to signs: Drove past a red X in the left-hand lane: that lane was closed \(Rule 258\)/.test(f)), show(redX));
+    assert.equal(redX.verdict, 'Not yet', show(redX));
+    // staying in the right-hand lane into the roadworks: into the cones
+    await start('mw-roadworks', 2); await set({ mph: 48 }); await untilDone(); const cones = await outcome();
+    assert.ok(cones.faults.some(f => /^S Response to signs: Drove into the coned-off lane at the roadworks \(Rule 288\)/.test(f)), show(cones));
+    assert.ok(cones.reasons.some(r => /never moved out of the closing lane/.test(r)), cones.reasons.join(' | '));
+    console.log('Restrictions:', [fast, redX, cones].map(r => [...new Set(r.faults.filter(f => /gantries|red X|coned-off/.test(f)).map(f => f.split(':').slice(1).join(':').trim()))].join('; ')).join(' | '));
+  }
+  console.log('Motorway lessons: careless driving marked for what it was, repeatably; lane strip and feedback present; safe following passes; every safe answer to joining traffic passes; exits signed, careless exits and recovery marked, a missed exit carried on safely passes; at dusk only the lighting changes; gantry limits, the red X and the roadworks cones marked.');
 } finally { await browser?.close(); server.kill(); }
