@@ -120,9 +120,9 @@ export function createUI(net) {
   }
   function hud(p, t, running) {
     const mph = Math.round(Math.abs(p.v) * MPH), ctx = t.ctx, way = ctx && ctx.d < 30 ? ctx.way : null;
-    const limit = way ? way.mph : 30, over = mph > limit + 1;
+    const temp = t.restriction?.limit() ?? null, limit = temp ?? (way ? way.mph : 30), over = mph > limit + 1;
     $('hudSpd').textContent = mph; $('hudLimit').textContent = limit; $('hudLimit').classList.toggle('over', over);
-    $('hudLimit').title = !way ? 'Off the road network' : way.assumed ? `No limit tagged for ${way.name || 'this road'}; ${limit} mph assumed` : `${limit} mph limit`;
+    $('hudLimit').title = temp != null ? `${limit} mph: the ${t.restriction.what}` : !way ? 'Off the road network' : way.assumed ? `No limit tagged for ${way.name || 'this road'}; ${limit} mph assumed` : `${limit} mph limit`;
     const rn = way ? (way.name || (way.rb ? 'Roundabout' : 'Unnamed road')) : 'Off the road network';
     $('hudRoad').textContent = rn;
     const R = t.route, ins = R.instructions, i = Math.min(t.step, ins.length - 1), s = ins[i];
@@ -148,8 +148,8 @@ export function createUI(net) {
     // lanes: the arrows' lanes before a junction, or on a motorway lesson the lanes that are right for you
     // now (amber) and the one you are in (marked underneath): an instrument, not a sentence
     const mw = running && t.laneGuide, ln = $('hudLanes'), showL = mw || (s.laneOK && s.lanes >= 2 && s.lanes <= 4 && !t.offRoute && s.s - t.sRoute < 250 && s.s > t.sRoute - 2);
-    const lanes = mw ? mw.lanes : s.lanes, ok = mw ? mw.ok : s.laneOK, here = mw ? mw.here : -1;
-    ln.hidden = !showL; if (showL) { const k = lanes + ':' + ok.join(',') + ':' + here; if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: lanes }, (_, i) => `<i class="${[ok.includes(i) ? 'on' : '', i === here ? 'me' : ''].join(' ').trim()}"></i>`).join(''); } }
+    const lanes = mw ? mw.lanes : s.lanes, ok = mw ? mw.ok : s.laneOK, here = mw ? mw.here : -1, shut = mw?.shut || [];
+    ln.hidden = !showL; if (showL) { const k = lanes + ':' + ok.join(',') + ':' + here + ':' + shut.join(','); if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: lanes }, (_, i) => `<i class="${[ok.includes(i) ? 'on' : '', shut.includes(i) ? 'shut' : '', i === here ? 'me' : ''].join(' ').trim()}"></i>`).join(''); } }
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
     // Getting started: the state goes on the instruments, not into a sentence over the road.

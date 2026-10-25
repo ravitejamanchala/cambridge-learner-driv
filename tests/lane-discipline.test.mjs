@@ -157,9 +157,20 @@ test('an exit: one lane at a time and in lane by 300 yards passes; a late sweep 
 test('the lane strip offers the lane you are overtaking in, and only the left lane near an exit', () => {
   const A = createLaneAssessor();
   const f = { t: 0, dt: 0.1, v: 30, laneF: 1, lanes: 3, indicator: null, looks: [], others: [{ id: 1, lane: 0, fw: 40, v: 22 }], exitIn: null };
-  assert.deepEqual(A.guide(f), { lanes: 3, ok: [0, 1], here: 1 });
-  assert.deepEqual(A.guide({ ...f, others: [] }), { lanes: 3, ok: [0], here: 1 });
-  assert.deepEqual(A.guide({ ...f, exitIn: 800 }), { lanes: 3, ok: [0], here: 1 });
+  assert.deepEqual(A.guide(f), { lanes: 3, ok: [0, 1], here: 1, shut: [] });
+  assert.deepEqual(A.guide({ ...f, others: [] }), { lanes: 3, ok: [0], here: 1, shut: [] });
+  assert.deepEqual(A.guide({ ...f, exitIn: 800 }), { lanes: 3, ok: [0], here: 1, shut: [] });
+});
+
+// ---------- closed lanes (a red X on a gantry, roadworks) ----------
+test('a closed lane to your left: staying out of it is not hogging, and the lane strip shows it shut', () => {
+  // in the middle lane with nothing to pass for a minute: hogging, unless the left-hand lane is closed
+  const open = run({ v: 50 * MPH, lane: 1, seconds: 40 });
+  assert.ok(open.faults.some(f => /nothing to overtake/.test(f.text)), cats(open).join('\n'));
+  const A = createLaneAssessor({ fault: () => assert.fail('marked for keeping out of a closed lane') });
+  for (let i = 0; i < 400; i++) A.step({ t: i * 0.1, dt: 0.1, v: 22, laneF: 1, lanes: 3, indicator: null, looks: [], others: [], exitIn: null, closed: [0] });
+  const g = A.guide({ t: 40, dt: 0.1, v: 22, laneF: 1, lanes: 3, indicator: null, looks: [], others: [], exitIn: null, closed: [0] });
+  assert.deepEqual(g, { lanes: 3, ok: [1], here: 1, shut: [0] });
 });
 
 // ---------- joining from a slip road (issue #8): "lane -1" is the acceleration lane ----------

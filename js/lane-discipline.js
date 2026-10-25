@@ -44,6 +44,8 @@ const sec = (x) => `${x < 10 ? x.toFixed(1) : Math.round(x)} s`;
 // moving back now would cut in front of it. Shared with the test driver, so the two never disagree.
 export function overtaking(f, lane) {
   if (lane <= 0) return true;
+  // the lane to your left closed (a red X, roadworks) here or just ahead: staying out of it is right
+  if (f.closed?.includes(lane - 1)) return true;
   // in the middle lane with traffic coming down a slip road beside you: making room for it is courtesy,
   // not hogging (but nobody has to: Rule 259 puts the duty to give way on the joining traffic)
   if (lane === 1 && f.others.some(o => o.lane === -1 && o.fw > -60 && o.fw < 250)) return true;
@@ -229,13 +231,15 @@ export function createLaneAssessor({ fault = () => {} } = {}) {
     for (const [id, s] of st.seen) if (t - s.t > 2) st.seen.delete(id);
   }
 
-  // Which lanes are right for you now, for the lane strip on the instruments: the left-hand lane, plus
-  // the lane you are in while overtaking justifies it; only the left-hand lane once an exit is close.
+  // Which lanes are right for you now, for the lane strip on the instruments: the left-hand lane (the
+  // leftmost open one, when lanes are closed), plus the lane you are in while overtaking justifies it; only
+  // the left-hand lane once an exit is close. Closed lanes are shown shut.
   function guide(f) {
     if (f.laneF == null) return null;
-    const here = Math.max(-1, Math.min(f.lanes - 1, Math.round(f.laneF))), ok = [0];
-    if (f.exitIn == null || f.exitIn > 1600) for (let l = 1; l <= here; l++) if (overtaking(f, l)) ok.push(l);
-    return { lanes: f.lanes, ok: [...new Set(ok)], here };
+    const shut = f.closed || [], first = Array.from({ length: f.lanes }, (_, l) => l).find(l => !shut.includes(l)) ?? 0;
+    const here = Math.max(-1, Math.min(f.lanes - 1, Math.round(f.laneF))), ok = [first];
+    if (f.exitIn == null || f.exitIn > 1600) for (let l = first + 1; l <= here; l++) if (overtaking(f, l) && !shut.includes(l)) ok.push(l);
+    return { lanes: f.lanes, ok: [...new Set(ok)], here, shut };
   }
   return { step, guide, events: out.events, stats: out.stats, get lane() { return st.lane; } };
 }

@@ -114,7 +114,8 @@ export function createTest(net, traffic, player) {
     // waypoints passed (for re-routing)
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;
-    const way = nr.way, limit = way.mph;
+    // a lower limit shown on gantry signals or at roadworks applies instead of the road's own
+    const temp = t.restriction?.limit() ?? null, way = nr.way, limit = temp ?? way.mph;
     // moving off from the kerb (Rule 159): look round first, and don't pull out in front of traffic coming from behind
     if (t.parked && v > 0.8) {
       t.parked = false;
@@ -132,8 +133,8 @@ export function createTest(net, traffic, player) {
       else if (close && close.d < 80 && player.indicator !== 'R') t.fault('D', 'Signals – necessary', 'Did not signal before moving off with a vehicle coming');
     }
     // speed
-    if (timer('spd', mph > limit + 2.5, dt) > 2) t.fault('D', 'Use of speed', `Went over the ${limit} mph limit on ${way.name || 'this road'}`, 'spd', 10);
-    if (timer('spd2', mph > limit + 10, dt) > 1) t.fault('S', 'Use of speed', `Drove well over the ${limit} mph limit`, 'spd2', 14);
+    if (timer('spd', mph > limit + 2.5, dt) > 2) t.fault('D', 'Use of speed', temp != null ? `Went over the ${limit} mph ${t.restriction.what}` : `Went over the ${limit} mph limit on ${way.name || 'this road'}`, 'spd', 10);
+    if (timer('spd2', mph > limit + 10, dt) > 1) t.fault('S', 'Use of speed', temp != null ? `Drove well over the ${limit} mph ${t.restriction.what}` : `Drove well over the ${limit} mph limit`, 'spd2', 14);
     // one-way and positioning
     const along = fx * nr.tx + fz * nr.tz;
     if (way.oneway && timer('ww', v > 2 && along < -0.4, dt) > 0.8) t.fault('S', way.rb ? 'Positioning – roundabout' : 'Response to signs', way.rb ? 'Went the wrong way round the roundabout' : 'Drove the wrong way along a one-way road', 'ww', 12);
