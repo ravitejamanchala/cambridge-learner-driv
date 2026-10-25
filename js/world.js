@@ -139,16 +139,17 @@ export function buildWorld(scene, net, traffic) {
     const L = laneInfo(k.e, k.dir);
     for (let i = 0; i < L.n; i++) {
       const off = (L.outer - L.laneW * (i + 0.5)) * k.dir, w = Math.min(2.6, L.laneW - 0.5);
-      for (const [word, at] of [['KEEP', -1.6], ['CLEAR', 1.6]]) {
-        const p = posAt(k.e, Math.max(0, Math.min(k.e.len, k.s + at * k.dir))), tx = p.tx * k.dir, tz = p.tz * k.dir;
-        keepClear.push({ word, x: p.x + p.tz * off, z: p.z - p.tx * off, yaw: Math.atan2(-tx, -tz), w });
+      for (const [word, at] of [['KEEP', -1.9], ['CLEAR', 1.9]]) {
+        // centred on a node (across a side road's mouth) a word runs past the end of the edge: carry on along its tangent
+        const s = k.s + at * k.dir, sc = Math.max(0, Math.min(k.e.len, s)), p = posAt(k.e, sc), over = s - sc, tx = p.tx * k.dir, tz = p.tz * k.dir;
+        keepClear.push({ word, x: p.x + p.tx * over + p.tz * off, z: p.z + p.tz * over - p.tx * off, yaw: Math.atan2(-tx, -tz), w });
       }
     }
   }
   if (keepClear.length) {
     const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
     const mats = {}; for (const word of ['KEEP', 'CLEAR']) textMats.push(mats[word] = new T.MeshBasicMaterial({ map: roadText(word), transparent: true, depthWrite: false }));
-    for (const k of keepClear) { const m = new T.Mesh(g, mats[k.word]); m.position.set(k.x, 0.08, k.z); m.rotation.y = k.yaw; m.scale.set(k.w, 1, 2.4); m.renderOrder = 5; m.userData.keepClear = k.word; scene.add(m); }
+    for (const k of keepClear) { const m = new T.Mesh(g, mats[k.word]); m.position.set(k.x, 0.08, k.z); m.rotation.y = k.yaw; m.scale.set(k.w, 1, 3.2); m.renderOrder = 5; m.userData.keepClear = k.word; scene.add(m); }
   }
   // Dutch-style roundabouts: red cycle track round the outside with white "elephant's footprint" edges where it crosses the roads
   const annulus = (acc, ring, r0, r1, y) => { const N = 96; for (let i = 0; i < N; i++) { const a0 = i / N * 2 * Math.PI, a1 = (i + 1) / N * 2 * Math.PI, P = (r, a) => [ring.x + r * Math.sin(a), ring.z - r * Math.cos(a)];
@@ -412,8 +413,10 @@ function dash(acc, e, s, len, off, y, half = 0.07) {
 function roadText(word) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');
   g.fillStyle = '#f2f2ec'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `bold ${word.length > 4 ? 120 : 150}px Arial, sans-serif`;
-  g.save(); g.translate(128, 256); g.scale(1, 3.2); g.fillText(word, 0, 0); g.restore();
+  g.font = 'bold 150px Arial, sans-serif';
+  // squeezed across to fit the canvas, so no letter is cut off at the edges
+  const fit = Math.min(1, 236 / g.measureText(word).width);
+  g.save(); g.translate(128, 256); g.scale(fit, 3.2); g.fillText(word, 0, 0); g.restore();
   const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
 }
 function bikeTexture() {

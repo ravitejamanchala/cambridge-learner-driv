@@ -310,26 +310,36 @@ GROUPS.handling = {
 };
 // Approach a junction along one road: the steady driver follows the lane towards node `at` (x, z) on the road
 // named `road`, starting `from` metres out, and pulls up just short of the line it meets there.
-const approach = (page, area, road, at, from, mph = 20) => page.evaluate(([road, at, from, mph]) => {
+// With `through`, the path carries straight on along the same road past the junction for that many metres
+// instead of pulling up at the line.
+const approach = (page, area, road, at, from, mph = 20, through = 0) => page.evaluate(([road, at, from, mph, through]) => {
   const a = window.cambridgeDrive, net = a.net, v = [...net.nx].findIndex((x, i) => Math.hypot(x - at[0], net.nz[i] - at[1]) < 1);
-  const o = net.inc[v].find(o => o.e.way.name === road), e = o.e, toward = o.dir === 1 ? -1 : 1; // inc dir 1 leaves v
+  // of the two sides of a through road, the one that carries a KEEP CLEAR towards the node, if either does
+  const named = net.inc[v].filter(o => o.e.way.name === road), o = named.find(o => (net.keepClear || []).some(k => k.e === o.e && k.dir === (o.dir === 1 ? -1 : 1))) || named[0];
+  const e = o.e, toward = o.dir === 1 ? -1 : 1; // inc dir 1 leaves v
   const pts = [], L = e.len, lane = e.way.oneway ? 0 : Math.min(e.way.w / 4, 2.2);
   for (let k = Math.min(from, L - 1); k >= 0; k -= 2) { const s = toward > 0 ? L - k : k; let i = 0; while (i < e.n - 2 && e.cum[i + 1] < s) i++;
     const l = e.cum[i + 1] - e.cum[i] || 1, u = (s - e.cum[i]) / l, tx = (e.px[i + 1] - e.px[i]) / l * toward, tz = (e.pz[i + 1] - e.pz[i]) / l * toward;
     pts.push({ x: e.px[i] + (e.px[i + 1] - e.px[i]) * u + tz * lane, z: e.pz[i] + (e.pz[i + 1] - e.pz[i]) * u - tx * lane, tx, tz }); }
+  const on = through > 0 && net.inc[v].find(q => q.e !== e && q.e.way.name === road);
+  if (on) { const c = on.e, out = c.a === v ? 1 : -1, L2 = c.len, lane2 = c.way.oneway ? 0 : Math.min(c.way.w / 4, 2.2);
+    for (let k = 2; k <= Math.min(through, L2 - 1); k += 2) { const s = out > 0 ? k : L2 - k; let i = 0; while (i < c.n - 2 && c.cum[i + 1] < s) i++;
+      const l = c.cum[i + 1] - c.cum[i] || 1, u = (s - c.cum[i]) / l, tx = (c.px[i + 1] - c.px[i]) / l * out, tz = (c.pz[i + 1] - c.pz[i]) / l * out;
+      pts.push({ x: c.px[i] + (c.px[i + 1] - c.px[i]) * u + tz * lane2, z: c.pz[i] + (c.pz[i + 1] - c.pz[i]) * u - tx * lane2, tx, tz }); } }
   const p0 = pts[0]; a.player.place(p0.x, p0.z, Math.atan2(-p0.tx, -p0.tz)); a.player.v = mph * 0.447;
   const line = [...(net.giveByEdge?.get(e.id) || net.giveways.filter(g => g.e === e)), ...(net.stopsByEdge.get(e.id) || [])].filter(g => g.dir === toward)
     .map(g => (toward > 0 ? e.len - g.s : g.s)).sort((x, y) => x - y)[0] ?? 6;
-  window.__path = pts; window.__target = mph * 0.447; window.__stopAt = { x: net.nx[v], z: net.nz[v], d: line + 2.5 };
-}, [road, at, from, mph]);
+  window.__path = pts; window.__target = mph * 0.447; window.__stopAt = on ? null : { x: net.nx[v], z: net.nz[v], d: line + 2.5 };
+}, [road, at, from, mph, through]);
 const stopNear = (page) => page.evaluate(() => { const s = window.__stopAt, p = window.cambridgeDrive.player; if (s && Math.hypot(p.x - s.x, p.z - s.z) < s.d + 8) window.__target = Math.max(0, (Math.hypot(p.x - s.x, p.z - s.z) - s.d) * 0.5); });
 const SPOTS = {
   'milton-road-side-road': { title: 'A side road off Milton Road (Ascham Road), approaching the give-way', area: 'mock:east-road', road: 'Ascham Road', at: [498.8, -1820.9], from: 70 },
   'newmarket-road': { title: 'Newmarket Road at Godesdone Road, where a 4 m stub of road meets the junction', area: 'mock:east-road', road: 'Newmarket Road', at: [1365.5, -865.9], from: 70 },
   'crossroads': { title: 'Hills Road at the Lensfield Road crossroads, lights and two lanes', area: 'mock:east-road', road: 'Hills Road', at: [377.3, 222.8], from: 80 },
-  'keep-clear': { title: 'High Street westbound at Orchard Way in the practice town: KEEP CLEAR', area: 'lesson:move-off', road: 'High Street', at: [0, 0], from: 70 },
+  'keep-clear': { title: 'High Street westbound at Orchard Way in the practice town: KEEP CLEAR', area: 'lesson:move-off', road: 'High Street', at: [0, 0], from: 70, through: 120, still: 14 },
 };
-const goSpot = async (page, k, mph) => { const S = SPOTS[k], [kind, id] = S.area.split(':'); await startDrive(page, kind, id); await installDriver(page); await approach(page, S.area, S.road, S.at, S.from, mph); };
+// a still is taken from `still` metres out (about 25 m), close enough to see the line and what leads to it
+const goSpot = async (page, k, mph, from) => { const S = SPOTS[k], [kind, id] = S.area.split(':'); await startDrive(page, kind, id); await installDriver(page); await approach(page, S.area, S.road, S.at, from ?? S.from, mph, from == null ? S.through || 0 : 0); };
 GROUPS.markings = {
   dir: 'docs/evidence/4-junction-markings',
   title: 'Junction markings and KEEP CLEAR (issue #4)',
@@ -350,14 +360,14 @@ GROUPS.markings = {
     for (const k of Object.keys(SPOTS)) {
       for (const [tag, site] of [['before', before], ['after', url]]) {
         if (!site || (tag === 'before' && k === 'keep-clear')) continue;
-        const page = await open({ width: 1280, height: 720 }, site); await goSpot(page, k, 0);
+        const page = await open({ width: 1280, height: 720 }, site); await goSpot(page, k, 0, SPOTS[k].still ?? 26);
         await page.evaluate(() => { const a = window.cambridgeDrive; a.player.v = 0; window.__target = 0; for (let i = 0; i < 30; i++) a.frame(0.05); });
         await camera(page, 1); await page.evaluate(() => { for (let i = 0; i < 20; i++) window.cambridgeDrive.frame(0.05); }); await page.waitForTimeout(400);
         await page.screenshot({ path: path.join(dir, `${k}-${tag}.jpg`), type: 'jpeg', quality: 86 }); await page.close();
       }
       rows.push(`### ${SPOTS[k].title}`, '', k === 'keep-clear' ? `![after](${k}-after.jpg)` : `| Before | After |\n|---|---|\n| ![before](${k}-before.jpg) | ![after](${k}-after.jpg) |`, '');
     }
-    return ['## Before and after, from the driver\'s seat', '', 'The same spot with the old marking rules (before) and the new ones (after), the car stopped where the clip starts.', '', ...rows];
+    return ['## Before and after, from the driver\'s seat', '', 'The same spot with the old marking rules (before) and the new ones (after), from the driver\'s seat about 25 m before the line.', '', ...rows];
   },
 };
 const group = GROUPS[process.argv[2]];
