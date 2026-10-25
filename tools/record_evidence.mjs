@@ -370,6 +370,32 @@ GROUPS.markings = {
     return ['## Before and after, from the driver\'s seat', '', 'The same spot with the old marking rules (before) and the new ones (after), from the driver\'s seat about 25 m before the line.', '', ...rows];
   },
 };
+// metres along the route to the node of the first yellow box (or, with keep, the KEEP CLEAR) on it
+const toMarked = (keep = false) => `a => { const t = a.test, R = t.route, end = st => st.dir > 0 ? st.e.b : st.e.a, K = a.net.keepClear[0];
+  const k = R.steps.findIndex(st => ${keep} ? end(st) === (K.dir > 0 ? K.e.b : K.e.a) : a.net.boxes.some(b => b.node === end(st))); return R.stepS[k + 1] - t.sRoute; }`;
+GROUPS.boxes = {
+  dir: 'docs/evidence/5-box-junctions-keep-clear',
+  title: 'Yellow box junctions and KEEP CLEAR (issue #5)',
+  driverNote: 'The careful drives use the Bot lab\'s reference driver (`js/bots.js`, the one `npm run test:bots` checks every lesson with), which waits before a box or KEEP CLEAR until there is room beyond it. The careless one uses the scriptable driver from `npm run test:boxes`, which just follows the car in front.',
+  clips: [
+    { name: '01-waiting-at-the-line-for-room', driver: 'bot', lesson: { id: 'box-junction', scenario: 'box' }, seconds: 24,
+      caption: 'Straight on over the yellow box at Station Road, the light green. Traffic is queueing beyond the box, so the driver waits at the line, outside the box, until the queue moves off and there is room for the whole car on the other side, then crosses without stopping.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 55`, 120); } },
+    { name: '02-waiting-in-the-box-to-turn-right', driver: 'bot', lesson: { id: 'box-right', scenario: 'box-right' }, seconds: 20,
+      caption: 'Turning right at the same box with the exit clear: the driver moves forward into the box to the turning point and waits there for the oncoming traffic to pass, which Rule 174 allows, then turns. Nothing is marked.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-right'); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 60`, 120); } },
+    { name: '03-stopping-short-of-keep-clear', driver: 'bot', lesson: { id: 'keep-clear', scenario: 'keep-clear' }, seconds: 22,
+      caption: 'High Street, a queue ahead. The driver stops short of the KEEP CLEAR across the mouth of Orchard Way, and a car waiting in Orchard Way turns right into the gap; then the queue moves off.',
+      async setup(p) { await startDrive(p, 'lesson', 'keep-clear'); await camera(p, 0); await ffUntil(p, `a => (${toMarked(true)})(a) < 45`, 120); } },
+    { name: '04-following-the-queue-into-the-box', driver: 'scripted', seconds: 22,
+      caption: 'The careless version of clip 1: following the car in front into the box with no room beyond it, and stopping inside, across the junction. Marked at once as a serious fault (Rule 174).',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await p.evaluate(() => Object.assign(window.__mw, { mph: 20, gap: 0.6 })); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 50`, 120); } },
+    { name: '05-what-it-is-marked-for', driver: 'scripted', seconds: 8,
+      caption: 'The result of that drive: not passed, the serious fault named, and the lesson\'s own feedback saying what went wrong.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await p.evaluate(() => Object.assign(window.__mw, { mph: 20, gap: 0.6 }));
+        await ffUntil(p, 'a => a.test.sRoute > a.test.route.len - 30', 400); await p.evaluate(() => { window.__mw.mph = -1; }); await ffUntil(p, 'a => a.test.done', 60); } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });

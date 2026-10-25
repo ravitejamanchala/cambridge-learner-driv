@@ -1,5 +1,6 @@
 // The examiner: follows progress along the route, re-routes when you go off it, and marks faults DVSA-style.
 import { MARKING, RULES, HANDLING } from './config.js';
+import { createClearJudge } from './box-junction.js';
 import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet, paved, onPaved } from './net.js';
 
 // The four wheels against the road surface: how many are off it, the furthest any is past the edge, and
@@ -36,9 +37,12 @@ export function createTest(net, traffic, player) {
   t.reset = () => {
     t.basicStatus = null; t.alert = null; t.coach = null; t.laneGuide = null;
     Object.assign(t, { lap: null, done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [], offRoad: { max: 0, seconds: 0 } });
+    t.boxes.reset();
     for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
   t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
+  // yellow boxes and KEEP CLEAR (Rule 174): judged on every drive; t.boxes.log keeps each crossing for feedback
+  t.boxes = createClearJudge({ net, test: t, traffic, player });
   const timer = (k, cond, dt) => (t.timers[k] = cond ? (t.timers[k] || 0) + dt : 0);
 
   // where the car is along the route: nearest route SEGMENT (not vertex), searched only a short way
@@ -111,6 +115,7 @@ export function createTest(net, traffic, player) {
     const nr = nearest(net, player.x, player.z); t.ctx = nr;
     progress(dt);
     if (t.ungraded && rollLap() && t.onLap) t.onLap();
+    t.boxes.update(dt);
     // waypoints passed (for re-routing)
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;

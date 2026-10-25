@@ -85,11 +85,12 @@ test('edge keys match the road inspector\'s', () => {
 for (const id of ['a1', 'town', 'rbs']) test(`${id}: markings survive export and import: position, heading, direction and kind`, () => {
   const d = area(id), set = exportMarkings(d);
   assert.ok(set.markings.length > 10);
-  const bare = { ...d, giveways: [], stops: [], zebras: [], keepClear: [] };
+  const bare = { ...d, giveways: [], stops: [], zebras: [], keepClear: [], boxes: [] };
   const { data, report } = importMarkings(bare, JSON.parse(JSON.stringify(set)));
   assert.equal(report.unmatched.length, 0); assert.equal(report.applied, set.markings.length);
   for (const k of ['giveways', 'stops', 'zebras']) assert.deepEqual(data[k], d[k], `${k} changed in the round trip`);
   assert.deepEqual(data.keepClear || [], d.keepClear || []);
+  assert.deepEqual(data.boxes || [], d.boxes || []);
   assert.deepEqual(exportMarkings(data), set, 'a second export differs');
   // and the world built from it is the same: the same lines in the same places
   const a = buildNet(d), b = buildNet(data), pos = (n) => n.giveways.map(g => [g.e.id, g.dir, +g.x.toFixed(2), +g.z.toFixed(2)]);
@@ -99,11 +100,12 @@ for (const id of ['a1', 'town', 'rbs']) test(`${id}: markings survive export and
 test('direction from the heading alone, and a merge never doubles a marking', () => {
   const d = area('town'), set = exportMarkings(d);
   const noDir = { version: 1, markings: set.markings.map(({ dir, ...m }) => m) };
-  const { data } = importMarkings({ ...d, giveways: [], stops: [], zebras: [], keepClear: [] }, noDir);
+  const { data } = importMarkings({ ...d, giveways: [], stops: [], zebras: [], keepClear: [], boxes: [] }, noDir);
   assert.deepEqual(data.giveways, d.giveways, 'direction recovered from heading');
   const again = importMarkings(d, set, { merge: true });
   assert.equal(again.report.applied, 0); assert.equal(again.report.duplicates, set.markings.length);
-  for (const k of ['giveways', 'stops', 'zebras', 'keepClear']) assert.deepEqual(again.data[k], d[k]);
+  assert.deepEqual(data.boxes, d.boxes, 'the box keeps its node');
+  for (const k of ['giveways', 'stops', 'zebras', 'keepClear', 'boxes']) assert.deepEqual(again.data[k], d[k]);
 });
 
 test('KEEP CLEAR is configured, never applied by rule: one in the practice town, none on the Cambridge map', () => {

@@ -9,6 +9,7 @@
 //   signal-stop a traffic-light stop line stops     [edge, s, dir, cluster, group]
 //   zebra       a zebra crossing          zebras    [edge, s]
 //   keepclear   KEEP CLEAR in the lanes   keepClear [edge, s, dir, len]
+//   box         a yellow box junction     boxes     [edge, s, dir]   over the node the edge reaches going dir
 //
 // s is metres along the edge in its own direction; dir is +1 travelling with the edge, -1 against it.
 // heading is the compass bearing of travel there (degrees, north 0, east 90), carried for people and
@@ -39,6 +40,7 @@ export function exportMarkings(d) {
   for (const [ei, s, dir, cluster, group] of d.stops || []) put('signal-stop', ei, s, dir, { cluster, group });
   for (const [ei, s] of d.zebras || []) put('zebra', ei, s, 1);
   for (const [ei, s, dir, len] of d.keepClear || []) put('keepclear', ei, s, dir, { length: r2((len || 100) / 10) });
+  for (const [ei, s, dir] of d.boxes || []) put('box', ei, s, dir);
   return { version: 1, markings: out };
 }
 
@@ -50,15 +52,15 @@ export function exportMarkings(d) {
 // class and end points, and is matched by those.
 // a marking of the same family within 12 m of edge ei at s, facing within 60 degrees of dir
 function nearby(d, type, ei, s, dir) {
-  const p = pointAt(d, ei, s), fam = type === 'zebra' ? ['zebras'] : type === 'keepclear' ? ['keepClear'] : ['giveways', 'stops'];
+  const p = pointAt(d, ei, s), fam = type === 'zebra' ? ['zebras'] : type === 'keepclear' ? ['keepClear'] : type === 'box' ? ['boxes'] : ['giveways', 'stops'];
   return fam.some(k => (d[k] || []).some(r => { const q = pointAt(d, r[0], r[1] / 10);
     if (Math.hypot(q.x - p.x, q.z - p.z) >= 12) return false;
-    return k === 'zebras' || (q.tx * (r[2] || 1)) * (p.tx * dir) + (q.tz * (r[2] || 1)) * (p.tz * dir) > 0.5; }));
+    return k === 'zebras' || k === 'boxes' || (q.tx * (r[2] || 1)) * (p.tx * dir) + (q.tz * (r[2] || 1)) * (p.tz * dir) > 0.5; }));
 }
 export function importMarkings(d, set, { merge = false } = {}) {
   const byKey = new Map(), byRoad = new Map();
   d.edges.forEach((_, ei) => { byKey.set(edgeKey(d, ei), ei); byRoad.set(roadOf(d, ei), ei); });
-  const LIST = { giveway: 'giveways', stop: 'giveways', 'signal-stop': 'stops', zebra: 'zebras', keepclear: 'keepClear' };
+  const LIST = { giveway: 'giveways', stop: 'giveways', 'signal-stop': 'stops', zebra: 'zebras', keepclear: 'keepClear', box: 'boxes' };
   const next = { ...d }, report = { applied: 0, unmatched: [], duplicates: 0 };
   const kinds = new Set(set.markings.map(m => LIST[m.type]).filter(Boolean));
   for (const k of kinds) next[k] = merge ? [...(d[k] || [])] : [];
@@ -73,7 +75,7 @@ export function importMarkings(d, set, { merge = false } = {}) {
       else dir = s < len / 2 ? -1 : 1; // no direction given: facing the nearer end, the junction it serves
     }
     const sDm = Math.round(s * 10);
-    const row = m.type === 'zebra' ? [ei, sDm] : m.type === 'keepclear' ? [ei, sDm, dir, Math.round((m.length || 10) * 10)]
+    const row = m.type === 'zebra' ? [ei, sDm] : m.type === 'box' ? [ei, sDm, dir] : m.type === 'keepclear' ? [ei, sDm, dir, Math.round((m.length || 10) * 10)]
       : m.type === 'signal-stop' ? [ei, sDm, dir, m.cluster ?? 0, m.group ?? 0] : [ei, sDm, dir, m.type === 'stop' ? 1 : 0];
     const twin = merge ? nearby(next, m.type, ei, s, dir) : next[list].find(r => r[0] === ei && Math.abs(r[1] - sDm) < 5 && (m.type === 'zebra' || r[2] === dir) && (list !== 'giveways' || !!r[3] === (m.type === 'stop')));
     if (twin) { report.duplicates++; continue; }

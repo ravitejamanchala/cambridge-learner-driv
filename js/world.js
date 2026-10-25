@@ -3,6 +3,7 @@
 import { WORLD } from './config.js';
 import { posAt, laneInfo, nearest, paved } from './net.js';
 import { lineDashes } from './markings.js';
+import { boxArea } from './box-junction.js';
 import { MW, JUNCTIONS, centreLine, sampleAt, circuitLength } from './motorway.js';
 import { buildChunkContent, kitResources } from './city.js';
 import { buildSigns, setSignsLit } from './signs.js';
@@ -150,6 +151,13 @@ export function buildWorld(scene, net, traffic) {
     const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
     const mats = {}; for (const word of ['KEEP', 'CLEAR']) textMats.push(mats[word] = new T.MeshBasicMaterial({ map: roadText(word), transparent: true, depthWrite: false }));
     for (const k of keepClear) { const m = new T.Mesh(g, mats[k.word]); m.position.set(k.x, 0.08, k.z); m.rotation.y = k.yaw; m.scale.set(k.w, 1, 3.2); m.renderOrder = 5; m.userData.keepClear = k.word; scene.add(m); }
+  }
+  // yellow box junctions (diagram 1043): a yellow border and criss-cross lines over the whole crossing (issue #5)
+  for (const [i, b] of (net.boxes || []).entries()) {
+    const A = boxArea(net, b.node, i); if (!A) continue;
+    const mat = new T.MeshBasicMaterial({ map: boxTexture(A.hl * 2, A.hw * 2), transparent: true, depthWrite: false }); textMats.push(mat);
+    const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    const m = new T.Mesh(g, mat); m.position.set(A.x, 0.075, A.z); m.rotation.y = Math.atan2(-A.ax, -A.az); m.scale.set(A.hw * 2, 1, A.hl * 2); m.renderOrder = 4; m.userData.box = i; scene.add(m);
   }
   // Dutch-style roundabouts: red cycle track round the outside with white "elephant's footprint" edges where it crosses the roads
   const annulus = (acc, ring, r0, r1, y) => { const N = 96; for (let i = 0; i < N; i++) { const a0 = i / N * 2 * Math.PI, a1 = (i + 1) / N * 2 * Math.PI, P = (r, a) => [ring.x + r * Math.sin(a), ring.z - r * Math.cos(a)];
@@ -417,6 +425,20 @@ function roadText(word) {
   // squeezed across to fit the canvas, so no letter is cut off at the edges
   const fit = Math.min(1, 236 / g.measureText(word).width);
   g.save(); g.translate(128, 256); g.scale(fit, 3.2); g.fillText(word, 0, 0); g.restore();
+  const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+// a box junction's markings, `len` along its axis by `wid` across: a border and lines at 45 degrees both
+// ways about 2 m apart, in road-marking yellow on clear. The lines are 0.3 m wide, half as wide again as
+// real ones, so the box still reads from 30 m back, as signs and lamps are drawn larger than life
+function boxTexture(len, wid) {
+  const ppm = 32, c = document.createElement('canvas'); c.width = Math.min(1024, Math.round(wid * ppm)); c.height = Math.min(1024, Math.round(len * ppm));
+  const g = c.getContext('2d'), kx = c.width / wid, kz = c.height / len;
+  g.strokeStyle = '#f0c419'; g.lineWidth = 0.3 * ppm; g.lineCap = 'butt';
+  g.strokeRect(0.15 * kx, 0.15 * kz, c.width - 0.3 * kx, c.height - 0.3 * kz);
+  g.save(); g.beginPath(); g.rect(0, 0, c.width, c.height); g.clip();
+  const step = 2 * Math.SQRT2 * ppm, span = c.width + c.height;
+  for (let d = -span; d <= span; d += step) { g.beginPath(); g.moveTo(d, 0); g.lineTo(d + c.height, c.height); g.moveTo(d + c.height, 0); g.lineTo(d, c.height); g.stroke(); }
+  g.restore();
   const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
 }
 function bikeTexture() {

@@ -71,6 +71,8 @@ export function buildNet(d) {
   // KEEP CLEAR across the lanes of one direction, centred `s` along the edge and `len` long; only where a
   // map or layout configures it, never by rule (issue #4)
   net.keepClear = (d.keepClear || []).map(([ei, s, dir, len]) => feature(net, { e: edges[ei], s: s / 10, dir, len: (len || 100) / 10 }));
+  // yellow box junctions, each over the node at the end of its edge (issue #5); the box itself is js/box-junction.js
+  net.boxes = (d.boxes || []).map(([ei, s, dir]) => ({ e: edges[ei], s: s / 10, dir, node: dir > 0 ? edges[ei].b : edges[ei].a }));
   tidyJunctionLines(net);
   net.fillets = junctionFillets(net);
   net.stopGrid = new Map();
