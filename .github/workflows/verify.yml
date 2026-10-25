@@ -29,6 +29,8 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
       - run: npx playwright install --with-deps chromium
       - run: node tests/local-tracks-browser.mjs
+      - run: node tests/experimental-practice-browser.mjs
+      - run: node tests/cambridge-pilot-browser.mjs
       - run: npm run build:pages
       - run: node tests/pages-browser.mjs
       - run: node tests/three-imports-browser.mjs

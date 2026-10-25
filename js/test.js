@@ -11,13 +11,13 @@ export function approachLane(nr,approach,heading) {
 
 export function createTest(net, traffic, player) {
   const t = {
-    running: false, done: false, route: null, waypoints: [], wpIndex: 1,
+    experimental: false, running: false, done: false, route: null, waypoints: [], wpIndex: 1,
     sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0,
     faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), onRb: false, ctx: null, onFault: null
   };
   t.setRoute = (route, nodes) => { t.route = route; t.waypoints = nodes; };
   t.fault = (kind, cat, text, key, cd = 8) => {
-    if (!t.running) return; const now = traffic.clock;
+    if (!t.running || t.experimental) return; const now = traffic.clock;
     if (key) { if (t.cool[key] && now < t.cool[key]) return; t.cool[key] = now + cd; }
     t.faults.unshift({ kind, cat, text, key: key || null, context: t.context || null, elapsed: Math.max(0, now - (t.startedAt ?? now)), at: now, x: Math.round(player.x * 10) / 10, z: Math.round(player.z * 10) / 10 }); if (kind === 'S') t.S++; else t.D++;
     t.onFault && t.onFault();
@@ -27,7 +27,7 @@ export function createTest(net, traffic, player) {
     Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [] });
     for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
-  t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
+  t.passed = () => t.experimental ? null : t.S === 0 && t.D <= MARKING.maxDrivingFaults;
   const timer = (k, cond, dt) => (t.timers[k] = cond ? (t.timers[k] || 0) + dt : 0);
 
   // where the car is along the route: nearest route SEGMENT (not vertex), searched only a short way
@@ -66,6 +66,31 @@ export function createTest(net, traffic, player) {
     } catch (e) { t.offT = 0; }
   }
 
+  function physicalContacts() {
+    const v = player.v, fx = -Math.sin(player.th), fz = -Math.cos(player.th);
+    // collisions
+    // Boxes about 10% smaller than the vehicles, checked in both vehicles' directions; a real impact needs 1.5 m/s
+    // closing speed; one fault per crash; and it is your fault only if your own movement closed the gap, or you had
+    // just broken a rule (red light, not giving way). Otherwise it is noted that someone hit you.
+    const PL = 4.3 * 0.45, PW = 1.8 * 0.45, rx = -fz, rz = fx;
+    const hit = (o, oL, oW, bike) => {
+      const dx = o.x - player.x, dz = o.z - player.z, d = Math.hypot(dx, dz);
+      if (d > 9) { t.contacts.delete(o); return; }
+      const ofx = -Math.sin(o.th), ofz = -Math.cos(o.th), orx = -ofz, orz = ofx;
+      const sep = [[fx, fz], [rx, rz], [ofx, ofz], [orx, orz]].some(([ax, az]) => Math.abs(dx * ax + dz * az) > PL * Math.abs(fx * ax + fz * az) + PW * Math.abs(rx * ax + rz * az) + oL * Math.abs(ofx * ax + ofz * az) + oW * Math.abs(orx * ax + orz * az));
+      if (sep) { if (d > PL + oL + 1) t.contacts.delete(o); return; }
+      if (t.contacts.has(o)) return; t.contacts.add(o);
+      const ux = dx / (d || 1), uz = dz / (d || 1), mine = v * (fx * ux + fz * uz), theirs = -(o.v * (ofx * ux + ofz * uz)), closing = mine + theirs;
+      if (closing < 1.5) return; // a nudge, not a crash
+      const lastRule = t.faults.find(f => traffic.clock - f.at < 4 && /traffic lights|Junctions – observation|Pedestrian/.test(f.cat));
+      if ((mine > 0.5 && mine >= theirs * 0.6) || lastRule) { t.fault('S', 'Control – collision', bike ? 'Collided with a cyclist' : 'Collided with another vehicle'); player.v = Math.min(player.v, 0) * 0.5; }
+      else t.hits.push({ text: bike ? 'A cyclist rode into you' : 'Another vehicle drove into you', x: Math.round(player.x), z: Math.round(player.z) });
+      o.v = 0; o.ghost = Math.max(o.ghost || 0, 1.5); // the other road user stops, then eases past
+    };
+    for (const c of traffic.cars) if (c.alive && !(c.ghost > 0)) hit(c, 4.2 * 0.45, 1.8 * 0.45, false);
+    for (const b of traffic.bikes.concat(traffic.ringBikes)) if (b.alive !== false) hit(b, 0.9 * 0.9, 0.3, true);
+  }
+
   t.update = (dt, inputSteer) => {
     if (!t.running) return;
     if (t.mode === 'manoeuvre') { t.ctx = nearest(net, player.x, player.z); if (Math.abs(player.v) > 0.3) t.parked = false; return; }
@@ -75,6 +100,12 @@ export function createTest(net, traffic, player) {
     // waypoints passed (for re-routing)
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;
+    if (t.experimental) {
+      if (Math.abs(v) > .3) t.parked = false;
+      player.onRb = t.onRb = nr.way.rb;
+      physicalContacts();
+      return; // Navigation and collision physics only: no examiner timers or objectives.
+    }
     const way = nr.way, limit = way.mph;
     // moving off from the kerb (Rule 159): look round first, and don't pull out in front of traffic coming from behind
     if (t.parked && v > 0.8) {
@@ -189,27 +220,7 @@ export function createTest(net, traffic, player) {
       if (!la || fw < la.dist) la = { dist: fw, st };
     }
     t.lightAhead = la ? { dist: la.dist, state: traffic.lightState(la.st) } : null;
-    // collisions
-    // Boxes about 10% smaller than the vehicles, checked in both vehicles' directions; a real impact needs 1.5 m/s
-    // closing speed; one fault per crash; and it is your fault only if your own movement closed the gap, or you had
-    // just broken a rule (red light, not giving way). Otherwise it is noted that someone hit you.
-    const PL = 4.3 * 0.45, PW = 1.8 * 0.45, rx = -fz, rz = fx;
-    const hit = (o, oL, oW, bike) => {
-      const dx = o.x - player.x, dz = o.z - player.z, d = Math.hypot(dx, dz);
-      if (d > 9) { t.contacts.delete(o); return; }
-      const ofx = -Math.sin(o.th), ofz = -Math.cos(o.th), orx = -ofz, orz = ofx;
-      const sep = [[fx, fz], [rx, rz], [ofx, ofz], [orx, orz]].some(([ax, az]) => Math.abs(dx * ax + dz * az) > PL * Math.abs(fx * ax + fz * az) + PW * Math.abs(rx * ax + rz * az) + oL * Math.abs(ofx * ax + ofz * az) + oW * Math.abs(orx * ax + orz * az));
-      if (sep) { if (d > PL + oL + 1) t.contacts.delete(o); return; }
-      if (t.contacts.has(o)) return; t.contacts.add(o);
-      const ux = dx / (d || 1), uz = dz / (d || 1), mine = v * (fx * ux + fz * uz), theirs = -(o.v * (ofx * ux + ofz * uz)), closing = mine + theirs;
-      if (closing < 1.5) return; // a nudge, not a crash
-      const lastRule = t.faults.find(f => traffic.clock - f.at < 4 && /traffic lights|Junctions – observation|Pedestrian/.test(f.cat));
-      if ((mine > 0.5 && mine >= theirs * 0.6) || lastRule) { t.fault('S', 'Control – collision', bike ? 'Collided with a cyclist' : 'Collided with another vehicle'); player.v = Math.min(player.v, 0) * 0.5; }
-      else t.hits.push({ text: bike ? 'A cyclist rode into you' : 'Another vehicle drove into you', x: Math.round(player.x), z: Math.round(player.z) });
-      o.v = 0; o.ghost = Math.max(o.ghost || 0, 1.5); // the other road user stops, then eases past
-    };
-    for (const c of traffic.cars) if (c.alive && !(c.ghost > 0)) hit(c, 4.2 * 0.45, 1.8 * 0.45, false);
-    for (const b of traffic.bikes.concat(traffic.ringBikes)) if (b.alive !== false) hit(b, 0.9 * 0.9, 0.3, true);
+    physicalContacts();
     // lane discipline: be in the lane the examiner asked for before the junction
     for (const ins of t.route.instructions) {
       if (!ins.laneOK || ins.laneChecked) continue;
@@ -268,7 +279,7 @@ export function createTest(net, traffic, player) {
       if (offL > (way.oneway ? -0.5 : 0.3)) finish();
     }
   };
-  function finish() { if (!t.running || t.done) return; t.running = false; t.done = true; t.onFinish && t.onFinish(); }
+  function finish() { if (!t.running || t.done || t.experimental) return; t.running = false; t.done = true; t.onFinish && t.onFinish(); }
   t.finish = finish;
   return t;
 }

@@ -28,5 +28,6 @@ fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length }));
 
 if(process.argv.includes('--pages-preview')) {
+ fs.cpSync(path.join(SRC,'examples/cambridge-pilot'),path.join(OUT,'examples/cambridge-pilot'),{recursive:true});
  fs.writeFileSync(path.join(OUT,'auth-config.js'),'window.LEARNER_CONFIG={BROWSER_AUTHORING:true};');
 } else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));

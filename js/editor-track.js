@@ -21,6 +21,9 @@ export function validate(d) {
       !d.sceneryHidden.every((k) => typeof k === "string" && k.length < 200))
   )
     errors.push("Invalid scenery overrides");
+  if (d.sceneryMode !== undefined && !['authored','procedural'].includes(d.sceneryMode)) errors.push('Invalid scenery mode');
+  if (d.sceneryMode === 'procedural' && Array.isArray(d.objects) && d.objects.some(o => o?.type === 'building')) errors.push('Procedural scenery cannot include authored buildings');
+  if (d.practiceMode !== undefined && d.practiceMode !== 'experimental') errors.push('Invalid practice mode');
   const n = d.network;
   if (
     !n ||

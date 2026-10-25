@@ -105,7 +105,7 @@ async function boot() {
       const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
       const net = buildNet(d.network || d);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic, {authored: !!d.network || d.sceneryMode === "authored"});
+      const world = buildWorld(scene, net, traffic, {authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
       if(d.network) addEditorObjects(T,scene,d);
       world.setShadows(shadowsOn);
       const test = createTest(net, traffic, player);
@@ -147,6 +147,7 @@ async function boot() {
     route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
+    test.experimental = localTracks.get(A.id)?.practiceMode === 'experimental';
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
@@ -165,7 +166,8 @@ async function boot() {
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
     ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
-    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    $('backBtn').textContent = test.experimental ? 'Reset to spawn' : 'Back to last instruction';
+    $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
@@ -366,7 +368,7 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (scenario) scenario.stop();
+    const test = A.test; if (test.experimental) return; if (scenario) scenario.stop();
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -410,14 +412,14 @@ async function boot() {
     loadPlan(plan);
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : createScenario(plan.lesson, deps);
+    scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
     stats.distance = 0; stats.topSpeed = 0;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = A.test.experimental ? 'Experimental practice · no grading or recorded results' : plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
@@ -431,6 +433,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('backBtn').addEventListener('click', () => {
     if (plan?.lesson?.manoeuvre) return;
+    if (A.test.experimental) { begin(); return; }
     const test = A.test, r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
     let best = 0; for (let k = 0; k < r.cum.length; k++) if (r.cum[k] <= s) best = k;
     const a = best, b = Math.min(r.xs.length - 1, best + 1), tx = r.xs[b] - r.xs[a], tz = r.zs[b] - r.zs[a], L = Math.hypot(tx, tz) || 1;
@@ -560,7 +563,7 @@ async function boot() {
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
-    if (test.running) test.elapsed = (test.elapsed || 0) + dt;
+    if (test.running && !test.experimental) test.elapsed = (test.elapsed || 0) + dt;
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);

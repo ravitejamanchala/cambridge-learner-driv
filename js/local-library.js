@@ -15,7 +15,7 @@ export async function loadLocalLibrary(index,routes) {
   const clean=clearRoadBuildings(entry.track),prepared=prepareEditorTrack(clean);
   tracks.set(id,{...clean,network:prepared.network,plan:{...entry.track.plan,waypoints:prepared.waypoints}});
   index.areas.push({id,file:''}); index.plans['route:'+id]={...entry.meta,area:id};
-  routes.push({id,name:entry.track.title+' · local '+entry.id.slice(0,8),blurb:'Local editor revision '+entry.id+'. '+(entry.track.attribution||''),waypoints:prepared.waypoints,localNodes:prepared.nodes});
+  routes.push({id,practiceMode:entry.track.practiceMode,name:entry.track.title+' · local '+entry.id.slice(0,8),blurb:'Local editor revision '+entry.id+'. '+(entry.track.attribution||''),waypoints:prepared.waypoints,localNodes:prepared.nodes});
  }
  return tracks;
 }
@@ -27,6 +27,20 @@ export function mountLocalLibrary({onSelect,selectedRoute}={}){
  const summary=document.createElement('p');summary.id='localTrackSummary';panel.append(summary);
  const details=document.createElement('details');details.innerHTML='<summary>Edit saved JSON</summary><label>Revision <select aria-label="Saved local revision"></select></label><textarea aria-label="Editor track JSON" rows="10" spellcheck="false" style="width:100%;font-family:monospace"></textarea><button class="cbtn" type="button">Save as new revision</button><button class="cbtn" type="button" data-export>Download JSON</button>';
  panel.append(details);
+ const pilot=document.createElement('details');pilot.className='pilot-routes';
+ const heading=document.createElement('summary');heading.textContent='Cambridge (Brookmount Court) experimental loops';pilot.append(heading);
+ const note=document.createElement('p');note.textContent='Two approximately 6 km loops on cached OSM roads. No grading or saved results. Centre entrance and access/turn restrictions are unverified; scenery is generated. Each load saves a new local revision.';pilot.append(note);
+ for(const direction of ['clockwise','anticlockwise']){
+  const button=document.createElement('button');button.type='button';button.className='cbtn';button.textContent='Load '+direction+' practice';
+  button.onclick=async()=>{button.disabled=true;status.textContent='Loading experimental loop…';try{
+   const response=await fetch(new URL('examples/cambridge-pilot/brookmount-'+direction+'.json',document.baseURI));
+   if(!response.ok)throw Error('Pilot file unavailable in this build. Import its JSON instead.');
+   await persist(await response.text());
+  }catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
+  pilot.append(button);
+ }
+ panel.append(pilot);
+
  const status=panel.querySelector('[role=status]'),input=panel.querySelector('input'),select=details.querySelector('select'),textarea=details.querySelector('textarea'),save=details.querySelector('button');
  const downloadButton=details.querySelector('[data-export]');
  let currentId=null,library=[],loaded=false,chosen=selectedRoute?.()||null;
