@@ -1,5 +1,6 @@
 import { createParkingDriver } from './parking-driver.js';
 import { senseMotorway, overtaking } from './lane-discipline.js';
+import { crossing, CAR_HALF } from './box-junction.js';
 import { posAt, nearestWhere } from './net.js';
 import { steerFor, steerLock, HANDLING } from './config.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
@@ -120,6 +121,12 @@ export function makeDriver(api) {
       }
     }
     for (const s of net.stops) { if(t.ctx && s.e!==t.ctx.e)continue;const rx = s.x - pl.x, rz = s.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 50 || Math.abs(rx * fz - rz * fx) > s.w / 2 + 2 || s.tx * fx + s.tz * fz < 0.5) continue; const L = tr.lightState(s); if (L === 'R' || L === 'RA' || (L === 'A' && fw > 6)) stopAt(fw, 4.5); }
+    // yellow boxes and KEEP CLEAR (Rule 174): wait before the area until there is room beyond it
+    for (const A of t.boxes?.areas || []) {
+      if (Math.abs(A.x - pl.x) > 50 || Math.abs(A.z - pl.z) > 50) continue;
+      const c = crossing(A, pl.x + fx * CAR_HALF, pl.z + fz * CAR_HALF, fx, fz);
+      if (c.into > 0.3 && c.into < 40 && t.boxes.blocked(A)) stopAt(c.into + CAR_HALF, CAR_HALF + 1);
+    }
     for (const z of net.zebras) { if (z.ped.state === 'idle') continue; const rx = z.x - pl.x, rz = z.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 40 || Math.abs(rx * fz - rz * fx) > z.w) continue; stopAt(fw, 5); }
     for (const c of tr.puffins) { if (c.ped.state === 'idle') continue; const rx = c.x - pl.x, rz = c.z - pl.z, fw = rx * fx + rz * fz; if (fw < 1 || fw > 40 || Math.abs(rx * fz - rz * fx) > c.w) continue; stopAt(fw, 4.5); }
     const look = Math.max(24, pl.v * pl.v / 9 + pl.v * 1.2 + 8), others = tr.cars.concat(tr.bikes);

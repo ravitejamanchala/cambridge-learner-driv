@@ -5,6 +5,7 @@ import { safeTrafficSpawn } from './traffic-spawn.js';
 import { seededRandom } from './random.js';
 import { along, endNode, posAt, laneCentre, laneInfo, cycleLeft, laneArrows, manoeuvre, nearestWhere } from './net.js';
 import { MW } from './motorway.js';
+import { clearAreas, crossing, exitBlocked, exitLine } from './box-junction.js';
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -16,6 +17,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   let traitRandom=Math.random;
   // lessons can script a junction: { group, t0 } holds `group` on green until t0, then runs amber, red, red-and-amber, green
   const overrides = new Map();
+  // yellow boxes by the node they cover, and KEEP CLEAR areas (js/box-junction.js)
+  const areas = clearAreas(net), boxAt = new Map(areas.filter(A => A.kind === 'box').map(A => [A.node, A])), keeps = areas.filter(A => A.kind === 'keep');
   // UK sequence: red, red+amber, green, amber, red. Junctions alternate two groups; stand-alone crossings get a pedestrian phase.
   function lightState(st) {
     const ov = overrides.get(st.cluster);
@@ -373,6 +376,13 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const others = player ? all.concat([player]) : all;
     // look further ahead at speed so fast traffic can stop behind a slower learner
     const look = Math.max(20, a.v * a.v / 10 + 12); let blocked = false, waitOn = null, waitV = Infinity;
+    // Part way round a turn the heading points across the corner, not along the road being turned into: a
+    // learner waiting in the other lane there (short of KEEP CLEAR, say) is judged against the way this
+    // vehicle is going, so it does not sit for ever behind someone who is not in its way. (Not at roundabouts,
+    // where the ordinary give-way rules decide.)
+    let tdx = 0, tdz = 0;
+    { const q = a.next && rem < 12 ? along(a.next.e, Math.min(4, a.next.e.len / 2), a.next.dir) : a.prev && a.s < 8 ? along(a.e, Math.min(a.e.len, a.s + 4), a.dir) : null;
+      if (q && !w.rb && !a.next?.e.way.rb && q.tx * fx + q.tz * fz < 0.94) { tdx = q.tx; tdz = q.tz; } }
     for (const o of others) {
       if (o === a || o.alive === false) continue;
       if (a.ghost > 0 && !o.isPlayer) continue;
@@ -383,6 +393,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
       // lane. (Only there: at a roundabout a car waiting to enter can face the same way as one on the ring.)
       let lx = fx, lz = fz;
       if (w.cls === 'motorway' && Math.cos((o.th || 0) - a.th) > 0.9) { lx += -Math.sin(o.th); lz += -Math.cos(o.th); const L = Math.hypot(lx, lz) || 1; lx /= L; lz /= L; }
+      if (o.isPlayer && (tdx || tdz) && Math.abs(o.v) < 0.5) { lx = tdx; lz = tdz; }
       const lat = Math.abs(rx * lz - rz * lx), oBike = o.kind === 'bike';
       const oncoming = Math.cos((o.th || 0) - a.th) < -0.5; // passing in the other lane, not in our way
       let width = bike ? (oBike ? 0.8 : 1.3) : (oBike ? 1.25 : o.isPlayer ? 2.8 : 2.2); // more room round the learner, who may be turning across
@@ -405,6 +416,23 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
         if (bike && o.isPlayer && Math.abs(o.v) < 0.5 && fwd < 12) blocked = true;
       }
     }
+    // Box junctions and KEEP CLEAR (Rule 174): wait before the area until there is room beyond it for this
+    // vehicle, so a queue never blocks the junction. (A blue-light vehicle and cyclists filter as they would.)
+    a.areaHold = false;
+    if (!bike && !blue) {
+      const room = (A, x, z, tx, tz, opt) => !exitBlocked(A, x, z, tx, tz, others.filter(o => o !== a), opt);
+      const A = a.next && rem < 45 && boxAt.get(endNode(a));
+      if (A) {
+        const t = along(a.e, a.e.len - 0.5, a.dir), back = crossing(A, net.nx[A.node], net.nz[A.node], -t.tx, -t.tz).out, into = rem - back - 2.2, L = exitLine(net, A.node, a.next);
+        if (into > 0.3 && !room(A, L.x, L.z, L.fx, L.fz, { lo: L.lo, hi: L.hi })) { vmax = Math.min(vmax, brakeTo(0, into - 0.3)); a.areaHold = true; }
+      }
+      for (const K of keeps) {
+        if (Math.abs(K.x - a.x) > 45 || Math.abs(K.z - a.z) > 45 || fx * K.ax + fz * K.az < 0.9) continue;
+        const c = crossing(K, a.x, a.z, fx, fz), into = c.into - 2.2;
+        if (into > 0.3 && into < 40 && !room(K, a.x, a.z, fx, fz)) { vmax = Math.min(vmax, brakeTo(0, into - 0.3)); a.areaHold = true; }
+      }
+    }
+    if (a.held) vmax = 0; // a lesson is holding this one still (a queue it has set up)
     // signalled to move left and waited, but someone is keeping pace in that lane: ease off and drop in behind
     if (a.intent && a.intent.to < a.lane && clock > a.intent.at + 1) vmax = Math.min(vmax, a.v - 1.5, w.mph * 0.447 * a.cruise - 3);
     // A learner signalling to move into this vehicle's lane, just ahead of it or alongside: a courteous
@@ -442,7 +470,8 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     // Stuck for a while, a vehicle may slip through the traffic around it (a ghost, for a moment) so a knot of
     // background traffic never locks for good. Not when it is queueing behind the learner, or behind someone
     // who is: then it waits its turn in the line, as anyone would, rather than piling through the queue.
-    a.queued = !!waitOn && (waitOn.isPlayer || !!waitOn.queued) && Math.abs(waitOn.v || 0) < 0.5;
+    // (waiting before a box or KEEP CLEAR, or held by a lesson, is queueing too)
+    a.queued = !!a.held || a.areaHold || (!!waitOn && (waitOn.isPlayer || !!waitOn.queued) && Math.abs(waitOn.v || 0) < 0.5);
     if (a.stuck > 8 && !a.queued) { a.ghost = 3; a.stuck = 0; } a.ghost -= dt;
     a.v = a.v > vmax ? Math.max(vmax, a.v - 7 * dt) : Math.min(vmax, a.v + (bike ? 1.2 : 2.2) * dt);
     a.s += a.v * dt;
@@ -460,7 +489,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   function setDensity(value) { if (!['normal', 'light', 'none'].includes(value)) throw new Error('Unsupported traffic density'); density = value; all.forEach(a => a.scripted = false); }
   function reset(px,pz,seed) {
     random=seededRandom(seed);traitRandom=seededRandom((seed^0x9e3779b9)>>>0);clock=0;overrides.clear();
-    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;a.emergency=false;});
+    all.forEach(a=>{a.alive=false;a.mesh.visible=false;a.pinned=0;a.scripted=false;a.swing=0;a.emergency=false;a.held=false;});
     all.forEach(a=>spawn(a,px,pz,true));
     net.zebras.forEach(z=>Object.assign(z.ped,{state:'idle',t:2+(z.id*7.1)%9,p:0,dir:1}));
     puffins.forEach(c=>{c.last='G';Object.assign(c.ped,{state:'idle',p:0,dir:1});});
@@ -495,7 +524,7 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
   // path (optional): route steps the car should follow instead of choosing turns at random
   // lane (optional): which lane, 0 nearest the kerb; keepTo (optional): a road class it never leaves
   function placeCar(c, e, dir, s, speed, cruise = 1, path = null, lane = 0, keepTo = null) {
-    Object.assign(c, { scripted: true, traits: null, intent: null, ind: null, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), laneF: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false });
+    Object.assign(c, { scripted: true, traits: null, intent: null, ind: null, e, dir, s, lane: Math.min(lane, laneInfo(e, dir).n - 1), laneF: Math.min(lane, laneInfo(e, dir).n - 1), prev: null, alive: true, stuck: 0, ghost: 0, v: speed, cruise, path, keepTo, emergency: false, held: false });
     const p = trackPoint(c); c.x = p.x; c.z = p.z; c.th = Math.atan2(-p.tx, -p.tz); c.next = chooseNext(c); c.mesh.visible = true; c.pinned = 45;
   }
   return { setDensity, reset, lightState, update, init, cars, bikes, ringBikes, puffins, pedestrians:pedPool, overrides, placeBike, placeCar, placeRingBike, miniNodes, get clock() { return clock; } };

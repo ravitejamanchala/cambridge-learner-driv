@@ -17,6 +17,7 @@
     "test:bots": "node tests/bots-browser.mjs",
     "test:free": "node tests/free-drive-browser.mjs",
     "test:motorway": "node tests/motorway-lessons-browser.mjs",
+    "test:boxes": "node tests/boxes-browser.mjs",
     "test:control": "node tests/control-browser.mjs",
     "evidence": "node tools/record_evidence.mjs"
   },

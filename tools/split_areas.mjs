@@ -79,7 +79,7 @@ groups.forEach((g, gi) => {
   const area = {
     version: full.version, source: full.source, origin: full.origin, kx: full.kx, kz: full.kz, classes: full.classes,
     area: { id, box: b.map(Math.round) }, names, ways, nodes, edges,
-    stops: remap(full.stops), zebras: remap(full.zebras), giveways: remap(full.giveways),
+    stops: remap(full.stops), zebras: remap(full.zebras), giveways: remap(full.giveways), ...(full.keepClear ? { keepClear: remap(full.keepClear) } : {}), ...(full.boxes ? { boxes: remap(full.boxes) } : {}),
     minis: full.minis.filter(([x, z]) => inBox(b, x / 10, z / 10)), rbs: full.rbs.filter(([x, z]) => inBox(b, x / 10, z / 10)),
     lamps: (full.lamps || []).reduce((out, v, i, a) => { if (i % 2 === 0 && inBox(b, a[i] / 10, a[i + 1] / 10)) out.push(a[i], a[i + 1]); return out; }, [])
   };
