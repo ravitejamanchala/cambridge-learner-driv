@@ -43,6 +43,20 @@ gate. The preview runs as a guest with the whole course open, syncs nothing, and
 "Preview build · <commit>" label in the lobby (never while driving). `tests/preview-build.test.mjs`
 checks that a production build never carries the flag or the label.
 
+## The sandbox branch
+
+For trying things out in the real app (a map, lesson or marking JSON file, say) without a pull request,
+push to the long-lived `sandbox` branch. `.github/workflows/sandbox.yml` builds it as a preview and deploys
+it to a fixed address:
+
+    https://sandbox.learner-drive-app.pages.dev/
+
+Every push to `main` is merged into `sandbox` and redeployed, so the experiment always runs on the latest
+app. If something on `sandbox` conflicts with `main` the run fails with a message and leaves the branch
+alone: merge `main` into `sandbox` by hand and resolve it. Tests run on every sandbox build but do not stop
+the deploy. Like the pull-request previews it runs as a guest with the whole course open and never touches
+production. When an experiment is worth keeping, open a pull request from a branch with just that change.
+
 **Do not publish previews to GitHub Pages.** The local-mock sandbox (`development/local-mock-library`)
 publishes there and replaces the whole tree each time, so anything else put there is wiped.
 
