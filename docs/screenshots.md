@@ -322,9 +322,9 @@ Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic
 
 ### Traffic joining from a slip road
 
-![Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.](screenshots/lesson-mw-merging.jpg)
+![Traffic joining from a slip road — M100 · junction 3 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.](screenshots/lesson-mw-merging.jpg)
 
-Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.
+Traffic joining from a slip road — M100 · junction 3 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.
 
 ### Leaving the motorway
 
@@ -337,6 +337,18 @@ Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3
 ![If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.](screenshots/lesson-mw-missed-exit.jpg)
 
 If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.
+
+### Speed limits on the gantries, and a closed lane
+
+![Speed limits on the gantries, and a closed lane — M100 · smart motorway · three lanes. The signals on the gantries above each lane show the speed limit and which lanes you may use. Be down to each limit by its gantry and keep to it, and move out of a lane marked with an arrow before the red X: that lane is closed.](screenshots/lesson-mw-smart-limits.jpg)
+
+Speed limits on the gantries, and a closed lane — M100 · smart motorway · three lanes. The signals on the gantries above each lane show the speed limit and which lanes you may use. Be down to each limit by its gantry and keep to it, and move out of a lane marked with an arrow before the red X: that lane is closed.
+
+### Roadworks: a lane closed and a 50 limit
+
+![Roadworks: a lane closed and a 50 limit — M100 · roadworks · three lanes. Roadworks ahead close the right-hand lane. Read the signs as they come, be down to 50 mph by the first 50 sign, move left in good time or merge in turn where the lane ends, and keep to 50 until the end of the roadworks.](screenshots/lesson-mw-roadworks.jpg)
+
+Roadworks: a lane closed and a 50 limit — M100 · roadworks · three lanes. Roadworks ahead close the right-hand lane. Read the signs as they come, be down to 50 mph by the first 50 sign, move left in good time or merge in turn where the lane ends, and keep to 50 until the end of the roadworks.
 
 ### Joining at dusk
 
