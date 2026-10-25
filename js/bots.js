@@ -1,4 +1,7 @@
 import { createParkingDriver } from './parking-driver.js';
+import { senseMotorway, overtaking } from './lane-discipline.js';
+import { posAt, nearestWhere } from './net.js';
+import { steerFor, steerLock, HANDLING } from './config.js';
 // Bot lab (open the sim with ?bots in the address): drives lessons, puzzles and mock tests with a
 // rule-following test driver, as fast as the browser allows (no rendering unless you watch), and
 // keeps every result in localStorage so several windows can run at once and add to the same table.
@@ -31,6 +34,7 @@ export function makeDriver(api) {
     const A = api.A, t = A.test, pl = api.player, R = t.route, tr = A.traffic, net = A.net; if (!t.running) return null;
     const lesson = api.lesson?.(), status = api.scenarioStatus?.();
     if (lesson?.manoeuvre) return parkingInput();
+    if (t.timeOfDay === 'dusk' && !pl.headlights) pl.headlights = true; // dipped headlights before moving off at dusk
     if (pl.operation?.enabled && pl.operation.transmission !== 'automatic') {
       const missing = ['doorClosed', 'seatSet', 'mirrorsSet', 'belt'].find(k => !pl.operation[k]);
       if (missing) api.operate(missing);
@@ -75,6 +79,10 @@ export function makeDriver(api) {
     const nearMini=net.minis.some(m=>Math.hypot(m.x-pl.x,m.z-pl.z)<18);
     const follow = nearMini ? 6 : 10;
     const p = api.lanePoint(t.sRoute + follow), d = wrapA(Math.atan2(-(p.x - pl.x), -(p.z - pl.z)) - pl.th);
+    // on a motorway: its own lane-aware driving, below (nothing else on the road applies there)
+    const mw = joinPlan(api, st, t, pl, tr) || exitPlan(api, st, t, pl, tr) || motorwayPlan(api, st, t, pl, tr);
+    if (mw) { const dm = wrapA(Math.atan2(-(mw.p.x - pl.x), -(mw.p.z - pl.z)) - pl.th);
+      return { throttle: pl.v < mw.target - 0.2 ? 1 : 0, brake: pl.v > mw.target + 0.5 ? Math.min(1, (pl.v - mw.target) / 4) : 0, steer: steerFor(dm, 2, pl.v), aim: dm }; }
     const nr = t.ctx; let target = Math.min(nr ? nr.way.mph / MPH * 0.88 : 8, 8);
     if(nearMini)target=Math.min(target,3.5);
     if (lesson?.scenario === 'steering') target = Math.min(target, 5.5);
@@ -147,7 +155,9 @@ export function makeDriver(api) {
     }
     if (ins.kind === 'rb' && ahead > 2 && ahead < 22) {
       const vx = net.nx[ins.node], vz = net.nz[ins.node], lit = net.stops.some(s => s.e===ins.approach.e && s.dir===ins.approach.dir && Math.hypot(s.x-vx,s.z-vz)<40);
-      if (!lit && others.some(o => o.alive && o.e.way.rb && o.v > .5 && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 8);
+      // a car on the ring signalling left that leaves the ring before it reaches this entry is not coming past
+      const leavingHere = o => o.ind === 'L' && o.next && !o.next.e.way.rb && (o.dir > 0 ? o.e.len - o.s : o.s) <= Math.hypot(o.x - vx, o.z - vz) + 2;
+      if (!lit && others.some(o => o.alive && o.e.way.rb && o.v > .5 && !leavingHere(o) && Math.hypot(o.x - vx, o.z - vz) < 26 && ((vx - o.x) * -Math.sin(o.th) + (vz - o.z) * -Math.cos(o.th)) > -1)) stopAt(ahead, 8);
     }
     for (const m of net.minis) {
       const dx = m.x - pl.x, dz = m.z - pl.z, fw = dx * fx + dz * fz; if (fw < 5 || fw > 26 || Math.abs(dx * fz - dz * fx) > 8) continue;
@@ -176,8 +186,175 @@ export function makeDriver(api) {
     if (api.scenarioPhase?.() === 'coming') target = Math.min(target, 1.6);
     if (ins.signal && ahead < 80 && ahead > 3 && pl.indicator !== ins.signal && !(ins.kind === 'rb' && t.sRoute > ins.prevExitS - 0.3)) pl.signal(ins.signal);
     if (ins.kind === 'rb' && ins.exitSignal && t.sRoute > ins.prevExitS + 0.3 && t.sRoute < ins.exitS && pl.indicator !== 'L') pl.signal('L');
-    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: Math.max(-1, Math.min(1, d * 2.4)) };
+    return { throttle: pl.v < target - 0.15 ? 1 : 0, brake: pl.v > target + (target < .1 ? 0 : .15) && pl.v > 0.01 ? 1 : 0, steer: steerFor(d, 2.4, pl.v), aim: d };
   };
+}
+
+// ---------- motorway ----------
+// The reference driver for the motorway lessons: keeps left, overtakes slower traffic only into a gap
+// nobody has to brake for (mirror, shoulder, signal, then move), moves back once the vehicle passed is
+// well behind, keeps two seconds and a bit behind, never passes on the left, and gets across one lane at
+// a time for an exit, easing off to drop in behind traffic when it has to.
+function motorwayPlan(api, st, t, pl, tr) {
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr });
+  if (f.laneF == null) { st.mw = null; return null; }
+  const R = t.route, here = Math.max(0, Math.min(f.lanes - 1, Math.round(f.laneF))), v = Math.max(pl.v, 1);
+  // a new drive (or a new route) starts afresh: the driver is reused from one drive to the next
+  // ... and settles for a few seconds before changing lane: just joined, or just started (Rule 259)
+  // (a new drive shows as the traffic clock starting again; a new route mid-drive keeps the settle time)
+  const fresh = !st.mw || tr.clock < st.mw.clock;
+  if (fresh || st.mw.route !== R) st.mw = { route: R, lat: here, want: here, from: here, moving: false, go: 0, settle: fresh ? tr.clock + 6 : st.mw.settle };
+  const M = st.mw; M.clock = tr.clock;
+  const cruise = Math.min(t.ctx.way.mph / MPH * 0.95, 30), CAR = 4.6;
+  const k = R.steps.findIndex(x => x.e.way.cls === 'motorway_link'), exitIn = k > 0 ? R.stepS[k] - t.sRoute : null;
+  // a vehicle signalling to move into a lane counts as in it: a careful driver waits for it rather than meeting it there
+  const inLane = l => f.others.filter(o => o.lane === l || o.into === l).sort((a, b) => a.fw - b.fw), ahead = l => inLane(l).find(o => o.fw > 3);
+  // a gap nobody has to brake for: well clear of anything behind (more when moving back in, so as never
+  // to cut in), clear of anything alongside, and not on the tail of anything ahead
+  const safeInto = (l, back) => l >= 0 && l < f.lanes && inLane(l).every(o => {
+    if (Math.abs(o.fw) < 7) return false;
+    if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > (back ? 1.5 : 1.6) && (close <= 0.3 || d / close > 6); }
+    return (o.fw - CAR) / v > 1.6 || o.v > pl.v + 1;
+  });
+  const look = (dir) => { const vs = dir > 0 ? ['right', 'blindspot'] : ['left', 'left-blindspot'];
+    for (const view of vs) if (!pl.observations.some(e => e.view === view && tr.clock - e.at < 3)) api.look(view); };
+  const indicate = (d) => { if (pl.indicator !== d) pl.signal(d); }, cancel = () => { if (pl.indicator) pl.signal(pl.indicator); };
+  let target = cruise;
+  if (!M.moving && tr.clock > M.settle) {
+    let want = here; const lead = ahead(here), next = ahead(here + 1);
+    // for an exit, move left one lane at a time; once the 300-yard marker has gone by out of the left-hand
+    // lane it is too late: let the exit go and carry on (Rule 263), never cut across
+    if (exitIn != null && exitIn < 2400) { if (here > 0 && exitIn > 280) want = here - 1; }
+    // overtake only when the next lane is actually moving faster than this one
+    else if (lead && lead.v < cruise - 2 && (lead.fw - CAR) / v < 7 && here < f.lanes - 1 && (!next || next.fw > 150 || next.v > lead.v + 2)) want = here + 1;
+    else if (here > 0 && !overtaking(f, here)) want = here - 1;
+    if (want !== here && safeInto(want, want < here)) {
+      const dir = want > here ? 1 : -1; Object.assign(M, { want, from: here, moving: true, go: tr.clock + 1.8 });
+      look(dir); indicate(dir > 0 ? 'R' : 'L');
+    } else if (want < here && exitIn != null && exitIn > 280) {
+      // getting across for an exit: pick the gap in the lane you need and match its speed to drop into it
+      const cars = inLane(want), gaps = [];
+      for (let g = 0; g <= cars.length; g++) {
+        const b = cars[g - 1], a = cars[g], lo = b ? b.fw + CAR + 1.6 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.7 * v : Infinity;
+        if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? cruise });
+      }
+      const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
+      // the gap ahead of you: speed up into it; behind you: drop back into it
+      // (never below about 45 mph on the motorway: with no gap, let the exit go rather than crawl)
+      if (best) { const d = at(best); target = Math.min(30.5, Math.max(20, best.v + Math.max(-4, Math.min(4, d * 0.12)) + Math.sign(d) * 0.6)); }
+    }
+  }
+  // still waiting to move left for an exit as the 300-yard marker goes by: too late, let it go
+  if (M.moving && exitIn != null && exitIn < 280 && M.want < M.from && Math.abs(M.lat - M.from) < 0.01) { M.moving = false; M.want = M.from; cancel(); }
+  if (M.moving && tr.clock >= M.go) {
+    const dir = M.want > M.from ? 1 : -1;
+    if (Math.abs(M.lat - M.from) < 0.01) {
+      if (!safeInto(M.want, dir < 0)) M.go = tr.clock + 0.5; // the gap closed: wait, still signalling
+      else { look(dir); M.lat += dir * 0.025; } // mirror and shoulder again, right as the car moves
+    } else {
+      M.lat += Math.sign(M.want - M.lat) * Math.min(Math.abs(M.want - M.lat), 0.025);
+      if (M.lat === M.want) { M.moving = false; M.settle = tr.clock + 4; cancel(); }
+    }
+  }
+  // two seconds and a bit behind whatever is ahead, in this lane and in the one being moved into
+  // two seconds and a little behind whoever is ahead; under two, no faster than now and below its speed until the gap opens
+  const follow = (o) => Math.max(0, Math.min(o.v + ((o.fw - CAR) - 2.4 * v) * 0.25, (o.fw - CAR) / v < 2.1 ? Math.min(o.v - 1, pl.v) : Infinity));
+  for (const l of new Set([here, M.want])) { const o = ahead(l); if (o) target = Math.min(target, follow(o)); }
+  // traffic about to merge from a slip road ahead will be in lane 1: ease off for it now, not once it is in
+  if (here === 0) for (const o of f.others) if (o.lane === -1 && o.fw > 10 && o.fw < 120) target = Math.min(target, follow(o));
+  // never pass on the left at speed
+  for (const o of f.others) if (o.lane > here && o.fw > 0 && o.fw < 80 && o.v < pl.v && pl.v > 13.4) target = Math.min(target, o.v - 0.3);
+  // the exit, from the left-hand lane: mirror, a glance over the shoulder and a left signal by the 300-yard
+  // marker, the mirror again as the slip road starts, and the speed of the traffic kept until on it
+  if (exitIn != null && exitIn < 300 && exitIn > -20 && here === 0 && !M.moving) {
+    if (pl.indicator !== 'L') { for (const view of ['left', 'left-blindspot']) api.look(view); indicate('L'); st.exitV = pl.v; }
+    if (exitIn < 40 && !pl.observations.some(e => e.view === 'left' && tr.clock - e.at < 3)) api.look('left');
+  }
+  // an exit let go: the route still turns up the slip road, so steer by the motorway itself, in this lane,
+  // until the lesson routes on to the next junction
+  if (exitIn != null && exitIn < 280 && here > 0) M.letGo = true;
+  if (M.letGo && exitIn != null && t.ctx.way.cls === 'motorway') {
+    let e = t.ctx.e, s2 = t.ctx.s + 25;
+    if (s2 > e.len) { const o = api.A.net.out[e.b].find(x => x.e.way.cls === 'motorway'); if (o) { s2 -= e.len; e = o.e; } else s2 = e.len; }
+    const c = posAt(e, Math.min(e.len, s2)), lat = e.way.w / 2 - 3.65 * (M.lat + 0.5);
+    return { p: { x: c.x + c.tz * lat, z: c.z - c.tx * lat }, target };
+  }
+  const q = api.lanePoint(t.sRoute + 25), off = M.lat * 3.65;
+  return { p: { x: q.x - q.tz * off, z: q.z + q.tx * off }, target };
+}
+
+// Joining from an entry slip road (Rule 259): build up to the speed of the left-hand lane, look right and
+// signal as the acceleration lane begins, and match the speed of a gap to drop into it. The slip road
+// itself runs into the left-hand lane, so following it is joining; with no safe gap, stop at the end of
+// the slip road rather than run out of it.
+function joinPlan(api, st, t, pl, tr) {
+  const nr = t.ctx, R = t.route; if (!nr || nr.way.cls !== 'motorway_link') return null;
+  const k = R.steps.findIndex(x => x.e === nr.e); if (k < 0 || R.steps[k + 1]?.e.way.cls !== 'motorway') return null;
+  const mergeIn = R.stepS[k] + nr.e.len - t.sRoute, CAR = 4.6, v = Math.max(pl.v, 1);
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr, net: api.A.net });
+  // lane 1, and anyone signalling to move into it
+  const lane0 = f.others.filter(o => o.lane === 0 || o.into === 0).sort((a, b) => a.fw - b.fw), near = lane0.filter(o => Math.abs(o.fw) < 250);
+  const flow = near.length ? near.reduce((a, o) => a + o.v, 0) / near.length : 27;
+  let target = Math.min(29, Math.max(18, flow));
+  if (mergeIn < 320) {
+    for (const view of ['right', 'blindspot']) if (!pl.observations.some(e => e.view === view && tr.clock - e.at < 3)) api.look(view);
+    if (pl.indicator !== 'R') pl.signal('R');
+  }
+  if (f.joining) {
+    const safe = lane0.every(o => { if (Math.abs(o.fw) < 7) return false;
+      if (o.fw < 0) { const d = -o.fw - CAR, close = o.v - pl.v; return d / Math.max(o.v, 1) > 1.4 && (close <= 0.3 || d / close > 4.5); }
+      return (o.fw - CAR) / v > 1.7 || (o.v > pl.v + 1 && (o.fw - CAR) / v > 1.2); });
+    if (!safe) {
+      const gaps = [];
+      for (let g = 0; g <= lane0.length; g++) {
+        const b = lane0[g - 1], a = lane0[g], lo = b ? b.fw + CAR + 1.6 * Math.max(b.v, 1) : -Infinity, hi = a ? a.fw - CAR - 1.8 * v : Infinity;
+        if (hi - lo > 0) gaps.push({ lo, hi, v: a && b ? (a.v + b.v) / 2 : (a || b)?.v ?? flow });
+      }
+      const at = (g) => Math.max(g.lo, Math.min(g.hi, 0)), best = gaps.sort((p, q) => Math.abs(at(p)) - Math.abs(at(q)))[0];
+      if (best) { const d = at(best); target = Math.min(30.5, Math.max(4, best.v + Math.max(-5, Math.min(5, d * 0.15)) + Math.sign(d) * 0.6)); }
+      // the taper starts 80 m before the merge: never into it without a gap
+      if (mergeIn < 110) target = Math.min(target, Math.sqrt(Math.max(0, 2 * 3 * (mergeIn - 85))));
+    }
+    // alongside the carriageway, up to speed and with a safe gap: move across now, as a person would,
+    // rather than following the slip road to its end and finding the gap gone
+    if (safe && f.laneF != null && f.laneF > -1.6 && pl.v > flow - 4) st.joinAcross = true;
+  } else if (f.laneF == null || f.laneF < -1.6) st.joinAcross = false;
+  if (st.joinAcross) {
+    const m = nearestWhere(api.A.net, pl.x, pl.z, e => e.way.cls === 'motorway');
+    if (m && m.d < 15) {
+      const fx = -Math.sin(pl.th), fz = -Math.cos(pl.th), along = m.tx * fx + m.tz * fz > 0 ? 1 : -1;
+      const c = posAt(m.e, Math.max(0, Math.min(m.e.len, m.s + 25 * along))), lat = (m.e.way.w / 2 - 3.65 * 0.5) * along;
+      // keep two seconds behind whoever is ahead in lane 1
+      const a = lane0.filter(o => o.fw > 0)[0]; if (a) target = Math.min(target, Math.max(0, a.v + (a.fw - CAR - 2.3 * v) * 0.4));
+      return { p: { x: c.x + c.tz * lat, z: c.z - c.tx * lat }, target };
+    }
+  }
+  // and never faster than the vehicle ahead on the slip road allows: other traffic joins here too
+  const ahead = tr.cars.filter(c => c.alive && c.e === nr.e).map(c => ({ c, d: (c.s - nr.s) * (nr.dir ?? 1) })).filter(o => o.d > 0).sort((a, b) => a.d - b.d)[0];
+  if (ahead) target = Math.min(target, Math.max(0, ahead.c.v + (ahead.d - CAR - 2 - 2.2 * v) * 0.4)); // two seconds and a little
+  return { p: api.lanePoint(t.sRoute + 25), target };
+}
+
+// Leaving by an exit slip road (Rule 272): keep up with the traffic while still beside the carriageway,
+// then slow down on the slip road for its bend and the roundabout at the end. Near the roundabout the
+// ordinary driver takes over, to give way.
+const bendAt = (e, s) => { const a = posAt(e, Math.max(0, s - 12)), b = posAt(e, Math.min(e.len, s)), c = posAt(e, Math.min(e.len, s + 12));
+  const ab = Math.hypot(b.x - a.x, b.z - a.z), bc = Math.hypot(c.x - b.x, c.z - b.z), ca = Math.hypot(a.x - c.x, a.z - c.z), k = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+  return k > 1e-6 ? ab * bc * ca / (2 * k) : 1e6; };
+function exitPlan(api, st, t, pl, tr) {
+  const nr = t.ctx, R = t.route; if (!nr || nr.way.cls !== 'motorway_link') return null;
+  const k = R.steps.findIndex(x => x.e === nr.e); if (k < 1 || R.steps[k - 1].e.way.cls !== 'motorway') return null;
+  if (nr.e.len - nr.s < 70) return null;
+  const f = senseMotorway({ t: tr.clock, dt: 0.05, player: pl, test: t, traffic: tr, net: api.A.net });
+  let target;
+  if (f.laneF != null && f.laneF > -0.8) target = Math.max(st.exitV ?? pl.v, 20); // still beside the carriageway: keep up
+  else {
+    let suit = 30; for (let d = 0; d <= 150; d += 10) suit = Math.min(suit, Math.sqrt(2.6 * bendAt(nr.e, nr.s + d)) + d * 0.09);
+    target = Math.min(suit, Math.sqrt(64 + 2 * 2.4 * Math.max(0, nr.e.len - nr.s - 60)));
+  }
+  if (pl.indicator !== 'L' && nr.s < 120) pl.signal('L');
+  if (nr.s > 120 && pl.indicator === 'L') pl.signal('L'); // cancel once clear of the motorway
+  return { p: api.lanePoint(t.sRoute + 20), target };
 }
 
 // ---------- results store ----------
@@ -193,6 +370,47 @@ function download(name, text, type, url) { const a = document.createElement('a')
 
 
 // ---------- runner + panel ----------
+// A person at the controls. The reference driver above always knows the right steering angle, applies it
+// exactly and at once, twenty times a second. A person sees the road a moment late, decides a few times a
+// second, and on a keyboard or the touch buttons can only press left, right, accelerator or brake all the
+// way. This wraps the reference driver's intentions in those limits, so the Bot lab can show how hard a
+// drive is for someone driving it by hand: how often they leave the road, and how much steering it takes.
+//   device 'keys'  on/off steering and pedals, as the keyboard and touch buttons are
+//   device 'stick' an analog stick or wheel, with a little unsteadiness in the hand
+export function humanize(drive, { device = 'keys', reaction = 0.3, rate = 10, clock, speed: api_v = () => 0, seed = 7 } = {}) {
+  const seen = []; let next = -1, key = 0, stick = 0, pedal = { throttle: 0, brake: 0 }, r = seed >>> 0;
+  const acc = { steer: 0, throttle: 0, brake: 0 }, out = { steer: 0, throttle: 0, brake: 0 };
+  const rand = () => { r = (r + 0x6D2B79F5) >>> 0; let x = Math.imul(r ^ (r >>> 15), 1 | r); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  const stats = { presses: 0, steerTravel: 0 };
+  const human = () => {
+    const now = clock(), o = drive(); if (!o) return o;
+    if (seen.length && now < seen[seen.length - 1][0]) { seen.length = 0; next = -1; } // a new drive: the clock started again
+    seen.push([now, o]); while (seen.length > 2 && seen[1][0] <= now - reaction) seen.shift();
+    if (now < next && now >= next - 1) return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+    next = now + 1 / rate;
+    const late = { ...seen[0][1] }; // what the driver had seen `reaction` seconds ago
+    // A person steers only as firmly as their reaction time allows without weaving (McRuer's crossover
+    // model): the wheel angle per radian of heading error is capped at about 0.8 × wheelbase / (speed ×
+    // reaction time). The reference driver, reacting at once, can afford to steer harder.
+    const v = Math.max(3, Math.abs(api_v())), lock = steerLock(v);
+    if (typeof late.aim === 'number' && late.aim) { const wheel = late.steer * lock, cap = 0.8 * HANDLING.wheelbase / (v * reaction) * Math.abs(late.aim);
+      late.steer = Math.max(-1, Math.min(1, Math.sign(wheel) * Math.min(Math.abs(wheel), cap) / lock)); }
+    if (device === 'keys') {
+      // keys are on or off, so a person taps: a gentle turn or a light throttle is a key pressed some of
+      // the time, more often the more is wanted (each decision makes up for what the last ones fell short by)
+      const tapped = (want, k) => { acc[k] += want - out[k]; out[k] = Math.abs(acc[k]) >= 0.5 ? Math.sign(acc[k]) : 0; return out[k]; };
+      const was = key; key = tapped(late.steer, 'steer'); if (key && key !== was) stats.presses++;
+      pedal = { throttle: Math.max(0, tapped(late.throttle, 'throttle')), brake: Math.max(0, tapped(late.brake, 'brake')) };
+    } else {
+      const was = stick; stick = Math.max(-1, Math.min(1, late.steer + (rand() - 0.5) * 0.08)); stats.steerTravel += Math.abs(stick - was);
+      pedal = { throttle: late.throttle, brake: late.brake };
+    }
+    return { ...o, ...pedal, steer: device === 'keys' ? key : stick };
+  };
+  human.stats = stats;
+  return human;
+}
+
 export function createBotLab(api) {
   const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const f = q.shift(); f && f(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
   const drive = makeDriver(api);
@@ -210,6 +428,8 @@ export function createBotLab(api) {
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
+<div class="row"><label>Traffic <select id="blTraffic" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="lesson">The lesson's own</option><option value="random">Add random traffic</option></select></label></div>
+<div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
 <div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
 <div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
@@ -275,11 +495,12 @@ export function createBotLab(api) {
 
   async function runOne(p, label, iteration) {
     const base=$("blSeed").value,seed=base===""?crypto.getRandomValues(new Uint32Array(1))[0]:(Number(base)+iteration)>>>0;
-    await api.start(p.kind, p.id,seed);
+    await api.start(p.kind, p.id, seed, { traffic: $('blTraffic').value });
     const A = api.A, t = A.test, wall0 = performance.now(), speed = +$('blSpd').value, watch = speed > 0;
     const limit = Math.max(240, t.route.len / 3 + 180); // seconds of sim time before giving up
     let sim = 0, bestS = t.sRoute, lastProg = 0, end = 'done';
-    api.setInput(drive);
+    const who = $('blDriver').value, input = who === 'reference' ? drive : humanize(drive, { device: who, clock: () => A.traffic.clock, speed: () => api.player.v, seed });
+    api.setInput(input);
     while (!t.done) {
       if (stopReq) { end = 'stopped'; break; }
       if (paused) { await new Promise(r => requestAnimationFrame(r)); api.frame(0); continue; }
@@ -304,7 +525,8 @@ export function createBotLab(api) {
     const pl = api.player;
     saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
-      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)] });
+      simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)],
+      traffic: $('blTraffic').value, driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
     render();
   }
 

@@ -1,6 +1,6 @@
 // Stylised city dressing for each 400 m chunk: houses with pitched roofs, shops with awnings,
 // taller blocks with rooftop gardens, street lamps and trees. Everything is instanced per chunk.
-import { posAt, nearest } from './net.js';
+import { posAt, nearest, paved } from './net.js';
 
 const T = THREE;
 const pick = (R, a) => a[Math.floor(R() * a.length)];
@@ -97,14 +97,20 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const hit = (x, z, r) => { const gx = Math.floor(x / 12), gz = Math.floor(z / 12); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = occ.get((gx + i) * 100003 + gz + j); if (a) for (const b of a) if (Math.hypot(b[0] - x, b[1] - z) < (b[2] + r) * 0.9) return true; } return false; };
   const add = (x, z, r) => { const kk = Math.floor(x / 12) * 100003 + Math.floor(z / 12); let a = occ.get(kk); if (!a) occ.set(kk, a = []); a.push([x, z, r]); };
   const inChunk = (x, z) => Math.floor(x / C) === cx && Math.floor(z / C) === cz;
+  // Surveyed lamp posts in this chunk, and a test for "a real one already stands about here".
+  const SURVEYED_NEAR = 16;
+  const surveyed = (net.lamps || []).filter(([x, z]) => inChunk(x, z));
+  const surveyedNear = (x, z) => surveyed.some(([lx, lz]) => Math.hypot(lx - x, lz - z) < SURVEYED_NEAR);
   const centreDist = (x, z) => Math.hypot(x + 150, z + 380); // roughly Market Square
   for (const e of edges) {
     const cls = e.way.cls; if (/trunk/.test(cls) || e.way.rb || e.way.mph >= 50) continue; // no houses along fast roads and country lanes
     const main = /^(primary|secondary|tertiary)/.test(cls);
-    // street lamps on main roads
+    // Street lamps on main roads. Where the map carries surveyed positions (Mapillary, reviewed in the
+    // road inspector) those are used instead, and a spaced-out pole near one of them is dropped rather
+    // than standing next to it.
     if (main) for (let s = 10, i = 0; s < e.len - 6; s += 34, i++) {
       const p = posAt(e, s), side = i % 2 ? 1 : -1, o = e.way.w / 2 + 0.9, x = p.x + p.tz * side * o, z = p.z - p.tx * side * o;
-      if (inChunk(x, z)) lamps.push([x, z, -p.tz * side, p.tx * side]); // last two: direction from pole towards the road
+      if (inChunk(x, z) && !surveyedNear(x, z)) lamps.push([x, z, -p.tz * side, p.tx * side]); // last two: direction from pole towards the road
     }
     for (const side of [-1, 1]) {
       let s = 5;
@@ -149,6 +155,39 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
       }
     }
   }
+  // Motorway verges: belts of trees that come and go, so there are open stretches and wooded ones (that
+  // rhythm is what gives a sense of speed), and now and then a farmstead set well back as a landmark.
+  // Everything is seeded by position, so a chunk freed behind the driver and rebuilt looks the same.
+  if (net.motorway) for (const e of edges) {
+    if (e.way.rb || e.way.mph < 50) continue;
+    const near = paved(e.way) + 6, sides = e.way.oneway ? [1] : [-1, 1]; // a carriageway plants its own nearside only
+    const wood = (x, z) => 0.5 + 0.32 * Math.sin(x * 0.0019 + z * 0.0007) + 0.22 * Math.sin(z * 0.0031 - x * 0.0011 + 1.7);
+    for (const side of sides) {
+      for (let t = 6; t < e.len - 6; t += 8 + R() * 8) {
+        const p = posAt(e, t);
+        if (R() > wood(p.x, p.z)) continue;
+        for (let q = 0, n = 1 + Math.floor(R() * 3); q < n; q++) {
+          const o = near + R() * 34, x = p.x + p.tz * side * o, z = p.z - p.tx * side * o;
+          if (!inChunk(x, z) || hit(x, z, 2.4)) continue;
+          const nr = nearest(net, x, z); if (nr && nr.d < paved(nr.way) + 4) continue; // never on a slip road or the other carriageway
+          trees.push([x, z, 1.0 + R() * 0.7]); add(x, z, 2.4);
+        }
+      }
+      for (let t = 120; t < e.len - 60; t += 700 + R() * 500) {
+        if (R() > 0.45) continue;
+        const p = posAt(e, t), back = near + 70 + R() * 90, n = 2 + Math.floor(R() * 3);
+        for (let q = 0; q < n; q++) {
+          const o = back + (R() - 0.5) * 30, along = (R() - 0.5) * 40, x = p.x + p.tz * side * o + p.tx * along, z = p.z - p.tx * side * o + p.tz * along;
+          const TY = TYPES.house, w = rr(R, TY.w), d = rr(R, TY.d), h = rr(R, TY.h), rad = Math.max(w, d) / 2;
+          if (!inChunk(x, z) || hit(x, z, rad)) continue;
+          const nr = nearest(net, x, z); if (nr && nr.d < paved(nr.way) + rad + 8) continue;
+          add(x, z, rad); const rot = Math.atan2(-p.tz, p.tx) + (R() - 0.5) * 0.6;
+          B.house.push({ x, z, w, d, h, rot, c: pick(R, TY.tints) });
+          roofsP.push({ x, z, y: h, w: w * 1.06, d: d * 1.08, h: Math.min(w, d) * 0.38, rot, c: pick(R, ROOF_PITCH) });
+        }
+      }
+    }
+  }
   const M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), V = new T.Vector3(), S = new T.Vector3(), col = new T.Color();
   function inst(geo, mat, list, setup, shadow = true) {
     if (!list.length) return;
@@ -167,6 +206,17 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   const crowns = trees.map(([x, z, s], i) => ({ x, z, s, c: CROWNS[i % CROWNS.length] }));
   inst(k.crownG, k.mats.crown, crowns, (b) => { M.makeScale(b.s, b.s * 1.1, b.s); M.setPosition(b.x, 4.6 * b.s, b.z); });
   inst(k.crownG, k.mats.crown, bushes, (b) => { M.makeScale(b.s, b.s * 0.8, b.s); M.setPosition(b.x, b.y + b.s, b.z); });
+  // The surveyed poles. Each one is pushed out to the kerb if the survey put it inside the
+  // carriageway, and turned to face the road it stands beside. `nearest` reports the offset from the
+  // centre line rather than the point itself, so the point is reconstructed from it: q is the lamp
+  // stepped back across the road by `lat` along the normal to the tangent.
+  for (const [lx, lz] of surveyed) {
+    const nr = nearest(net, lx, lz); if (!nr) continue; // nothing to stand beside
+    const qx = lx - nr.lat * nr.tz, qz = lz + nr.lat * nr.tx;        // the point on the road's centre line
+    const side = nr.lat < 0 ? -1 : 1, off = Math.max(paved(nr.way) + 0.9, Math.abs(nr.lat)); // clear of the kerb, and of a hard shoulder
+    const x = qx + nr.tz * off * side, z = qz - nr.tx * off * side;
+    lamps.push([x, z, (qx - x) / off, (qz - z) / off]);              // the head reaches back over the road
+  }
   inst(k.poleG, k.mats.pole, lamps, ([x, z]) => { M.makeTranslation(x, 0, z); });
   inst(k.headG, k.mats.lampHead, lamps, ([x, z, dx, dz]) => { E.set(0, Math.atan2(dx, dz), 0, 'YXZ'); Q.setFromEuler(E); M.compose(V.set(x + dx * 0.6, 6.95, z + dz * 0.6), Q, S.set(1, 1, 1)); }, false);
   return grp;

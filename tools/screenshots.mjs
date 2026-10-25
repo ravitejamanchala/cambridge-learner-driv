@@ -112,6 +112,20 @@ try {
     await setView(page, 'chase');
   }
 
+  if (want('cockpit')) {
+    await page.evaluate(async () => { await window.cambridgeDrive.pick('lesson', 'lane-choice', true); window.cambridgeDrive.frame(0); });
+    await setView(page, 'driver'); await run(page, 3);
+    // enough lock to show the wheel turned, over a short enough moment to stay on the road
+    await page.evaluate(() => { const a = window.cambridgeDrive; window.__st = a.addInput(() => ({ throttle: a.player.v < 7 ? 0.5 : 0, brake: 0, steer: 0.4 })); });
+    await run(page, 1.1); await settle(page);
+    await capture(page, 'cockpit-steering', "The driver's seat: a steering wheel that turns with your hands, the dashboard, the windscreen frame and the mirrors. The paint on the bonnet is the car you chose.");
+    await page.evaluate(() => window.__st());
+    await run(page, 1.5); await settle(page);
+    await capture(page, 'cockpit-straight', 'The same seat running straight, with the rear-view mirror and the right-hand door mirror in use.');
+    await setView(page, 'chase'); await run(page, 1); await settle(page);
+    await capture(page, 'chase-mirror', 'The chase view carries the rear-view mirror too, as a panel under the instruction box.');
+  }
+
   // Coaching is off for every other case here, which is what a learner sees by default.
   if (want('coaching')) {
     const setCoaching = (page, on) => page.evaluate(v => document.querySelector(`#coSeg [data-co="${v}"]`).click(), on ? 1 : 0);
@@ -176,6 +190,28 @@ try {
     if (!shown) console.log('  !! the feedback was not on screen when captured:', shown);
     await capture(page, 'parallel-park-feedback', `The feedback after a run: what happened, measured, stage by stage (${shown} lines).`);
   }
+  if (want('free-drive')) {
+    await page.evaluate(() => document.querySelector('#resultSheet [data-close], #toLobbyBtn')?.click());
+    // a steady driver at 70 mph in the route's lane, keeping a gap to traffic ahead, so the pictures and
+    // the summary are of a real drive
+    await page.evaluate(() => { const a = window.cambridgeDrive, p = a.player; window.__free = a.addInput(() => {
+      const q = a.lanePoint(Math.min(a.test.route.len, a.test.sRoute + 25)), fx = -Math.sin(p.th), fz = -Math.cos(p.th); let want = 30.6;
+      for (const c of a.traffic.cars) { if (!c.alive) continue; const dx = c.x - p.x, dz = c.z - p.z, f = dx * fx + dz * fz;
+        if (f > 0 && f < Math.max(20, p.v * 2.2) && Math.abs(dx * fz - dz * fx) < 2.2) want = Math.min(want, c.v - (f < p.v * 1.6 ? 2 : 0)); }
+      let ang = Math.atan2(-(q.x - p.x), -(q.z - p.z)) - p.th; while (ang > Math.PI) ang -= 2 * Math.PI; while (ang < -Math.PI) ang += 2 * Math.PI;
+      return { throttle: p.v < want - 0.4 ? 1 : 0, brake: p.v > want + 1 ? Math.min(1, (p.v - want) / 6) : 0, steer: Math.max(-1, Math.min(1, ang * 3)) }; }); });
+    // the chase camera eases after the car only on drawn frames, so draw a couple of seconds of them
+    const catchUp = () => page.evaluate(() => { for (let i = 0; i < 40; i++) window.cambridgeDrive.frame(0.05); });
+    for (const [id, view, caption] of [['m3', 'chase', 'Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down.'], ['m2', 'driver', 'Free drive, two lanes, from the driver\'s seat.']]) {
+      await page.evaluate(async id => { await window.cambridgeDrive.pick('free', id, true); window.cambridgeDrive.frame(0); }, id);
+      await setView(page, view); await run(page, 25); await catchUp(); await settle(page);
+      await capture(page, `free-drive-${id}`, caption);
+    }
+    await run(page, 120);
+    await page.locator('#pauseBtn').click(); await page.locator('#quitBtn').click(); await page.waitForTimeout(400);
+    await capture(page, 'free-drive-summary', 'Ending a free drive: what was measured, and a plain note that nothing was added to the record.');
+    await page.evaluate(() => window.__free && window.__free());
+  }
   if (errors.length) console.log('page errors:', errors.join(' | '));
 } finally { await browser?.close(); server.kill(); }
 
@@ -191,7 +227,7 @@ if (!filter) {
 One picture per case in the course, captured by \`node tools/screenshots.mjs\` against the real
 application: the same build the checks drive, with the offline sign-in fixture and no network. Rerun it
 after changing the course or the interface, and commit what changes.
-${section('The lobby', 'lobby', '')}${section('The course menu', 'course', '')}${section('The garage', 'garage', '')}${section('Looking around', 'look', 'Hold Z to look left and X to look right. The camera swings; the car does not.')}${section('Blue light vehicle', 'blue-light', '')}${section('Parallel parking', 'parallel-park', '')}${section('Lessons', 'lesson-', 'Every practical lesson, at the start of its run.')}${section('Theory quizzes', 'quiz-', '')}${section('Mock tests', 'mock-', '')}`;
+${section('The lobby', 'lobby', '')}${section('The course menu', 'course', '')}${section('The garage', 'garage', '')}${section('Looking around', 'look', 'Hold Z to look left and X to look right. The camera swings; the car does not.')}${section('Blue light vehicle', 'blue-light', '')}${section('Parallel parking', 'parallel-park', '')}${section('Free drive on the motorway', 'free-drive', 'Ungraded: nothing is marked and nothing is saved.')}${section('Lessons', 'lesson-', 'Every practical lesson, at the start of its run.')}${section('Theory quizzes', 'quiz-', '')}${section('Mock tests', 'mock-', '')}`;
   fs.writeFileSync('docs/screenshots.md', page);
   console.log(`\n${written.length} screenshots in ${OUT}, indexed by docs/screenshots.md`);
 }

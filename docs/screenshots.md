@@ -90,6 +90,28 @@ Reversing into the space on the back arrow. One control, no gear selector.
 
 The feedback after a run: what happened, measured, stage by stage (10 lines).
 
+## Free drive on the motorway
+
+Ungraded: nothing is marked and nothing is saved.
+
+### Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down
+
+![Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down.](screenshots/free-drive-m3.jpg)
+
+Free drive, three lanes: central reservation and barrier, hard shoulder, and the next junction counting down.
+
+### Free drive, two lanes, from the driver's seat
+
+![Free drive, two lanes, from the driver's seat.](screenshots/free-drive-m2.jpg)
+
+Free drive, two lanes, from the driver's seat.
+
+### Ending a free drive: what was measured, and a plain note that nothing was added to the record
+
+![Ending a free drive: what was measured, and a plain note that nothing was added to the record.](screenshots/free-drive-summary.jpg)
+
+Ending a free drive: what was measured, and a plain note that nothing was added to the record.
+
 ## Lessons
 
 Every practical lesson, at the start of its run.
@@ -267,6 +289,72 @@ Country road at 60 — Grantchester Lane · national limit. A narrow country lan
 ![Dual carriageway at 70 — Babraham Road · dual carriageway. Build up to a safe speed and stay in the left-hand lane. Use the right-hand lane only to overtake, then move back.](screenshots/lesson-dual.jpg)
 
 Dual carriageway at 70 — Babraham Road · dual carriageway. Build up to a safe speed and stay in the left-hand lane. Use the right-hand lane only to overtake, then move back.
+
+### Keep left, overtake, move back
+
+![Keep left, overtake, move back — M100 · three lanes · 70 mph. Cruise in the left-hand lane. Overtake the slower vehicles you catch up with, then move back left once you are safely past, even if there is more traffic a long way ahead.](screenshots/lesson-mw-keep-left.jpg)
+
+Keep left, overtake, move back — M100 · three lanes · 70 mph. Cruise in the left-hand lane. Overtake the slower vehicles you catch up with, then move back left once you are safely past, even if there is more traffic a long way ahead.
+
+### Overtaking when the next lane is busy
+
+![Overtaking when the next lane is busy — M100 · two lanes · 70 mph. A slow lorry ahead, and faster traffic streaming past in the right-hand lane. Wait behind the lorry until there is a real gap, then overtake.](screenshots/lesson-mw-busy-lane.jpg)
+
+Overtaking when the next lane is busy — M100 · two lanes · 70 mph. A slow lorry ahead, and faster traffic streaming past in the right-hand lane. Wait behind the lorry until there is a real gap, then overtake.
+
+### Following distance at 70
+
+![Following distance at 70 — M100 · three lanes · traffic building. Follow the traffic in the left-hand lane as it slows down and speeds up again. Keep at least a two-second gap the whole way. 70 is the most you may do, not a speed to aim for.](screenshots/lesson-mw-following.jpg)
+
+Following distance at 70 — M100 · three lanes · traffic building. Follow the traffic in the left-hand lane as it slows down and speeds up again. Keep at least a two-second gap the whole way. 70 is the most you may do, not a speed to aim for.
+
+### Getting into lane for your exit
+
+![Getting into lane for your exit — M100 → J2 Ashwell. You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.](screenshots/lesson-mw-exit-prep.jpg)
+
+Getting into lane for your exit — M100 → J2 Ashwell. You are in the right-hand lane and leaving at junction 2. Move across one lane at a time, in gaps in the traffic, and be in the left-hand lane well before the exit.
+
+### Joining the motorway
+
+![Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.](screenshots/lesson-mw-join.jpg)
+
+Joining the motorway — J1 slip road → M100. Join from the slip road. Traffic already on the motorway has priority: build up your speed to match it, find a gap in the left-hand lane and fit into it without making anyone brake. If the gap you were aiming for closes, let it go and take the next one.
+
+### Traffic joining from a slip road
+
+![Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.](screenshots/lesson-mw-merging.jpg)
+
+Traffic joining from a slip road — M100 · junction 2 · three lanes. Traffic will join from the slip road beside you. You have priority and do not have to move over, but you can help if it is safe: keep your speed and let them fit in behind, ease off a little to let them in ahead, or move over if the middle lane is clear.
+
+### Leaving the motorway
+
+![Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.](screenshots/lesson-mw-exit.jpg)
+
+Leaving the motorway — M100 → J3 Kingsmere · two lanes. Leave at junction 3. Follow the signs as they count down, be in the left-hand lane in good time, and keep up with the traffic until you are on the slip road. Then slow down for its bend and the roundabout at the end.
+
+### If you miss your exit
+
+![If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.](screenshots/lesson-mw-missed-exit.jpg)
+
+If you miss your exit — M100 · junction 3 · three lanes. You are in the middle lane, leaving at junction 3, and the left-hand lane is a solid line of lorries. Never force your way in. If there is no safe gap in time, carry on to the next junction: never stop, reverse or cut across the hatching to get back.
+
+### Joining at dusk
+
+![Joining at dusk — J1 slip road → M100 · dusk. The light is going. Dipped headlights on before you set off, then join as you would by day: other drivers' speed is harder to judge in the dusk, so take a bigger gap if you are unsure.](screenshots/lesson-mw-dusk-join.jpg)
+
+Joining at dusk — J1 slip road → M100 · dusk. The light is going. Dipped headlights on before you set off, then join as you would by day: other drivers' speed is harder to judge in the dusk, so take a bigger gap if you are unsure.
+
+### Following at dusk
+
+![Following at dusk — M100 · three lanes · dusk. Follow the traffic as it slows and speeds up again, in the dusk. Two seconds is the least you may leave: at dusk, when you cannot see as far, leave more, and drive at a speed you could stop at within the distance you can see.](screenshots/lesson-mw-dusk-following.jpg)
+
+Following at dusk — M100 · three lanes · dusk. Follow the traffic as it slows and speeds up again, in the dusk. Two seconds is the least you may leave: at dusk, when you cannot see as far, leave more, and drive at a speed you could stop at within the distance you can see.
+
+### Leaving the motorway at dusk
+
+![Leaving the motorway at dusk — M100 → J3 Kingsmere · dusk. Leave at junction 3 as the light goes. The signs and the studs in the road stay bright in your headlights: use them. Mirror and signal by the 300-yard marker, keep your speed until you are on the slip road, then slow for the bend.](screenshots/lesson-mw-dusk-exit.jpg)
+
+Leaving the motorway at dusk — M100 → J3 Kingsmere · dusk. Leave at junction 3 as the light goes. The signs and the studs in the road stay bright in your headlights: use them. Mirror and signal by the 300-yard marker, keep your speed until you are on the slip road, then slow for the bend.
 
 ### Parallel parking at the kerb
 

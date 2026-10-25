@@ -3,15 +3,16 @@
 // format as the OpenStreetMap areas, so the sim loads it the same way. Built by tools/split_areas.mjs.
 //
 // Bearings are compass degrees from north, clockwise. Roundabouts run clockwise, as in the UK.
+import { MW, JUNCTIONS, centreLine, circuitLength, sampleAt, onCarriageway, carriagewayWidth, junctionSpan } from '../js/motorway.js';
 
-const CLASSES = ['trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'];
+const CLASSES = ['trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link', 'motorway', 'motorway_link'];
 const rad = (d) => d * Math.PI / 180;
 const at = (cx, cz, r, b) => [cx + r * Math.sin(rad(b)), cz - r * Math.cos(rad(b))];
 const dm = (v) => Math.round(v * 10);
 
 class Builder {
   constructor(id) {
-    Object.assign(this, { id, names: [], ways: [], nodes: [], edges: [], stops: [], zebras: [], giveways: [], minis: [], rbs: [], arrows: [], cycleRings: [] });
+    Object.assign(this, { id, names: [], ways: [], nodes: [], edges: [], stops: [], zebras: [], giveways: [], minis: [], rbs: [], arrows: [], cycleRings: [], barriers: [], mwSigns: [] });
     this.nodeKey = new Map(); this.wayKey = new Map(); this.cluster = 0;
   }
   node(x, z) {
@@ -23,6 +24,7 @@ class Builder {
   way(o) {
     let ni = this.names.indexOf(o.name || ''); if (ni < 0) { ni = this.names.length; this.names.push(o.name || ''); }
     const w = [ni, CLASSES.indexOf(o.cls || 'residential'), o.mph || 30, 0, o.oneway ? 1 : 0, o.w || 7.3, o.rb ? 1 : 0, o.lanes || 0, o.cl || 0, o.cr || 0, Math.round((o.cw || 1.5) * 10)];
+    if (o.hs) w.push(Math.round(o.hs * 10)); // hard shoulder, nearside, decimetres
     const k = JSON.stringify(w); if (!this.wayKey.has(k)) { this.wayKey.set(k, this.ways.length); this.ways.push(w); }
     return this.wayKey.get(k);
   }
@@ -95,7 +97,9 @@ class Builder {
       ...(this.parking ? { parking: this.parking } : {}),
       version: 1, source: 'Practice layout', origin: [52.2, 0.12], kx: 68226.76517048452, kz: 110574, classes: CLASSES,
       area: { id: this.id }, names: this.names, ways: this.ways, nodes: this.nodes, edges: this.edges.map(e => e.slice(0, 4)),
-      stops: this.stops, zebras: this.zebras, giveways: this.giveways, minis: this.minis, rbs: this.rbs, arrows: this.arrows, cycleRings: this.cycleRings
+      stops: this.stops, zebras: this.zebras, giveways: this.giveways, minis: this.minis, rbs: this.rbs, arrows: this.arrows, cycleRings: this.cycleRings,
+      ...(this.barriers.length ? { barriers: this.barriers } : {}), ...(this.mwSigns.length ? { mwSigns: this.mwSigns } : {}),
+      ...(this.motorway ? { motorway: this.motorway } : {})
     };
   }
 }
@@ -301,5 +305,88 @@ function park() {
   return B;
 }
 
-export const LAYOUTS = { town, rbs, roads, park };
+// ============ Motorway: a closed circuit with two or three lanes each way, four junctions ============
+// The geometry lives in js/motorway.js so lessons and free drive can name exact nodes. This only turns it
+// into roads: two carriageways, slip roads, a roundabout and a local road at each end of every junction.
+const smooth = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+const bearing = (cx, cz, x, z) => ((Math.atan2(x - cx, -(z - cz)) * 180 / Math.PI) + 360) % 360;
+function motorway(lanes) {
+  const B = new Builder('m' + lanes), line = centreLine(), total = circuitLength(), J = MW.junction;
+  const cw = carriagewayWidth(lanes), off0 = cw / 2 + MW.slipW / 2; // a slip lane runs alongside lane 1
+  // The slips share a node with the carriageway, which sits on its centre line, but they leave from and
+  // join the left-hand lane: only the node itself is on the centre line, so nothing swings across the
+  // carriageway towards it (routes and traffic blend round the node).
+  const lane0 = cw / 2 - MW.laneW / 2;
+  const main = { name: 'M100', cls: 'motorway', mph: 70, w: cw, lanes, oneway: 1, hs: MW.shoulder };
+  const slip = { cls: 'motorway_link', mph: 70, w: MW.slipW, lanes: 1, oneway: 1 };
+  B.motorway = { lanes, length: Math.round(total), junctions: [] };
+
+  for (const side of ['A', 'B']) {
+    const k = side === 'A' ? 1 : -1;
+    // Junction points first: the carriageway is cut there so the slip roads share its nodes.
+    const spans = JUNCTIONS.map(j => ({ j, ...junctionSpan(j, side) }));
+    const special = spans.flatMap(sp => [sp.diverge, sp.merge]).map(v => ((v % total) + total) % total);
+    const cuts = [];
+    for (let v = 0; v < total - 1; v += MW.edgeLen) if (special.every(x => Math.abs(x - v) > 60)) cuts.push(v);
+    cuts.push(...special); cuts.sort((a, b) => a - b);
+    // travel order: A runs with s, B against it
+    const order = side === 'A' ? cuts : [cuts[0], ...cuts.slice(1).reverse()];
+    for (let i = 0; i < order.length; i++) {
+      const a = order[i], b = i + 1 < order.length ? order[i + 1] : order[0];
+      const span = side === 'A' ? ((b - a + total) % total || total) : ((a - b + total) % total || total);
+      const pts = [];
+      for (let d = 0; d < span; d += MW.step) { const p = onCarriageway(line, lanes, side, a + d * k); pts.push([p.x, p.z]); }
+      const end = onCarriageway(line, lanes, side, b); pts.push([end.x, end.z]);
+      B.edge(main, pts);
+    }
+
+    // Each junction: an exit slip off the nearside to a roundabout, a local road out from it, and an
+    // entry slip back on downstream.
+    for (const sp of spans) {
+      const { j } = sp, at = (d, lat) => { const p = onCarriageway(line, lanes, side, sp.diverge + d * k, lat); return [p.x, p.z]; };
+      const sideOff = MW.sideOffset, r = MW.ring;
+      const G = at(J.out + r, sideOff), up = at(J.out, sideOff), down = at(J.out + 2 * r, sideOff), out = at(J.out + r, sideOff + r);
+      const bUp = bearing(G[0], G[1], ...up), bDown = bearing(G[0], G[1], ...down), bOut = bearing(G[0], G[1], ...out);
+      const R = B.ring(G[0], G[1], r, { name: '', cls: 'primary', mph: 40, w: 7.5 }, [bUp, bDown, bOut]);
+      const name = `J${j.n} slip road`;
+      // exit: ease out alongside lane 1, run as a deceleration lane, then sweep away to the roundabout
+      const ex = [];
+      for (let d = 0; d < J.out; d += 10) {
+        const lat = d < MW.taper ? lane0 + (off0 - lane0) * smooth(d / MW.taper) : d < J.decel ? off0 : off0 + (sideOff - off0) * smooth((d - J.decel) / (J.out - J.decel));
+        ex.push(at(d, lat));
+      }
+      ex[0] = at(0, 0); ex.splice(1, 0, at(1.5, lane0)); ex.push(R(bUp));
+      const exitE = B.edge({ ...slip, name }, ex);
+      // entry: from the roundabout back down to an acceleration lane beside lane 1, then into it
+      const en = [R(bDown)], startD = J.out + 2 * r;
+      for (let d = startD + 10; d < J.len; d += 10) {
+        const lat = d < J.len - J.accel ? off0 + (sideOff - off0) * (1 - smooth((d - startD) / (J.len - J.accel - startD)))
+          : d < J.len - MW.taper ? off0 : lane0 + (off0 - lane0) * (1 - smooth((d - (J.len - MW.taper)) / MW.taper));
+        en.push(at(d, lat));
+      }
+      const merge = onCarriageway(line, lanes, side, sp.merge); en.push(at(J.len - 1.5, lane0), [merge.x, merge.z]);
+      B.edge({ ...slip, name }, en);
+      // the local road the junction serves: national speed limit, out to where the map ends
+      const far = at(J.out + r, sideOff + 640);
+      const local = { name: `A${j.n}0${side === 'A' ? 1 : 2} to ${j.to}`, cls: 'primary', mph: 60, w: 7.3 };
+      B.road(local, [R(bOut), at(J.out + r, sideOff + 120), far]);
+      B.giveways.push([exitE, dm(B.edges[exitE].len - (7.5 / 2 + 0.8)), 1, 0]); // the slip road gives way at the roundabout
+      B.giveWay([at(J.out + r, sideOff + 120), R(bOut)], 7.5 / 2 + 0.8);
+      // signs on the nearside verge: advance direction signs at 1 mile and ½ mile, countdown markers at
+      // 300, 200 and 100 yards, and the final direction sign just before the slip road leaves
+      const verge = (before, extra) => { const p = onCarriageway(line, lanes, side, sp.diverge - before * k, cw / 2 + MW.shoulder + 2.2); return { x: +p.x.toFixed(2), z: +p.z.toFixed(2), tx: +p.tx.toFixed(4), tz: +p.tz.toFixed(4), j: j.n, to: j.to, before, ...extra }; };
+      for (const a of MW.advance) B.mwSigns.push(verge(a.at, { kind: 'advance', distance: a.text }));
+      for (const c of MW.countdown) B.mwSigns.push(verge(c.at, { kind: 'count', n: c.n }));
+      B.mwSigns.push(verge(30, { kind: 'exit' }));
+      B.motorway.junctions.push({ n: j.n, side, to: j.to, diverge: Math.round(sp.diverge), merge: Math.round(sp.merge), roundabout: G.map(v => +v.toFixed(1)), local: far.map(v => +v.toFixed(1)) });
+    }
+  }
+  // the central reservation barrier runs along the centre line all the way round
+  const bar = []; for (let i = 0; i < line.length; i += 2) bar.push(dm(line[i].x), dm(line[i].z));
+  bar.push(dm(line[0].x), dm(line[0].z)); B.barriers.push(bar);
+  return B;
+}
+const m2 = () => motorway(2), m3 = () => motorway(3);
+
+export const LAYOUTS = { town, rbs, roads, park, m2, m3 };
 export function buildLayout(id) { return LAYOUTS[id]().toJSON(); }

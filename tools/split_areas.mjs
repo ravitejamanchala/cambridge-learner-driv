@@ -13,6 +13,7 @@ import { buildNet, buildRoute, snapWaypoint } from '../js/net.js';
 import { ROUTES } from '../js/config.js';
 import { LESSONS } from '../js/course.js';
 import { PUZZLES } from '../js/puzzles.js';
+import { FREE_DRIVES } from '../js/free-drive.js';
 import { buildLayout, LAYOUTS } from './layouts.mjs';
 
 const SRC = 'data/cambridge.json', OUT = 'data/areas';
@@ -24,7 +25,8 @@ const net = buildNet(full);
 const plans = ROUTES.map(r => ({ key: 'route:' + r.id, name: r.name, wps: r.waypoints }));
 const practice = [
   ...LESSONS.filter(l => l.waypoints).map(l => ({ key: 'lesson:' + l.id, name: l.title, wps: l.waypoints, area: l.area })),
-  ...PUZZLES.map(p => ({ key: 'puzzle:' + p.id, name: p.title, wps: p.waypoints, area: p.area }))
+  ...PUZZLES.map(p => ({ key: 'puzzle:' + p.id, name: p.title, wps: p.waypoints, area: p.area })),
+  ...FREE_DRIVES.map(d => ({ key: 'free:' + d.id, name: d.title, wps: d.waypoints, area: d.area }))
 ];
 for (const p of plans) {
   const r = buildRoute(net, p.wps.map(w => snapWaypoint(net, w)));
@@ -78,7 +80,8 @@ groups.forEach((g, gi) => {
     version: full.version, source: full.source, origin: full.origin, kx: full.kx, kz: full.kz, classes: full.classes,
     area: { id, box: b.map(Math.round) }, names, ways, nodes, edges,
     stops: remap(full.stops), zebras: remap(full.zebras), giveways: remap(full.giveways),
-    minis: full.minis.filter(([x, z]) => inBox(b, x / 10, z / 10)), rbs: full.rbs.filter(([x, z]) => inBox(b, x / 10, z / 10))
+    minis: full.minis.filter(([x, z]) => inBox(b, x / 10, z / 10)), rbs: full.rbs.filter(([x, z]) => inBox(b, x / 10, z / 10)),
+    lamps: (full.lamps || []).reduce((out, v, i, a) => { if (i % 2 === 0 && inBox(b, a[i] / 10, a[i + 1] / 10)) out.push(a[i], a[i + 1]); return out; }, [])
   };
   const file = id + '.json', txt = JSON.stringify(area);
   fs.writeFileSync(path.join(OUT, file), txt);

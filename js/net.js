@@ -11,8 +11,11 @@ export async function loadNet(url) {
 
 export function buildNet(d) {
   const net = { origin: d.origin, kx: d.kx, kz: d.kz, names: d.names, chunkSize: 400 };
+  // motorway extras: the central reservation barrier, the blue junction signs, and the junction list
+  net.barriers = (d.barriers || []).map(f => { const out = []; for (let i = 0; i < f.length; i += 2) out.push([f[i] / 10, f[i + 1] / 10]); return out; });
+  net.mwSigns = d.mwSigns || []; net.motorway = d.motorway || null;
   // cl/cr: cycle lane on the left/right of the way's direction (0 none, 1 advisory, 2 mandatory, 3 separate track); cw: lane width
-  const ways = d.ways.map(w => ({ name: d.names[w[0]], cls: d.classes[w[1]], mph: w[2], assumed: !!w[3], oneway: w[4], w: w[5], rb: !!w[6], lanes: w[7], cl: w[8] || 0, cr: w[9] || 0, cw: (w[10] || 15) / 10 }));
+  const ways = d.ways.map(w => ({ name: d.names[w[0]], cls: d.classes[w[1]], mph: w[2], assumed: !!w[3], oneway: w[4], w: w[5], rb: !!w[6], lanes: w[7], cl: w[8] || 0, cr: w[9] || 0, cw: (w[10] || 15) / 10, hs: (w[11] || 0) / 10 }));
   const nN = d.nodes.length / 2;
   const nx = new Float32Array(nN), nz = new Float32Array(nN);
   for (let i = 0; i < nN; i++) { nx[i] = d.nodes[2 * i] / 10; nz[i] = d.nodes[2 * i + 1] / 10; }
@@ -52,6 +55,8 @@ export function buildNet(d) {
   for (const st of net.stops) { const c = cl.get(st.cluster) || new Set(); c.add(st.group); cl.set(st.cluster, c); }
   for (const st of net.stops) { st.single = cl.get(st.cluster).size < 2; st.offset = (st.cluster * 7.37) % 32; }
   net.zebras = d.zebras.map(([ei, s], id) => feature(net, { id, e: edges[ei], s: s / 10, dir: 1 }));
+  // Surveyed street-lamp positions, where the map has them. Flat x,z pairs in decimetres.
+  net.lamps = []; for (let i = 0; d.lamps && i < d.lamps.length; i += 2) net.lamps.push([d.lamps[i] / 10, d.lamps[i + 1] / 10]);
   net.giveways = d.giveways.map(([ei, s, dir, stop]) => feature(net, { e: edges[ei], s: s / 10, dir, stop: !!stop }));
   net.minis = d.minis.map(([x, z]) => ({ x: x / 10, z: z / 10 }));
   net.rbs = d.rbs.map(([x, z, r, w]) => ({ x: x / 10, z: z / 10, r: r / 10, w: w / 10 }));
@@ -162,10 +167,29 @@ export function laneCentre(e, dir, i = 0) {
   const L = laneInfo(e, dir); i = Math.min(i, L.n - 1);
   return L.outer - L.laneW * (i + 0.5);
 }
+// How far paved road reaches from a way's centre line on its widest side: the hard shoulder on a
+// motorway is road surface, not verge, so stopping on it is not "mounting the kerb".
+export const paved = (w) => w.w / 2 + Math.max(w.hs || 0, w.cls === 'motorway' ? 1 : 0);
 export const laneOffset = (w) => w.oneway ? (w.w > 7.6 && !w.rb ? w.w / 4 : (w.rb ? 0.8 : 0)) : Math.min(w.w / 4, 2.2);
 export const endNode = (st) => st.dir > 0 ? st.e.b : st.e.a;
 export const startNode = (st) => st.dir > 0 ? st.e.a : st.e.b;
 
+// nearest road to a point among the edges `ok` accepts (e.g. only the motorway, while on a slip road)
+export function nearestWhere(net, x, z, ok) {
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  let best = null, bd = 1e18;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = net.grid.get(ck(cx + i, cz + j)); if (!a) continue;
+    for (let k = 0; k < a.length; k += 2) {
+      const e = net.edges[a[k]]; if (!ok(e)) continue;
+      const s = a[k + 1], ax = e.px[s], az = e.pz[s], dx = e.px[s + 1] - ax, dz = e.pz[s + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = ax + dx * t, qz = az + dz * t, dd = (x - qx) ** 2 + (z - qz) ** 2;
+      if (dd < bd) { bd = dd; const L = Math.sqrt(L2); best = { e, way: e.way, d: Math.sqrt(dd), s: e.cum[s] + t * L, tx: dx / L, tz: dz / L, lat: (x - qx) * (dz / L) - (z - qz) * (dx / L) }; }
+    }
+  }
+  return best;
+}
 // nearest road to a point
 export function nearest(net, x, z) {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
@@ -184,6 +208,22 @@ export function nearest(net, x, z) {
     }
   }
   return best;
+}
+// Is the point on paved road, within `margin` of some road's paved edge? Not just the nearest centre
+// line: where a slip road leaves a motorway, the slip's centre line can be nearer than the motorway's
+// while the car is plainly on the motorway.
+export function onPaved(net, x, z, margin = 0) {
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = net.grid.get(ck(cx + i, cz + j)); if (!a) continue;
+    for (let k = 0; k < a.length; k += 2) {
+      const e = net.edges[a[k]], s = a[k + 1], lim = paved(e.way) + margin;
+      const ax = e.px[s], az = e.pz[s], dx = e.px[s + 1] - ax, dz = e.pz[s + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if ((x - ax - dx * t) ** 2 + (z - az - dz * t) ** 2 < lim * lim) return true;
+    }
+  }
+  return false;
 }
 export function stopsNear(net, x, z) {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), out = [];

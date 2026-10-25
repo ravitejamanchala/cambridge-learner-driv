@@ -3,6 +3,9 @@
 // behind the sign-in gate with no way through. This routes the account service, the Clerk SDK and the
 // API to local fixtures, so a suite can drive any lesson deterministically and without network access.
 export async function installAuthFixture(page, { full = true, host = 'clerk.fixture.invalid', api = 'https://api.fixture.invalid' } = {}) {
+  // The suites check the standard every drive was marked on before marking modes existed: Hard. A suite
+  // that wants another mode chooses it in the interface, as a learner would.
+  await page.addInitScript(() => { try { if (!localStorage.getItem('cambridge-learner-drive.mode')) localStorage.setItem('cambridge-learner-drive.mode', 'hard'); } catch (_) {} });
   await page.route('**/auth-config.js', r => r.fulfill({ contentType: 'text/javascript',
     body: `window.LEARNER_CONFIG={CLERK_PUBLISHABLE_KEY:'pk_test_'+btoa('${host}$'),API_BASE_URL:'${api}'};` }));
   await page.route(`https://${host}/**`, r => r.fulfill({ contentType: 'text/javascript',

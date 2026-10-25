@@ -1,5 +1,89 @@
 # Changelog
 
+## Unreleased: motorways, junction markings and pull-request previews
+
+- **Choose how strictly you are marked: Easy, Medium or Hard.** Pick it in the lesson, puzzle or mock-test panel before you start. A pass earns one star on Easy, two on Medium and three on Hard, and each lesson keeps its best. Hard is the standard every drive was marked on before, and for a mock test it is the real test (15 driving faults, no serious faults). Medium allows three more driving faults; Easy six more and one serious fault. Neither ever forgives a collision, and the lesson's goal is always required. The result says which mode it was. Lessons passed before this count as three stars.
+- **Slow traffic keeps to the left-hand lane.** Background vehicles used to keep whatever lane they started in, so a slow car could sit in the middle or right-hand lane indefinitely. Now slower vehicles start on the left, move back left once they have nothing to pass, pull out to overtake, and get across in good time for a motorway exit, always into a real gap.
+- **Traffic signals, gives way and varies, like people do.** Background vehicles never used an indicator, so you could not tell where anyone was going, and every car behaved alike.
+  - **Indicators**: a vehicle about to change lane flashes its indicator for a couple of seconds first, then moves. One driver in twenty never signals. With no gap it keeps signalling and eases off to drop in behind; a lane change abandons itself if someone turns up alongside.
+  - **Courtesy**: about half the drivers ease off to let you in when you signal into their lane beside or just ahead of them, and some move over for you on the slip road. The rest hold their speed, so a gap is still yours to judge.
+  - **Every driver is a little different**: following distance, accepted gap and patience are drawn per vehicle from the traffic seed.
+- **Motorway lane changes are judged less mechanically.** A wobble towards the line that comes back is no longer marked as an unsignalled lane change: the mirror and signal are checked when the car actually crosses the line. Moving into a gap ahead of a slower vehicle you are pulling away from is no longer *too small a gap*; what counts is whether the vehicle behind would have to brake. Moving left and then onto the slip road is *cutting across* only inside the last 100 yards. Joining slowly behind traffic that is itself waiting on the slip road is not *joining too slowly*. When someone moves into the gap in front of you, you get the same few seconds to drop back as after a lane change of your own, and staying close after that is marked as before. Collisions, cutting in and forcing someone to brake are marked as before.
+- **The Bot lab can drive in random traffic** (*Traffic: random*, or `BOT_TRAFFIC=random`), so a drive is tested against traffic it has not been tuned to, not only the lesson's scripted cars. The reference driver now reads other drivers' indicators, follows traffic down the slip road, and moves across into a gap as soon as it is alongside one instead of following the slip road to its end.
+- **Driving off the road is marked, and the car is easier for a person to steer.**
+  - **Leaving the road could pass.** Nothing was marked until the middle of the car was 0.8 m past the edge, and then only as one driving fault, so a car could run onto the verge and still pass. Now the wheels are judged against the road as drawn: a wheel over the edge is *Mounted the kerb* (driving fault), and the car off the road is *Drove off the road* (serious). Free drive still marks nothing, but its summary says how long the wheels were off the road.
+  - **Steering is limited by grip.** Full input turns the wheels to full lock at walking pace, then no further than a firm turn of about 7 m/s² sideways. Before, a full press at 30 mph turned the car at about 25 m/s² (no car can), so every tap of a key was a swerve.
+  - **No mirror checks to press in the chase view.** The mirrors are always on screen there, so mirror and shoulder checks count as made and are not marked; the run detail says so. The driver's view marks them as before.
+  - **Game controllers and wheels** work: left stick or wheel steers, triggers are the pedals, LB and RB indicate, Y checks the mirrors. Keys and touch still work as before and win over an idle controller.
+  - **A person-like driver in the Bot lab** (*A person on keys*, *A person on a controller*) runs any drive with a reaction time, a few decisions a second, tapped keys or an unsteady stick. Over all 60 drives, the steering change halved the time a person on keys spent off the road (274 s to 134 s) and cut it fivefold on a controller (88 s to 16 s, serious faults 33 to 6). On keys the pass rate did not move (34 of 60): town turns on on/off keys still clip kerbs.
+  - The reference bot now steers by wheel angle through the same grip limit as everyone else, and passes all 60 drives, including the two-lane roundabout that used to stall.
+- **Evening motorway driving** (issue #10).
+  - **Three lessons at dusk**: *Joining at dusk*, *Following at dusk* and *Leaving the motorway at dusk*, the same motorway lessons set as the light goes, with the time of day saved in the lesson data. A **Motorway at dusk** free drive too.
+  - **What changes is only what you see**: a dusk sky, lamps on every vehicle (tail lights always, headlights on), road studs in their proper colours, lit columns at each junction, and signs that glow in the headlights. The road, the traffic and every rule are the same as by day: the same careless drive is given the same faults at dusk, and the Bot lab's careful drives come out the same.
+  - **Headlights**: switch dipped headlights on with **H** or the lights button, which only appears at dusk. Driving off without them is marked once, as a driving fault under ancillary controls (Rules 113 and 115).
+  - **Fair at dusk**: the fog never closes in nearer than 600 m and every vehicle shows its lamps, so nothing the examiner marks is hidden by the lighting.
+  - **Low-power graphics** (Settings → Graphics): no shadows, no headlight beam or light pools on the road, and a lower pixel ratio, with the lamps kept. Menus honour reduced motion.
+  - **Fixed along the way:** the headlight beam was left behind in the previous scene whenever a new map area loaded, so it never lit the road.
+  - **Cheap enough to draw.** The first measurement put a dusk frame at 2.6× the cost of a day one: every road stud on the 24 km circuit was drawn every frame, 100,000 of the 140,000 triangles in view. Studs are now drawn only within 800 m of the car (about 500 of them), and a dusk frame costs about 1.35× a day one; on low-power graphics it costs less than day.
+  - Evidence: clips, day-and-dusk stills from the same spot and frame times in [docs/evidence/10-evening-motorway](docs/evidence/10-evening-motorway/README.md). The frame times are from the headless software renderer, so they compare day, dusk and low power with each other; measuring on real phones and laptops is still to do.
+- **Leaving the motorway, and missing your exit** (issue #9).
+  - **Exits are signed**: blue advance direction signs at 1 mile and ½ mile, countdown markers at 300, 200 and 100 yards, and the final sign at the slip road, on both carriageways of both motorway worlds.
+  - *Leaving the motorway* (two lanes, junction 3): follow the signs, mirror and signal by the 300-yard marker, keep up with the traffic until you are on the slip road, then slow for its bend and give way at the roundabout before driving on along the A301. Leaving without a mirror check or a signal, braking hard on the carriageway before the slip road, and taking the slip road's bend too fast are each marked.
+  - *If you miss your exit* (three lanes, junction 3): a solid line of lorries means there is no safe gap. Carrying on to the next junction passes; stopping on the motorway, reversing, or cutting across the hatching to reach the slip road are serious faults.
+  - **A missed exit now carries on safely in every exit lesson**: the route continues to the next junction and the instruction box says so, instead of the lesson simply stopping. Not being in lane for an exit is no longer marked when traffic gave you no chance to get there.
+  - **Slip roads curve gently now.** The bend where each slip road swept away to its roundabout was as tight as a 27 m radius (it suited about 20 mph); the roundabouts sit closer and the slip roads curve over a longer stretch, so no bend is tighter than about 135 m.
+- **Joining the motorway, and traffic joining beside you** (issue #8). Two more motorway lessons:
+  - *Joining the motorway*: from the slip road at 30 mph into a left-hand lane where the first gap closes as you reach it and the middle lane is busy. Build up speed, look, signal, and fit into a gap without making anyone brake. Joining beside a car, into a gap that makes the car behind brake, far slower than the traffic, or moving straight out again are all marked; joining is judged as a lane change from the slip road, with the same mirror and signal checks.
+  - *Traffic joining from a slip road*: two vehicles come down the slip road as you pass, with a car alongside you in the middle lane. You have priority. Keeping your lane and speed, easing off, or moving over once it is safe all pass, and the result says which you did; moving over into the occupied lane does not.
+  - **Joining traffic now gives way** to traffic already on the motorway, the learner included: it fits into a real gap or drops back behind, and with no gap waits at the end of the acceleration lane rather than forcing in. Nothing on the motorway is made to brake or move over for it.
+  - **Fixed along the way:** traffic in the outer lanes slowed to the speed of whatever was in the next lane on long bends, because "is it in my lane?" was measured across the car's own heading; it is now measured across the road between the two. The same bends made cars brake for a learner in the next lane, and joining traffic braked hard for a corner that was only the node where the slip road meets the motorway.
+- **Motorway lessons: lane discipline, overtaking and following distance** (issue #7). A new **Motorways** unit with four lessons, each with its own scripted traffic so every run is the same:
+  - *Keep left, overtake, move back* (three lanes), *Overtaking when the next lane is busy* (two lanes), *Following distance at 70* (traffic slowing and speeding up in every lane) and *Getting into lane for your exit* (from the right-hand lane to junction 2).
+  - **Judged in context, not lane by lane.** Being out of the left-hand lane is fine while you are overtaking or waiting for a safe gap to move back; what is marked is a lane change without a mirror check or signal, a gap that makes someone brake, cutting in, sweeping across two lanes, staying out with nothing to pass, sitting under two seconds behind, passing on the left, and not being in lane for an exit. Every rule is in `js/lane-discipline.js`, and `tests/lane-discipline.test.mjs` runs scripted careful and careless traces through it.
+  - **Instruments, not sentences:** the lane strip shows the lanes that are right for you and the one you are in; the following lesson shows your gap to the car ahead in seconds.
+  - **Feedback itemises every lane change**: speed, which mirror was checked, whether you looked over your shoulder, how long you signalled first, and the gap you moved into; plus your following record and how long you were out of the left-hand lane, and why.
+  - The Bot lab's test driver can now drive a motorway: it keeps left, overtakes only into a safe gap, moves back without cutting in, keeps two seconds and gets across for an exit one lane at a time. `npm run test:motorway` drives the careless versions and checks each is marked for what it was, the same way twice.
+  - **Fixed along the way:** slip roads began and ended on the carriageway's centre line, so traffic and the route guide swung right across the motorway before taking an exit; they now leave from and join the left-hand lane. And the kerb check could mark a car in lane 1 as off the road where a slip road leaves, because the slip's centre line was nearer than the motorway's; road surface is now judged against every road nearby.
+  - **The instruction box no longer runs into the speedometer** on mid-width windows (around 900 px) when it carries a junction name and a lane strip: it slides left just enough to clear the instruments, measured from the real elements, and never into the map.
+- **Motorways, and a free drive that goes on as long as you like** (issue #6). Two new worlds, with two and three lanes each way, on a 15-mile circuit of long straights and gentle bends: central reservation and barrier, hard shoulders, 2 m / 7 m lane lines, four junctions with diverge and merge slips, roundabouts and blue advance signs. Pick **Free drive** in the lobby.
+  - Free drive is **ungraded**: no faults, no result, and nothing written to the learner's record or account. Leave at a junction and a route back onto the circuit is built from wherever you are; the instruction box counts down to the next junction rather than the end of the route.
+  - **End drive** shows a summary of what was measured — distance, time, average speed, laps, junctions passed, the longest stretch kept at or under the limit, and the top speed. Any time over the limit is said plainly, measured against the limit of the road you were on (70 on the motorway, 60 and 40 on the roads at the junctions).
+  - **Memory stays bounded however long you drive.** Scenery further than 1.5 km from the car is freed. `npm run test:free` drives for 14 minutes, right round the circuit, sampling memory and frame time, and fails if either keeps growing; the numbers go to `test-results/free-drive-benchmark.json`.
+  - Background traffic keeps to its lane on the motorway at lane-appropriate speeds, and bicycles stay off it.
+  - Leaving at a junction keeps the directions on the way back (the roundabout at the bottom of the slip road, the turn back on); the junction countdowns are only for the carriageway itself.
+  - **Fixed along the way:** the Start button in the Free drive, Mock test and Puzzles sheets started whatever had last been chosen in the lobby, so opening Free drive and pressing Start straight away could begin a graded town lesson. Each sheet's Start now starts what that sheet shows.
+  - Evidence: real-time clips of each of the above in [docs/evidence/6-motorway-free-drive](docs/evidence/6-motorway-free-drive/README.md), recorded with the new `npm run evidence -- motorway`.
+- **A preview for every pull request.** Each one is deployed to `https://pr-<number>.learner-drive-app.pages.dev/`, with the link posted on the pull request. Previews run as a guest with the whole course open, never touch production, and carry a small "Preview build" label in the lobby. See [deployment](docs/deployment.md#pull-request-previews).
+
+## Unreleased: map corrections, steering wheel, head angles and a mirror in the chase view
+
+- **The Cambridge map is corrected from street-level imagery.** A review of 568 Mapillary features in
+  the road inspector, applied to `data/cambridge.json` and kept in
+  [data/corrections](data/corrections/) as the provenance of the map:
+  - **244 roads have their corners rounded off.** The overrides only add intermediate points — every
+    polyline keeps its endpoints, and the centre line moves by at most 6 cm — so every mock-test route
+    came out the same length with the same examiner instructions afterwards.
+  - **21 zebra crossings and 17 stop lines** that the map did not have. The other 47 markings in the
+    file were already on the map within 12 m and were dropped: a second zebra beside an existing one
+    would have the examiner mark a learner twice for one crossing.
+  - **483 surveyed street lamps**, used in place of the lamp posts the city builder spaces out along
+    main roads. A spaced-out pole within 16 m of a surveyed one is dropped rather than standing next
+    to it, and each surveyed pole turns to face the road it stands beside.
+  - **Lamp posts stood in the road, and their heads were placed from a point that does not exist.**
+    `nearest()` reports how far off the centre line you are, not the point on it, so reading `nr.x`
+    gave `NaN` and every surveyed lamp head got a nonsense transform. The point is now reconstructed
+    from the offset, and a lamp the survey put inside the carriageway is stepped out to the kerb —
+    the same 0.9 m stand-off the spaced-out poles use. 65 of 986 needed moving; none now stands
+    closer than 0.90 m to a carriageway edge.
+- **Roads had unmarked stretches.** A road is cut into one edge per junction, and the centre line and
+  lane dividers kept a fixed 9 m clear of each end — so any edge shorter than 18 m got no markings at
+  all, and the road looked bare between two marked stretches. A 12 m length of Hills Road and a 17 m
+  length of The Fen Causeway were among them. The clearance now scales with the edge, which takes the
+  unmarked total on the mock-test maps from 2,274 m to 98 m, all of it stubs under 5 m where a centre
+  line would be wrong anyway.
+  - The one road-attribute correction in the file (Milton Road's width and lane count) was already
+    what the map said, so nothing changed there.
+
 ## Unreleased: sign-in gate, blue light vehicles, hold-to-look and parallel parking
 - **Sign in before driving.** Where the build is configured with an account service, the lobby, lessons, puzzles and mock tests all stay locked until the learner signs in, and the sign-in sheet says so. A build with no account service configured (local development, the demo build) still runs as a guest on the device, so those builds are not left unusable.
   - Signing out now drops verified paid access with the session, instead of leaving it behind until the next API call.
@@ -21,10 +105,37 @@
 - **Parking is one control.** Tap once to release the parking brake, hold the back arrow to reverse, tap once to park. The P/R/N/D selector and the cockpit drill are gone from the manoeuvre, and the control is a small button in the corner rather than a panel across the view.
   - Parking no longer forces the overhead view on the learner.
   - Parking bays are marked with broken white lines, as on a UK road.
+- **A steering wheel you can see working.** The cockpit had a thin ring with one bar across it, which
+  gave no sense of rotation at all — a bar at 180° looks exactly like a bar at 0°. It is now a rim, a
+  centre hub and three spokes on a tilted column, turning with the driver's input (2.3 rad at full
+  lock, not the real 450°, which spins out of sight when full lock is one key press away).
+- **The cockpit reads as a car.** A dashboard that closes off the bottom of the view instead of
+  letting you see the road underneath it, a windscreen header, slimmer A-pillars at the edges of the
+  glass, an instrument binnacle behind the wheel, and a roof rail and door waist down each side — so
+  the wing mirrors are mounted on something rather than floating in mid-air.
+- **How far the head turns now matches what the check is.** A glance in a door mirror swings about
+  **45°** (it was 106°); holding the same key until it becomes a blind-spot check opens out to about
+  **95°**, over the shoulder; `B` is the interior mirror, so it barely moves the head (15°, down from
+  100°). The chase view uses 0.8 of those, because the car is in shot as well. `npm run test:drive`
+  measures all three.
+- **The rear-view mirror is in the chase view as well**, as a panel under the instruction box. It is
+  the same camera and the same render target as the glass on the windscreen, so it costs no extra draw.
+- **The blue lights are the police car's own.** The model carries a light bar with a `BlueLights`
+  material on the lenses; that is what flashes now, rather than a second bar bolted over the top. The
+  lenses pulse together and an additive halo alternates end to end, so something is lit at every
+  moment — the old pattern left the bar dark half the time, which is why it was easy to miss in a
+  mirror. The halo keeps a floor on its size, so the light still registers far down the road.
+- **Mobile.** Anything drawn into the 3D view is now placed from the interface's own measurements
+  rather than a guessed share of the screen: a fixed fraction put the rear-view panel straight through
+  the speedometer on a phone held sideways. The rear-view mirror in the cockpit is also drawn in
+  towards the middle on an upright phone, where it used to sit off the left edge entirely — and that
+  is the mirror the whole blue-light exercise depends on. `npm run test:drive` checks both at
+  1280×720, 390×844 and 844×390.
 - **Coaching, for learners who want it** (Settings → Coaching, off by default). A quiet drive stays what everyone gets: the lesson card before Start, readings on the instruments, detail in the feedback. Switched on, a line appears above the Highway Code tip with the lesson's own brief for the first eight seconds, then whatever the exercise is reporting as it goes — including named stages for the parallel park ("pull up alongside the front one", "reverse into the space"). It lives in the column that already carries the tip card, so it is laid out with that column and can never land on an instrument; measured at 2–5% of the view at 390, 820 and 1280 px.
 - **Less to read while driving, more afterwards.** The lesson card carries the instructions before Start; the drive shows a short stage label and nothing else unless something has gone wrong; the result sheet now carries a measured account of the run — how long, how far, each stage with the distance travelled, contacts, final position and angle, observations and every fault.
 - **Looking round no longer swings the car.** The cockpit is attached to the camera, so turning the driver's head used to carry the bonnet and dashboard round with it and look like steering. The cockpit now stays with the car.
 - Contact with a parked car is logged once per object rather than once per frame: a car pushed back from an obstacle can sit a few centimetres clear, which used to read as a fresh impact every frame.
+- Docs: screenshots of a commercial UK driving simulator in [docs/development/reference](docs/development/reference/), kept as the bar to clear, with a section in the interface guidelines on what we took from it and where we deliberately differ.
 - Docs: [interface guidelines](docs/development/ui-guidelines.md) for anything the learner sees while driving, and [screenshots](docs/screenshots.md) of every case, generated by `node tools/screenshots.mjs`.
 - Checks: `npm run test:bots` drives every lesson, puzzle or mock test with the Bot lab's own driver and reports how each one ended. `lesson:rb-big` stalls on the two-lane roundabout; that predates these changes and is listed as a known stall rather than hidden.
 - **Getting started has no overlays at all.** The three-button mirror card is gone, and so is the running commentary in the mirrors, controlled-stop and acceleration lessons. The state now goes on the instruments the car already has: three ticks that fill as each check is recorded, a target band under the speedometer, and the stop countdown in the distance field.

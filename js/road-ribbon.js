@@ -13,9 +13,9 @@ export function ribbon(acc, e, o1, o2, y, s0 = 0, s1 = e.len) {
   }
 }
 
-export function dash(acc, e, s, len, off, y) {
+export function dash(acc, e, s, len, off, y, half = 0.07) {
   // Use the same bend vertices and offsets as the road surface.
-  ribbon(acc, e, off - 0.07, off + 0.07, y, s, Math.min(e.len, s + len));
+  ribbon(acc, e, off - half, off + half, y, s, Math.min(e.len, s + len));
 }
 
 export function roadBoundsVisible(bounds,x,z,radius) {

@@ -1,3 +1,4 @@
+import { starsOf } from './assessment.js';
 // Puzzles: short drives through tricky layouts of the kind found across the UK, graded Easy → Hardest.
 // Each layout is a practice copy of a real type of junction (tools/layouts.mjs), not the real place.
 // Same shape as a lesson (see course.js) plus `tier`, an optional `yield` event (traffic timed to arrive
@@ -70,4 +71,4 @@ export const PUZZLES = [
 ];
 
 // 3 stars: no driving faults. 2 stars: one. 1 star: solved within the tier's allowance.
-export const starsFor = (L) => !L || !L.passed ? 0 : L.bestD === 0 ? 3 : L.bestD <= 1 ? 2 : 1;
+export const starsFor = (L) => starsOf(L, 'puzzle'); // js/assessment.js: stars come from the marking a puzzle was passed on

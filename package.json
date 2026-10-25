@@ -19,7 +19,11 @@
     "test:local-mocks": "node tests/local-tracks-browser.mjs",
     "build:pages": "node tools/build_demo.mjs . dist --pages-preview",
     "test:pages": "node tests/pages-browser.mjs",
-    "test:imports": "node tests/three-imports-browser.mjs"
+    "test:imports": "node tests/three-imports-browser.mjs",
+    "test:free": "node tests/free-drive-browser.mjs",
+    "test:motorway": "node tests/motorway-lessons-browser.mjs",
+    "test:control": "node tests/control-browser.mjs",
+    "evidence": "node tools/record_evidence.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
