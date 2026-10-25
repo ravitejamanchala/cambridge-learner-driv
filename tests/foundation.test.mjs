@@ -11,8 +11,8 @@ import { createTest } from '../js/test.js';
 import { buildReport } from '../js/reports.js';
 const find = id => LESSONS.find(l => l.id === id);
 
-test('52 lessons retain all 29 legacy IDs and have valid metadata', () => {
-  assert.equal(LESSONS.length, 52); assert.deepEqual(validateCurriculum(LESSONS), []);
+test('55 lessons retain all 29 legacy IDs and have valid metadata', () => {
+  assert.equal(LESSONS.length, 55); assert.deepEqual(validateCurriculum(LESSONS), []);
   for (const id of ['move-off','speed','estop','turn-left','turn-right','lights','amber','emerge-left','emerge-right','lane-choice','right-lights','mini','rb-left','rb-ahead','rb-right','rb-big','rb-lights','dutch','zebra','cyclists','ped-crossing','cycle-left','follow','country','dual','q-showme','q-signs','q-stopping','q-priority','blue-light','parallel-park']) assert.ok(find(id), id);
 });
 test('validator rejects missing prerequisites, duplicate IDs and cycles', () => {

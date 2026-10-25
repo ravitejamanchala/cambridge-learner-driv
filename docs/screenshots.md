@@ -200,6 +200,24 @@ Choosing your lane — Station Road · two lanes each way. Straight on at two se
 
 Turning right at traffic lights — Bridge Street → High Street. Turn right at the High Street lights. Get in the right-hand lane, go on green, and give way to oncoming traffic before you turn.
 
+### Yellow box junction
+
+![Yellow box junction — Bridge Street · Station Road crossroads. Straight on over the yellow box at Station Road. Traffic is queueing beyond it: wait at the line, even on green, until there is room for your whole car on the other side.](screenshots/lesson-box-junction.jpg)
+
+Yellow box junction — Bridge Street · Station Road crossroads. Straight on over the yellow box at Station Road. Traffic is queueing beyond it: wait at the line, even on green, until there is room for your whole car on the other side.
+
+### Turning right in a yellow box
+
+![Turning right in a yellow box — Bridge Street → Station Road. Turn right into Station Road. Your exit is clear, so you may move into the box and wait there for oncoming traffic, then turn when there is a safe gap.](screenshots/lesson-box-right.jpg)
+
+Turning right in a yellow box — Bridge Street → Station Road. Turn right into Station Road. Your exit is clear, so you may move into the box and wait there for oncoming traffic, then turn when there is a safe gap.
+
+### KEEP CLEAR
+
+![KEEP CLEAR — High Street · Orchard Way. Traffic is queueing on High Street. Stop before the KEEP CLEAR markings, not on them, so traffic can get in and out of Orchard Way.](screenshots/lesson-keep-clear.jpg)
+
+KEEP CLEAR — High Street · Orchard Way. Traffic is queueing on High Street. Stop before the KEEP CLEAR markings, not on them, so traffic can get in and out of Orchard Way.
+
 ### Mini-roundabout
 
 ![Mini-roundabout — Queens Road → Ring Road. Give way to traffic from the right, then turn left at the mini-roundabout onto Ring Road.](screenshots/lesson-mini.jpg)

@@ -10,9 +10,9 @@ const rad = (d) => d * Math.PI / 180;
 const at = (cx, cz, r, b) => [cx + r * Math.sin(rad(b)), cz - r * Math.cos(rad(b))];
 const dm = (v) => Math.round(v * 10);
 
-class Builder {
+export class Builder {
   constructor(id) {
-    Object.assign(this, { id, names: [], ways: [], nodes: [], edges: [], stops: [], zebras: [], giveways: [], minis: [], rbs: [], arrows: [], cycleRings: [], barriers: [], mwSigns: [] });
+    Object.assign(this, { id, names: [], ways: [], nodes: [], edges: [], stops: [], zebras: [], giveways: [], minis: [], rbs: [], arrows: [], cycleRings: [], barriers: [], mwSigns: [], keepClear: [], boxes: [] });
     this.nodeKey = new Map(); this.wayKey = new Map(); this.cluster = 0;
   }
   node(x, z) {
@@ -71,6 +71,10 @@ class Builder {
   // features measured back from the end of an approach p -> q
   lights(appr, back, cluster, group) { const f = this.locate(appr[0], appr[1], -back); this.stops.push([f.ei, dm(f.s), f.dir, cluster, group]); }
   giveWay(appr, back) { const f = this.locate(appr[0], appr[1], -back); this.giveways.push([f.ei, dm(f.s), f.dir, 0]); }
+  // KEEP CLEAR across the lanes of the approach p -> q, centred `back` metres before q and `len` long
+  keepClearAt(appr, back, len) { const f = this.locate(appr[0], appr[1], -Math.max(back, 0.01)); this.keepClear.push([f.ei, dm(f.s), f.dir, dm(len)]); }
+  // a yellow box junction over node q, named by an approach p -> q
+  boxAt(appr) { const f = this.locate(appr[0], appr[1], -0.01); this.boxes.push([f.ei, dm(f.s), f.dir]); }
   zebra(p, q, fromP) { const f = this.locate(p, q, fromP); this.zebras.push([f.ei, dm(f.s)]); }
   lanesArrows(appr, codes) { const f = this.locate(appr[0], appr[1], -1); this.arrows.push([f.ei, f.dir, ...codes]); }
   mini(p) { this.minis.push([dm(p[0]), dm(p[1])]); }
@@ -99,7 +103,7 @@ class Builder {
       area: { id: this.id }, names: this.names, ways: this.ways, nodes: this.nodes, edges: this.edges.map(e => e.slice(0, 4)),
       stops: this.stops, zebras: this.zebras, giveways: this.giveways, minis: this.minis, rbs: this.rbs, arrows: this.arrows, cycleRings: this.cycleRings,
       ...(this.barriers.length ? { barriers: this.barriers } : {}), ...(this.mwSigns.length ? { mwSigns: this.mwSigns } : {}),
-      ...(this.motorway ? { motorway: this.motorway } : {})
+      ...(this.motorway ? { motorway: this.motorway } : {}), ...(this.keepClear.length ? { keepClear: this.keepClear } : {}), ...(this.boxes.length ? { boxes: this.boxes } : {})
     };
   }
 }
@@ -145,6 +149,12 @@ function town() {
   // Orchard Way: side road between High Street and Station Road
   B.road({ name: 'Orchard Way', cls: 'residential', mph: 30, w: 6.5 }, [[0, 0], [0, -220], [0, -450]]);
   B.zebra([0, 0], [250, 0], 130);
+  // KEEP CLEAR on High Street westbound across the mouth of Orchard Way: a queue back from the Bridge Street
+  // lights leaves the gap, so traffic can turn right out of Orchard Way. Configured here, not by rule.
+  B.keepClearAt([[250, 0], [0, 0]], 0, 9);
+  // a yellow box over the Bridge Street / Station Road crossroads: queues back from the junctions beyond it
+  // must not block the lights for the other road (issue #5)
+  B.boxAt([[-250, -700], [-250, -450]]);
 
   // lights: Station Road junctions (group 0 east-west, 1 north-south) and Bridge Street / High Street
   let c = B.cluster++;

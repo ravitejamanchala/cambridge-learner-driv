@@ -390,6 +390,7 @@ npm run test:browser     # the course end to end: prerequisites, control lessons
 npm run test:bots        # BOT_PICK=all:lesson | all:mock | all:puzzle
 npm run test:free        # motorway free drive: both layouts and dusk, a 14-minute dusk drive with memory sampled
 npm run test:motorway    # motorway lessons: careless driving marked, repeatably; lane strip, gap reading, dusk
+npm run test:boxes       # yellow box and KEEP CLEAR: following the queue in is marked and fails the lesson
 npm run test:control     # leaving the road marked, steering limits, game controllers
 node tools/screenshots.mjs   # regenerate docs/screenshots and docs/screenshots.md
 npm run evidence -- <group>  # real-time videos of a feature, into docs/evidence/

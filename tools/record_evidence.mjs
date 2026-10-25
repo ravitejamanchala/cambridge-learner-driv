@@ -329,6 +329,94 @@ GROUPS.restrictions = {
       async setup(p) { await startDrive(p, 'lesson', 'mw-smart-limits'); await ffUntil(p, 'a => a.test.done', 400); } },
   ],
 };
+// Approach a junction along one road: the steady driver follows the lane towards node `at` (x, z) on the road
+// named `road`, starting `from` metres out, and pulls up just short of the line it meets there.
+// With `through`, the path carries straight on along the same road past the junction for that many metres
+// instead of pulling up at the line.
+const approach = (page, area, road, at, from, mph = 20, through = 0) => page.evaluate(([road, at, from, mph, through]) => {
+  const a = window.cambridgeDrive, net = a.net, v = [...net.nx].findIndex((x, i) => Math.hypot(x - at[0], net.nz[i] - at[1]) < 1);
+  // of the two sides of a through road, the one that carries a KEEP CLEAR towards the node, if either does
+  const named = net.inc[v].filter(o => o.e.way.name === road), o = named.find(o => (net.keepClear || []).some(k => k.e === o.e && k.dir === (o.dir === 1 ? -1 : 1))) || named[0];
+  const e = o.e, toward = o.dir === 1 ? -1 : 1; // inc dir 1 leaves v
+  const pts = [], L = e.len, lane = e.way.oneway ? 0 : Math.min(e.way.w / 4, 2.2);
+  for (let k = Math.min(from, L - 1); k >= 0; k -= 2) { const s = toward > 0 ? L - k : k; let i = 0; while (i < e.n - 2 && e.cum[i + 1] < s) i++;
+    const l = e.cum[i + 1] - e.cum[i] || 1, u = (s - e.cum[i]) / l, tx = (e.px[i + 1] - e.px[i]) / l * toward, tz = (e.pz[i + 1] - e.pz[i]) / l * toward;
+    pts.push({ x: e.px[i] + (e.px[i + 1] - e.px[i]) * u + tz * lane, z: e.pz[i] + (e.pz[i + 1] - e.pz[i]) * u - tx * lane, tx, tz }); }
+  const on = through > 0 && net.inc[v].find(q => q.e !== e && q.e.way.name === road);
+  if (on) { const c = on.e, out = c.a === v ? 1 : -1, L2 = c.len, lane2 = c.way.oneway ? 0 : Math.min(c.way.w / 4, 2.2);
+    for (let k = 2; k <= Math.min(through, L2 - 1); k += 2) { const s = out > 0 ? k : L2 - k; let i = 0; while (i < c.n - 2 && c.cum[i + 1] < s) i++;
+      const l = c.cum[i + 1] - c.cum[i] || 1, u = (s - c.cum[i]) / l, tx = (c.px[i + 1] - c.px[i]) / l * out, tz = (c.pz[i + 1] - c.pz[i]) / l * out;
+      pts.push({ x: c.px[i] + (c.px[i + 1] - c.px[i]) * u + tz * lane2, z: c.pz[i] + (c.pz[i + 1] - c.pz[i]) * u - tx * lane2, tx, tz }); } }
+  const p0 = pts[0]; a.player.place(p0.x, p0.z, Math.atan2(-p0.tx, -p0.tz)); a.player.v = mph * 0.447;
+  const line = [...(net.giveByEdge?.get(e.id) || net.giveways.filter(g => g.e === e)), ...(net.stopsByEdge.get(e.id) || [])].filter(g => g.dir === toward)
+    .map(g => (toward > 0 ? e.len - g.s : g.s)).sort((x, y) => x - y)[0] ?? 6;
+  window.__path = pts; window.__target = mph * 0.447; window.__stopAt = on ? null : { x: net.nx[v], z: net.nz[v], d: line + 2.5 };
+}, [road, at, from, mph, through]);
+const stopNear = (page) => page.evaluate(() => { const s = window.__stopAt, p = window.cambridgeDrive.player; if (s && Math.hypot(p.x - s.x, p.z - s.z) < s.d + 8) window.__target = Math.max(0, (Math.hypot(p.x - s.x, p.z - s.z) - s.d) * 0.5); });
+const SPOTS = {
+  'milton-road-side-road': { title: 'A side road off Milton Road (Ascham Road), approaching the give-way', area: 'mock:east-road', road: 'Ascham Road', at: [498.8, -1820.9], from: 70 },
+  'newmarket-road': { title: 'Newmarket Road at Godesdone Road, where a 4 m stub of road meets the junction', area: 'mock:east-road', road: 'Newmarket Road', at: [1365.5, -865.9], from: 70 },
+  'crossroads': { title: 'Hills Road at the Lensfield Road crossroads, lights and two lanes', area: 'mock:east-road', road: 'Hills Road', at: [377.3, 222.8], from: 80 },
+  'keep-clear': { title: 'High Street westbound at Orchard Way in the practice town: KEEP CLEAR', area: 'lesson:move-off', road: 'High Street', at: [0, 0], from: 70, through: 45, still: 14 },
+};
+// a still is taken from `still` metres out (about 25 m), close enough to see the line and what leads to it
+const goSpot = async (page, k, mph, from) => { const S = SPOTS[k], [kind, id] = S.area.split(':'); await startDrive(page, kind, id); await installDriver(page); await approach(page, S.area, S.road, S.at, from ?? S.from, mph, from == null ? S.through || 0 : 0); };
+GROUPS.markings = {
+  dir: 'docs/evidence/4-junction-markings',
+  title: 'Junction markings and KEEP CLEAR (issue #4)',
+  driverNote: 'The car is driven by the steady driver the browser checks use, along the lane and up to the line at each junction.',
+  clips: [
+    { name: '01-side-road-give-way', seconds: 20, caption: 'Ascham Road to Milton Road from the driver\'s seat: one give-way line at the mouth of the junction (the map had two on this approach, one inside the junction), and Milton Road\'s centre line broken across the side road.',
+      async setup(p) { await goSpot(p, 'milton-road-side-road'); await camera(p, 1); }, script: (p) => () => stopNear(p) },
+    { name: '02-newmarket-road', seconds: 20, caption: 'Newmarket Road towards Godesdone Road: the lane line now stops short of the junction instead of running into it from a 4 m stub of road.',
+      async setup(p) { await goSpot(p, 'newmarket-road'); await camera(p, 1); }, script: (p) => () => stopNear(p) },
+    { name: '03-crossroads', seconds: 22, caption: 'Hills Road into the Lensfield Road crossroads: the lane lines lengthen on the approach and end at the stop line.',
+      async setup(p) { await goSpot(p, 'crossroads'); await camera(p, 1); }, script: (p) => () => stopNear(p) },
+    { name: '04-keep-clear', seconds: 12, caption: 'High Street westbound in the practice town: KEEP CLEAR in your lane across the mouth of Orchard Way, so a queue leaves room for traffic turning in and out. Configured for this spot, not painted at every junction.',
+      async setup(p) { await goSpot(p, 'keep-clear'); await p.evaluate(() => { window.__stopAt = null; }); await camera(p, 1); } },
+  ],
+  // the same spots before (the motorway branch, the old rules) and after, from the driver's seat
+  async extra(open, dir) {
+    const before = process.env.BEFORE_URL, rows = [];
+    for (const k of Object.keys(SPOTS)) {
+      for (const [tag, site] of [['before', before], ['after', url]]) {
+        if (!site || (tag === 'before' && k === 'keep-clear')) continue;
+        const page = await open({ width: 1280, height: 720 }, site); await goSpot(page, k, 0, SPOTS[k].still ?? 26);
+        await page.evaluate(() => { const a = window.cambridgeDrive; a.player.v = 0; window.__target = 0; for (let i = 0; i < 30; i++) a.frame(0.05); });
+        await camera(page, 1); await page.evaluate(() => { for (let i = 0; i < 20; i++) window.cambridgeDrive.frame(0.05); }); await page.waitForTimeout(400);
+        await page.screenshot({ path: path.join(dir, `${k}-${tag}.jpg`), type: 'jpeg', quality: 86 }); await page.close();
+      }
+      rows.push(`### ${SPOTS[k].title}`, '', k === 'keep-clear' ? `![after](${k}-after.jpg)` : `| Before | After |\n|---|---|\n| ![before](${k}-before.jpg) | ![after](${k}-after.jpg) |`, '');
+    }
+    return ['## Before and after, from the driver\'s seat', '', 'The same spot with the old marking rules (before) and the new ones (after), from the driver\'s seat about 25 m before the line.', '', ...rows];
+  },
+};
+// metres along the route to the node of the first yellow box (or, with keep, the KEEP CLEAR) on it
+const toMarked = (keep = false) => `a => { const t = a.test, R = t.route, end = st => st.dir > 0 ? st.e.b : st.e.a, K = a.net.keepClear[0];
+  const k = R.steps.findIndex(st => ${keep} ? end(st) === (K.dir > 0 ? K.e.b : K.e.a) : a.net.boxes.some(b => b.node === end(st))); return R.stepS[k + 1] - t.sRoute; }`;
+GROUPS.boxes = {
+  dir: 'docs/evidence/5-box-junctions-keep-clear',
+  title: 'Yellow box junctions and KEEP CLEAR (issue #5)',
+  driverNote: 'The careful drives use the Bot lab\'s reference driver (`js/bots.js`, the one `npm run test:bots` checks every lesson with), which waits before a box or KEEP CLEAR until there is room beyond it. The careless one uses the scriptable driver from `npm run test:boxes`, which just follows the car in front.',
+  clips: [
+    { name: '01-waiting-at-the-line-for-room', driver: 'bot', lesson: { id: 'box-junction', scenario: 'box' }, seconds: 24,
+      caption: 'Straight on over the yellow box at Station Road, the light green. Traffic is queueing beyond the box, so the driver waits at the line, outside the box, until the queue moves off and there is room for the whole car on the other side, then crosses without stopping.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 55`, 120); } },
+    { name: '02-waiting-in-the-box-to-turn-right', driver: 'bot', lesson: { id: 'box-right', scenario: 'box-right' }, seconds: 20,
+      caption: 'Turning right at the same box with the exit clear: the driver moves forward into the box to the turning point and waits there for the oncoming traffic to pass, which Rule 174 allows, then turns. Nothing is marked.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-right'); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 60`, 120); } },
+    { name: '03-stopping-short-of-keep-clear', driver: 'bot', lesson: { id: 'keep-clear', scenario: 'keep-clear' }, seconds: 22,
+      caption: 'High Street, a queue ahead. The driver stops short of the KEEP CLEAR across the mouth of Orchard Way, and a car waiting in Orchard Way turns right into the gap; then the queue moves off.',
+      async setup(p) { await startDrive(p, 'lesson', 'keep-clear'); await camera(p, 0); await ffUntil(p, `a => (${toMarked(true)})(a) < 45`, 120); } },
+    { name: '04-following-the-queue-into-the-box', driver: 'scripted', seconds: 22,
+      caption: 'The careless version of clip 1: following the car in front into the box with no room beyond it, and stopping inside, across the junction. Marked at once as a serious fault (Rule 174).',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await p.evaluate(() => Object.assign(window.__mw, { mph: 20, gap: 0.6 })); await camera(p, 0); await ffUntil(p, `a => (${toMarked()})(a) < 50`, 120); } },
+    { name: '05-what-it-is-marked-for', driver: 'scripted', seconds: 8,
+      caption: 'The result of that drive: not passed, the serious fault named, and the lesson\'s own feedback saying what went wrong.',
+      async setup(p) { await startDrive(p, 'lesson', 'box-junction'); await p.evaluate(() => Object.assign(window.__mw, { mph: 20, gap: 0.6 }));
+        await ffUntil(p, 'a => a.test.sRoute > a.test.route.len - 30', 400); await p.evaluate(() => { window.__mw.mph = -1; }); await ffUntil(p, 'a => a.test.done', 60); } },
+  ],
+};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
@@ -339,13 +427,13 @@ try {
   fs.mkdirSync(group.dir, { recursive: true });
   const made = [];
   // a fresh page per clip, so one clip's state never leaks into the next
-  const open = async (viewport = VIEW) => { const page = await browser.newPage({ viewport }), errors = []; page.errors = errors;
+  const open = async (viewport = VIEW, site = url) => { const page = await browser.newPage({ viewport }), errors = []; page.errors = errors;
     page.on('pageerror', e => errors.push(e.message));
     await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', r => r.fulfill({ path: three + '/build/three.min.js', contentType: 'application/javascript' }));
     await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', r => r.fulfill({ path: three + '/examples/js/loaders/GLTFLoader.js', contentType: 'application/javascript' }));
     await page.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '', contentType: 'text/css' }));
     await installAuthFixture(page);
-    await page.goto(url); await page.waitForFunction(() => document.querySelector('#loadOv')?.hidden, {}, { timeout: 45000 }); await signedIn(page);
+    await page.goto(site); await page.waitForFunction(() => document.querySelector('#loadOv')?.hidden, {}, { timeout: 45000 }); await signedIn(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' });
     await page.waitForTimeout(5000); // let the car models arrive, so nothing on the road is still a box
     return page; };
