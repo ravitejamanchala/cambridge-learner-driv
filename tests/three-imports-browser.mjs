@@ -19,7 +19,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('#localTrackLibrary [role=status]')?.textContent.includes('Saved in this browser'));
   await page.locator('[data-open=mockSheet]').click();assert.match(await page.locator('#routePick [aria-checked=true]').innerText(),new RegExp(track.title));assert.match(await page.locator('#mockDetail').innerText(),new RegExp(track.title));
   await page.waitForFunction(title=>document.querySelector('#localTrackSummary')?.textContent.includes(title),track.title);
-  await page.locator('#localTrackLibrary summary').click();const value=JSON.parse(await page.getByLabel('Editor track JSON',{exact:true}).inputValue());assert.deepEqual(value,track);ids.push(await page.getByLabel('Saved local revision').inputValue());
+  await page.locator('#localTrackLibrary summary').filter({hasText:'Edit saved JSON'}).click();const value=JSON.parse(await page.getByLabel('Editor track JSON',{exact:true}).inputValue());assert.deepEqual(value,track);ids.push(await page.getByLabel('Saved local revision').inputValue());
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download JSON'}).click();const file=await download;assert.deepEqual(JSON.parse(await fs.readFile(await file.path(),'utf8')),track);assert.ok(file.suggestedFilename().includes(ids[i].slice(0,8)));
   await page.locator('#mockDetail [data-start]').click();await page.waitForFunction(()=>document.body.dataset.mode==='drive');
   const world=await page.evaluate(()=>{const a=window.cambridgeDrive;return {x:a.player.x,z:a.player.z,firstX:a.net.nx[0],length:a.test.route.len,buildings:a.camera.parent.children.filter(o=>o.userData.editorObjectId).length,area:a.area};});
@@ -29,7 +29,7 @@ try{
   await page.goto(url,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);
  }
  // Route list and revision dropdown both select the exact same saved map and download.
- await page.locator('[data-open=mockSheet]').click();await page.locator('#localTrackLibrary summary').click();
+ await page.locator('[data-open=mockSheet]').click();await page.locator('#localTrackLibrary summary').filter({hasText:'Edit saved JSON'}).click();
  for(let i=0;i<3;i++){
   await page.getByLabel('Saved local revision').selectOption(ids[i]);assert.match(await page.locator('#routePick [aria-checked=true]').innerText(),new RegExp(tracks[i].title));assert.deepEqual(JSON.parse(await page.getByLabel('Editor track JSON',{exact:true}).inputValue()),tracks[i]);
   await page.locator('#routePick button').filter({hasText:tracks[(i+1)%3].title}).click();await page.waitForFunction(expected=>document.querySelector('[aria-label="Saved local revision"]').value===expected,ids[(i+1)%3]);
@@ -39,7 +39,7 @@ try{
  // A real download from the admin route generator (including its historical road-label bug).
  const actual=JSON.parse(await fs.readFile('tests/fixtures/admin-cambridge-route.json','utf8'));
  await page.getByLabel('Import editor track JSON').setInputFiles('tests/fixtures/admin-cambridge-route.json');await page.waitForFunction(()=>document.querySelector('#localTrackLibrary [role=status]')?.textContent.includes('Saved in this browser'));await page.locator('[data-open=mockSheet]').click();assert.match(await page.locator('#routePick [aria-checked=true]').innerText(),/Cambridge start/);
- await page.locator('#localTrackLibrary summary').click();assert.deepEqual(JSON.parse(await page.getByLabel('Editor track JSON',{exact:true}).inputValue()),actual,'legacy download stays unchanged in storage/export');await page.locator('#mockDetail [data-start]').click();await page.waitForFunction(()=>document.body.dataset.mode==='drive');
+ await page.locator('#localTrackLibrary summary').filter({hasText:'Edit saved JSON'}).click();assert.deepEqual(JSON.parse(await page.getByLabel('Editor track JSON',{exact:true}).inputValue()),actual,'legacy download stays unchanged in storage/export');await page.locator('#mockDetail [data-start]').click();await page.waitForFunction(()=>document.body.dataset.mode==='drive');
  const actualWorld=await page.evaluate(()=>({len:cambridgeDrive.test.route.len,x:cambridgeDrive.player.x,z:cambridgeDrive.player.z,running:cambridgeDrive.test.running,buildings:cambridgeDrive.camera.parent.children.filter(o=>o.userData.editorObjectId).length}));assert.ok(actualWorld.len>90&&actualWorld.len<105);assert.equal(actualWorld.x,actual.spawn.x);assert.equal(actualWorld.z,actual.spawn.z);assert.equal(actualWorld.running,true);assert.equal(actualWorld.buildings,clearRoadBuildings(actual).objects.filter(o=>o.type==='building').length);await page.screenshot({path:'test-results/actual-admin-route-import.png'});console.log('PASS actual admin export imports unchanged and drives a 95 m Cambridge route with its own OSM buildings.',actualWorld);
  assert.deepEqual(errors,[]);assert.deepEqual(localRequests,[]);console.log('PASS: three different imports automatically select and drive three different worlds; revision/list/export selection stays synchronised, reload retains selection, built-in routes cannot export unrelated JSON.');
 }finally{await browser?.close();server?.kill();await fs.rm(root,{recursive:true,force:true});}
