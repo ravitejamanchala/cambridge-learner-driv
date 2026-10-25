@@ -332,6 +332,24 @@ are freed, and `npm run test:free` checks over a 14-minute drive that memory lev
 - **Navigation names the next junction, not the end of the circuit.** The instruction box counts down
   to `J2 · Ashwell`; the turn beacon stays hidden, because you pass most junctions straight by.
 
+- **Signals on gantries and roadworks are read from one plan.** `js/mw-restrictions.js` places each
+  gantry, sign and cone by distance along the circuit, and says the limit and the closed lanes at any
+  point; the examiner, the speed display, the lane strip, the background traffic and the Bot lab's
+  driver all read that same plan, so nothing can show one limit and mark another.
+- **What the gantry shows is the limit.** A red ring above your lane is mandatory (Rule 261): over it,
+  after the usual moment to slow, is marked as speeding against "the limit shown on the gantries", and
+  the speed display shows that limit, not the road's 70. Roadworks limits work the same way (Rule 288).
+- **A red X is never driven past** (Rule 258): passing one in its lane is serious. An arrow on the
+  gantry before it is the warning, so there is time to move over properly. Keeping out of a lane that is
+  closed (red X or cones) is never called hogging, and the lane strip shows that lane shut.
+- **Signs are larger than life.** A real gantry signal or roadworks board is a few pixels across at the
+  distance you need to act on it, so they are drawn at about 1.5 times real size (gantry signals 2.4 m,
+  works signs 2.4 by 3 m, cones a full 1 m), and the amber lamps flash beside any signal that restricts
+  you, as on a real smart motorway. Lit signals stay readable at dusk.
+- **Feedback names each gantry.** The result says what the signal above your lane showed at each gantry
+  and how fast you passed it; at roadworks, your speed at the first 50 sign, your highest speed through
+  the works, and how far before the cones you left the closing lane.
+
 ## What we are aiming at
 
 `docs/development/reference/` holds screenshots of a commercial UK driving simulator, kept as the bar

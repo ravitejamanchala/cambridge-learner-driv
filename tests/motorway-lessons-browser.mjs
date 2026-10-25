@@ -249,13 +249,11 @@ try {
   // (the careful drives are the Bot lab's: npm run test:bots passes both lessons with no faults)
   {
     // ignoring the gantries' limits: marked against the limit they showed, not the road's 70
-    await start('mw-smart-limits', 1); await set({ mph: 68 }); await untilDone(); const fast = await outcome();
+    await start('mw-smart-limits'); await set({ mph: 68 }); await untilDone(); const fast = await outcome();
     assert.ok(fast.faults.some(f => /^S Use of speed: Drove well over the 50 mph limit shown on the gantries/.test(f)), show(fast));
     assert.ok(fast.reasons.some(r => /The gantry above your lane said: 60: passed at 6\d mph/.test(r)), fast.reasons.join(' | '));
-    // into the left-hand lane after the arrow, properly (mirror, signal), and on past the red X: the red X is the fault
-    await start('mw-smart-limits', 1); await set({ mph: 46 }); await steps(20 * 15);
-    await look('left'); await look('left-blindspot'); await signal('L'); await steps(40); await set({ want: 0 }); await steps(80); await signal('L');
-    await untilDone(); const redX = await outcome();
+    // staying in the left-hand lane, at the limit, after the arrow told you to move out: on past the red X
+    await start('mw-smart-limits'); await set({ mph: 46 }); await untilDone(); const redX = await outcome();
     assert.ok(redX.faults.some(f => /^S Response to signs: Drove past a red X in the left-hand lane: that lane was closed \(Rule 258\)/.test(f)), show(redX));
     assert.equal(redX.verdict, 'Not yet', show(redX));
     // staying in the right-hand lane into the roadworks: into the cones

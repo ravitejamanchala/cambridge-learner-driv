@@ -92,7 +92,7 @@ export const MOTORWAY_LESSONS = [
     goal: 'The signals on the gantries above each lane show the speed limit and which lanes you may use. Be down to each limit by its gantry and keep to it, and move out of a lane marked with an arrow before the red X: that lane is closed.',
     steps: ['Read the signal above your lane: a red ring is a limit you must keep to', 'An arrow above your lane: move over in good time, with mirrors and a signal', 'A red X: never drive beyond it in that lane'],
     rule: SIGNALS, waypoints: [M(3, 15200), M(3, 18400)], scenario: 'motorway', setup: 'gantries', restriction: 'gantries',
-    startAt: 250, startLane: 1, startMph: 66, endAtSpeed: true, scenarioVariants: [{ id: 'traffic', title: 'Light motorway traffic', trafficDensity: 'light' }],
+    startAt: 250, startLane: 0, startMph: 66, endAtSpeed: true, scenarioVariants: [{ id: 'traffic', title: 'Light motorway traffic', trafficDensity: 'light' }],
     focus: [...FOCUS, 'Use of speed', 'Response to signs'], maxD: 2 },
   { id: 'mw-roadworks', unit: 'motorway', area: 'm3', title: 'Roadworks: a lane closed and a 50 limit', road: 'M100 · roadworks · three lanes',
     goal: 'Roadworks ahead close the right-hand lane. Read the signs as they come, be down to 50 mph by the first 50 sign, move left in good time or merge in turn where the lane ends, and keep to 50 until the end of the roadworks.',
