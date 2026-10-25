@@ -13,7 +13,10 @@ export async function loadLocalLibrary(index,routes) {
  for(const entry of await entries()) {
   const id='local:'+entry.id;
   const clean=clearRoadBuildings(entry.track),prepared=prepareEditorTrack(clean);
-  tracks.set(id,{...clean,network:prepared.network,plan:{...entry.track.plan,waypoints:prepared.waypoints}});
+  // Waypoint cuts exist only for navigation. Drawing that split graph erases paint
+  // around every interior anchor and shortens junction approaches. Derive the
+  // visual graph from the validated source, never an imported renderNetwork field.
+  tracks.set(id,{...clean,renderNetwork:clean.network,network:prepared.network,plan:{...entry.track.plan,waypoints:prepared.waypoints}});
   index.areas.push({id,file:''}); index.plans['route:'+id]={...entry.meta,area:id};
   routes.push({id,practiceMode:entry.track.practiceMode,name:entry.track.title+' · local '+entry.id.slice(0,8),blurb:'Local editor revision '+entry.id+'. '+(entry.track.attribution||''),waypoints:prepared.waypoints,localNodes:prepared.nodes});
  }
@@ -29,11 +32,11 @@ export function mountLocalLibrary({onSelect,selectedRoute}={}){
  panel.append(details);
  const pilot=document.createElement('details');pilot.className='pilot-routes';
  const heading=document.createElement('summary');heading.textContent='Cambridge (Brookmount Court) experimental loops';pilot.append(heading);
- const note=document.createElement('p');note.textContent='Two approximately 6 km loops on cached OSM roads. No grading or saved results. Centre entrance and access/turn restrictions are unverified; scenery is generated. Each load saves a new local revision.';pilot.append(note);
+ const note=document.createElement('p');note.textContent='Two approximately 6 km loops on cached OSM roads, with buildings included. No grading or saved results. Centre entrance and access/turn restrictions are unverified; buildings are generated scenery. Each load saves a new local revision.';pilot.append(note);
  for(const direction of ['clockwise','anticlockwise']){
   const button=document.createElement('button');button.type='button';button.className='cbtn';button.textContent='Load '+direction+' practice';
   button.onclick=async()=>{button.disabled=true;status.textContent='Loading experimental loop…';try{
-   const response=await fetch(new URL('examples/cambridge-pilot/brookmount-'+direction+'.json',document.baseURI));
+   const response=await fetch(new URL('examples/cambridge-pilot/v2-buildings/brookmount-'+direction+'.json',document.baseURI));
    if(!response.ok)throw Error('Pilot file unavailable in this build. Import its JSON instead.');
    await persist(await response.text());
   }catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
