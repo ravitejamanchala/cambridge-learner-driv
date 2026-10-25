@@ -13,7 +13,7 @@ npm run dev:editor
 
 Open the printed localhost URL. Open **Mock tests → Cambridge (Brookmount Court) experimental loops**, then select **Load clockwise practice** or **Load anticlockwise practice**. Each load saves a new local revision and reloads the app. Open Mock tests, choose the imported route, and click **Start practice**. Pause → **Reset to spawn** resets the drive. Use the other load button to try the second direction.
 
-The local/browser-preview authoring environment is isolated from paid production accounts. Ordinary production sign-in/subscription rules are unchanged. The samples are also included by `npm run build:pages` for the existing browser authoring preview; standard production builds do not bundle the sample files. This work does not itself deploy that preview.
+The local/browser-preview authoring environment is isolated from paid production accounts. Ordinary production sign-in/subscription rules are unchanged. The samples are also included by `npm run build:pages` for the existing browser authoring preview; standard production builds do not bundle the sample files. The build script does not itself deploy the preview; release status is recorded below.
 
 Files:
 
@@ -62,3 +62,14 @@ Imported roads are now rendered from the original graph. Interior waypoint split
 - These are local software-Chromium checks, not full-route manual drives, live-provider verification, physical mobile tests or instructor review.
 
 No production deployment, database migration or DNS change. Earlier unfinished mobile layout edits are excluded from this feature's commits.
+
+## Preview delivery — 25 October 2026
+
+- Source implementation: `7e951319a6147c82a356325a77701f477e27f044`. Built from a clean detached worktree (`sourceDirty: false`), excluding the paused mobile UI edits.
+- GitHub Pages branch: `757cce2496dfda3723416fae1338b19f8ddd62f6`. Pushed the browser-only JSON sandbox to the existing preview at https://manchala.co.uk/cambridge-learner-driv/. No production branch or DNS change.
+- Static Pages browser check passed with the actual release bundle under the repository subpath: both new JSON resources available, IndexedDB import/edit/reload, immutable revisions, export, invalid-save recovery and actual mock driving.
+- Pilot browser scenes contained all 330 / 324 textured buildings; 14 / 11 were within 100 m of each spawn. Both drives moved 16.17 m with zero assessment time/faults. The experimental and ordinary mock regression browser suites also passed.
+- Local suites: admin 51 tests; simulator 93 tests. Both production builds and the Pages build passed.
+- The environment proxy returned HTTP 403 when reading the public preview, so live rollout and remote CI status were not independently verified. A successful branch push is not evidence that Pages deployment has finished.
+
+Mapillary remains disabled. Add `MAPILLARY_ACCESS_TOKEN` securely to the admin repository's `cloudflare` GitHub environment, never into JSON, source or chat. Private imagery also needs the matching Clerk secret and explicit private administrator grant documented in the admin setup guide. Its photo coverage and current provider terms could not be verified here.
