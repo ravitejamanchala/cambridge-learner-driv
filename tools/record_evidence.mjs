@@ -336,7 +336,7 @@ const SPOTS = {
   'milton-road-side-road': { title: 'A side road off Milton Road (Ascham Road), approaching the give-way', area: 'mock:east-road', road: 'Ascham Road', at: [498.8, -1820.9], from: 70 },
   'newmarket-road': { title: 'Newmarket Road at Godesdone Road, where a 4 m stub of road meets the junction', area: 'mock:east-road', road: 'Newmarket Road', at: [1365.5, -865.9], from: 70 },
   'crossroads': { title: 'Hills Road at the Lensfield Road crossroads, lights and two lanes', area: 'mock:east-road', road: 'Hills Road', at: [377.3, 222.8], from: 80 },
-  'keep-clear': { title: 'High Street westbound at Orchard Way in the practice town: KEEP CLEAR', area: 'lesson:move-off', road: 'High Street', at: [0, 0], from: 70, through: 120, still: 14 },
+  'keep-clear': { title: 'High Street westbound at Orchard Way in the practice town: KEEP CLEAR', area: 'lesson:move-off', road: 'High Street', at: [0, 0], from: 70, through: 45, still: 14 },
 };
 // a still is taken from `still` metres out (about 25 m), close enough to see the line and what leads to it
 const goSpot = async (page, k, mph, from) => { const S = SPOTS[k], [kind, id] = S.area.split(':'); await startDrive(page, kind, id); await installDriver(page); await approach(page, S.area, S.road, S.at, from ?? S.from, mph, from == null ? S.through || 0 : 0); };
@@ -351,7 +351,7 @@ GROUPS.markings = {
       async setup(p) { await goSpot(p, 'newmarket-road'); await camera(p, 1); }, script: (p) => () => stopNear(p) },
     { name: '03-crossroads', seconds: 22, caption: 'Hills Road into the Lensfield Road crossroads: the lane lines lengthen on the approach and end at the stop line.',
       async setup(p) { await goSpot(p, 'crossroads'); await camera(p, 1); }, script: (p) => () => stopNear(p) },
-    { name: '04-keep-clear', seconds: 18, caption: 'KEEP CLEAR on High Street in the practice town, across the mouth of Orchard Way: configured for this spot, not painted at every junction.',
+    { name: '04-keep-clear', seconds: 12, caption: 'High Street westbound in the practice town: KEEP CLEAR in your lane across the mouth of Orchard Way, so a queue leaves room for traffic turning in and out. Configured for this spot, not painted at every junction.',
       async setup(p) { await goSpot(p, 'keep-clear'); await p.evaluate(() => { window.__stopAt = null; }); await camera(p, 1); } },
   ],
   // the same spots before (the motorway branch, the old rules) and after, from the driver's seat
