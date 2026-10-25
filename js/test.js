@@ -214,7 +214,9 @@ export function createTest(net, traffic, player) {
       const fw = ex * fx + ez * fz, lt = Math.abs(ex * fz - ez * fx);
       if (Math.abs(fw) < 2.6 && lt < 1.25) continue; // touching: see collisions below
       const gap = lt - 0.9 - 0.35; // car half-width + bike half-width
-      if (Math.abs(fw) < 2.5 && v > b.v + 0.8 && gap < RULES.cyclistGap) {
+      // passing: the cyclist beside the front three-quarters of the car or just ahead. One stopped beside the
+      // back of a car that pulls away from a standstill (filtering up at a light) is not being passed
+      if (fw < 2.5 && fw > -1.2 && v > b.v + 0.8 && gap < RULES.cyclistGap) {
         if (gap < 0.75) t.fault('S', 'Clearance – cyclists', 'Passed dangerously close to a cyclist', 'bclose' , 8);
         else t.fault('D', 'Clearance – cyclists', `Passed a cyclist with less than ${RULES.cyclistGap} m clearance`, 'bpass', 8);
       }
