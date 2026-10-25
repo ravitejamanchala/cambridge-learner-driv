@@ -378,10 +378,11 @@ export function createTraffic(net, scene, makeCarMesh, makeBikeMesh, makePedestr
     const look = Math.max(20, a.v * a.v / 10 + 12); let blocked = false, waitOn = null, waitV = Infinity;
     // Part way round a turn the heading points across the corner, not along the road being turned into: a
     // learner waiting in the other lane there (short of KEEP CLEAR, say) is judged against the way this
-    // vehicle is going, so it does not sit for ever behind someone who is not in its way.
+    // vehicle is going, so it does not sit for ever behind someone who is not in its way. (Not at roundabouts,
+    // where the ordinary give-way rules decide.)
     let tdx = 0, tdz = 0;
     { const q = a.next && rem < 12 ? along(a.next.e, Math.min(4, a.next.e.len / 2), a.next.dir) : a.prev && a.s < 8 ? along(a.e, Math.min(a.e.len, a.s + 4), a.dir) : null;
-      if (q && q.tx * fx + q.tz * fz < 0.94) { tdx = q.tx; tdz = q.tz; } }
+      if (q && !w.rb && !a.next?.e.way.rb && q.tx * fx + q.tz * fz < 0.94) { tdx = q.tx; tdz = q.tz; } }
     for (const o of others) {
       if (o === a || o.alive === false) continue;
       if (a.ghost > 0 && !o.isPlayer) continue;
