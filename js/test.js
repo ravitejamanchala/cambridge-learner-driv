@@ -1,6 +1,17 @@
 // The examiner: follows progress along the route, re-routes when you go off it, and marks faults DVSA-style.
-import { MARKING, RULES } from './config.js';
-import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet } from './net.js';
+import { MARKING, RULES, HANDLING } from './config.js';
+import { nearest, stopsNear, buildRoute, laneIndex, laneName, inFillet, paved, onPaved } from './net.js';
+
+// The four wheels against the road surface: how many are off it, the furthest any is past the edge, and
+// whether the middle of the car is off. 15 cm of grace for the line itself and the kerb face.
+const TRACK = 0.78;
+export function wheelsOff(net, p) {
+  const fx = -Math.sin(p.th), fz = -Math.cos(p.th), half = HANDLING.wheelbase / 2;
+  const offAt = (x, z) => { if (onPaved(net, x, z, 0.15) || inFillet(net, x, z)) return 0; const n = nearest(net, x, z); return n ? Math.max(0.16, n.d - paved(n.way)) : 9; };
+  let wheels = 0, over = 0;
+  for (const a of [half, -half]) for (const b of [TRACK, -TRACK]) { const o = offAt(p.x + fx * a + fz * b, p.z + fz * a - fx * b); if (o) { wheels++; over = Math.max(over, o); } }
+  return { wheels, over, centre: wheels >= 2 && !onPaved(net, p.x, p.z, 0) && !inFillet(net, p.x, p.z) };
+}
 
 const MPH = 2.23694;
 export function approachLane(nr,approach,heading) {
@@ -13,18 +24,18 @@ export function createTest(net, traffic, player) {
   const t = {
     running: false, done: false, route: null, waypoints: [], wpIndex: 1,
     sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0,
-    faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), onRb: false, ctx: null, onFault: null
+    faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), onRb: false, ctx: null, onFault: null, offRoad: { max: 0, seconds: 0 }
   };
   t.setRoute = (route, nodes) => { t.route = route; t.waypoints = nodes; };
   t.fault = (kind, cat, text, key, cd = 8) => {
-    if (!t.running) return; const now = traffic.clock;
+    if (!t.running || t.ungraded) return; const now = traffic.clock; // free drive is never marked
     if (key) { if (t.cool[key] && now < t.cool[key]) return; t.cool[key] = now + cd; }
     t.faults.unshift({ kind, cat, text, key: key || null, context: t.context || null, elapsed: Math.max(0, now - (t.startedAt ?? now)), at: now, x: Math.round(player.x * 10) / 10, z: Math.round(player.z * 10) / 10 }); if (kind === 'S') t.S++; else t.D++;
     t.onFault && t.onFault();
   };
   t.reset = () => {
-    t.basicStatus = null; t.alert = null; t.coach = null;
-    Object.assign(t, { done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [] });
+    t.basicStatus = null; t.alert = null; t.coach = null; t.laneGuide = null;
+    Object.assign(t, { lap: null, done: false, sRoute: 0, idx: 0, step: 0, offRoute: false, offT: 0, rerouted: 0, faults: [], D: 0, S: 0, cool: {}, timers: {}, flags: {}, stopPrev: new Map(), amberAt: new Map(), parked: true, contacts: new Set(), hits: [], offRoad: { max: 0, seconds: 0 } });
     for (const i of t.route.instructions) Object.assign(i, { sigSeen: false, checked: false, laneSeen: undefined, laneChecked: false, exitSigSeen: false, exitChecked: false, earlyFlag: false });
   };
   t.passed = () => t.S === 0 && t.D <= MARKING.maxDrivingFaults;
@@ -47,7 +58,7 @@ export function createTest(net, traffic, player) {
     const dist = Math.sqrt(bd);
     t.offRoute = dist > 22;
     if (!t.offRoute) { t.idx = best; t.sRoute = Math.max(t.sRoute, s); t.offT = 0; }
-    else { t.offT += dt; if (t.offT > 2.5) reroute(); }
+    else { t.offT += dt; if (t.offT > 2.5) (t.ungraded && t.onOffRoute ? rejoin() : reroute()); }
     // current instruction (a roundabout stays current until you leave it at your exit)
     const ins = R.instructions; while (t.step < ins.length - 1 && t.sRoute > (ins[t.step].exitS ?? ins[t.step].s) + 6) t.step++;
   }
@@ -66,12 +77,40 @@ export function createTest(net, traffic, player) {
     } catch (e) { t.offT = 0; }
   }
 
+  // Free drive: off the circuit (out at a junction, say), the drive owner builds a route back onto it.
+  // The route starts at the beginning of the road the car is on and runs along it, so the car is on the
+  // route from the first moment; starting at the far end left it "off route" for the whole slip road.
+  function rejoin() {
+    const nr = nearest(net, player.x, player.z); t.offT = 0; if (!nr || nr.d > 30) return;
+    const fwd = (-Math.sin(player.th)) * nr.tx + (-Math.cos(player.th)) * nr.tz, d = nr.e.way.oneway ? 1 : (fwd >= 0 ? 1 : -1);
+    t.onOffRoute(d > 0 ? nr.e.a : nr.e.b, d > 0 ? nr.e.b : nr.e.a);
+  }
+  // put progress where the car actually is on a freshly built route (its first stretch, not just 45 m)
+  t.snapProgress = (reach = 1500) => {
+    const R = t.route; let best = 0, bd = 1e18, bs = 0;
+    for (let j = 0; j < R.xs.length - 1 && R.cum[j] < reach; j++) {
+      const ax = R.xs[j], az = R.zs[j], dx = R.xs[j + 1] - ax, dz = R.zs[j + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
+      const u = Math.max(0, Math.min(1, ((player.x - ax) * dx + (player.z - az) * dz) / L2)), d = (player.x - ax - dx * u) ** 2 + (player.z - az - dz * u) ** 2;
+      if (d < bd) { bd = d; best = j; bs = R.cum[j] + u * Math.sqrt(L2); }
+    }
+    t.idx = best; t.sRoute = bs; t.offRoute = false; t.offT = 0;
+  };
+  // Free drive: a lap route carries on a quarter-lap past its own start, and once the car is round,
+  // progress steps back one lap. The road under the car is the same either way, so nothing jumps.
+  t.useLap = (route, start, len) => { t.route = route; t.lap = { start, len }; t.idx = 0; t.sRoute = 0; t.step = 0; t.offT = 0; };
+  function rollLap() {
+    const L = t.lap; if (!L || t.sRoute < L.start + L.len + 30) return false;
+    t.sRoute -= L.len; let i = Math.min(t.idx, t.route.cum.length - 2); while (i > 0 && t.route.cum[i] > t.sRoute) i--; t.idx = i; t.step = 0;
+    return true;
+  }
+
   t.update = (dt, inputSteer) => {
     if (!t.running) return;
     if (t.mode === 'manoeuvre') { t.ctx = nearest(net, player.x, player.z); if (Math.abs(player.v) > 0.3) t.parked = false; return; }
     const v = player.v, mph = Math.abs(v) * MPH, fx = -Math.sin(player.th), fz = -Math.cos(player.th);
     const nr = nearest(net, player.x, player.z); t.ctx = nr;
     progress(dt);
+    if (t.ungraded && rollLap() && t.onLap) t.onLap();
     // waypoints passed (for re-routing)
     while (t.wpIndex < t.waypoints.length - 1) { const n = t.waypoints[t.wpIndex]; if (Math.hypot(net.nx[n] - player.x, net.nz[n] - player.z) < 25) t.wpIndex++; else break; }
     if (!nr) return;
@@ -103,9 +142,15 @@ export function createTest(net, traffic, player) {
       const offL = nr.lat * (Math.sign(along) || 1);
       if (timer('pos', v > 2 && offL < -0.5, dt) > 1.4) t.fault('D', 'Positioning – normal driving', 'Drove on the right-hand side of the road', 'pos', 8);
     } else timer('pos', false, dt);
-    // kerb
-    if (nr.d > way.w / 2 + 0.8 && !inFillet(net, player.x, player.z)) { if (!t.flags.kerb && Math.abs(v) > 1.2) { t.flags.kerb = true; t.fault('D', 'Control – steering', 'Mounted the kerb', 'kerb', 4); } }
-    else if (nr.d < way.w / 2) t.flags.kerb = false;
+    // Off the road, judged by the wheels against the road surface as drawn (junction corners included). A
+    // wheel over the edge is mounting the kerb; the middle of the car off the road is driving off it, a
+    // serious fault. Before this the car's centre had to be 0.8 m past the edge before anything was marked,
+    // and only ever as a driving fault, so a car could run right off the road and still pass.
+    const off = wheelsOff(net, player);
+    t.offRoad.max = Math.max(t.offRoad.max, off.over); if (off.wheels) t.offRoad.seconds += dt;
+    if (off.wheels && Math.abs(v) > 1.2 && !t.flags.kerb) { t.flags.kerb = true; t.fault('D', 'Control – steering', off.wheels > 1 ? 'Mounted the kerb with both wheels on one side' : 'Mounted the kerb', 'kerb', 4); }
+    if (timer('offroad', off.centre && Math.abs(v) > 1.2, dt) > 0.4 && !t.flags.offroad) { t.flags.offroad = true; t.fault('S', 'Control – steering', `Drove off the road: the car was ${off.over.toFixed(1)} m past the edge`, 'offroad', 8); }
+    if (!off.wheels) { t.flags.kerb = false; t.flags.offroad = false; }
     // roundabout entry
     if (way.rb && !t.onRb && v > 3.2) {
       // traffic lights control this entry: priority is set by the lights, not give-way
@@ -263,7 +308,7 @@ export function createTest(net, traffic, player) {
     }
     // finish: near the end, stopped, on the left
     const last = t.route.instructions[t.route.instructions.length - 1];
-    if (t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 35 && Math.abs(v) < 0.3) {
+    if (!t.ungraded && t.step >= t.route.instructions.length - 1 && t.sRoute > last.s - 35 && Math.abs(v) < 0.3) {
       const offL = nr.lat * (way.oneway ? 1 : (Math.sign(along) || 1));
       if (offL > (way.oneway ? -0.5 : 0.3)) finish();
     }

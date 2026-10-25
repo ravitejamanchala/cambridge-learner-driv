@@ -17,9 +17,19 @@ export const CAR = {
 
 // Steering and pedals. `steerSensitivity` 1 = default; lower is calmer.
 export const HANDLING = {
-  steerSensitivity: 1, maxSteer: 0.62, wheelbase: 2.6,
+  steerSensitivity: 1, maxSteer: 0.62, wheelbase: 2.6, turnGrip: 7, // turnGrip: m/s² sideways at full input once above walking pace (js/car.js steerLock)
   accel: 3.6, brake: 7.6, topSpeed: 34, drag: 0.0004, reverseSpeed: 4, creep: 1.9 // creep 1.9 m/s ≈ 4 mph // topSpeed m/s (about 76 mph); real cruising tops out near 72 mph
 };
+// How far the front wheels turn at full input: full lock at walking pace, for junctions and parking; above
+// that, no more than a firm turn (HANDLING.turnGrip m/s² sideways), as a real car's tyres allow. Before
+// this, full input at 30 mph would have turned the car at about 25 m/s², so every tap of a key was a swerve
+// and holding a gentle bend took constant correcting.
+export const steerLock = (v) => Math.min(HANDLING.maxSteer, Math.atan(HANDLING.wheelbase * HANDLING.turnGrip / Math.max(1, v * v)));
+// The test drivers' steering law (the Bot lab's and the scripted ones the browser checks use): the wheel
+// angle wanted for a heading error `err`, easing off as speed builds, then as much of the wheel as that
+// takes. Where the grip cannot give that angle the driver gets only what it allows, as a person does.
+export const steerFor = (err, gain, v) => Math.max(-1, Math.min(1, err * gain * HANDLING.maxSteer / (1 + Math.max(0, Math.abs(v) - 4) * 0.08) / steerLock(Math.abs(v))));
+
 
 // Test routes: waypoints are snapped to the nearest junction on the named road.
 const wp = (lat, lon, road) => ({ lat, lon, road });
@@ -44,7 +54,8 @@ export const RULES = { cyclistGap: 1.5 };
 export const MARKING = { maxDrivingFaults: 15 };
 
 export const WORLD = {
-  chunk: 400, buildRadius: 820, hideRadius: 1050, fogNear: 260, fogFar: 880,
+  chunk: 400, buildRadius: 820, hideRadius: 1050, freeRadius: 1500, // scenery chunks further than freeRadius are freed, not just hidden
+  fogNear: 260, fogFar: 880,
   sky: 0xb7c8d4, ground: 0x9aa585, road: 0x464b51, pave: 0xc9c3b6, line: 0xf2f1ea, cycle: 0x8a4a40,
   shadowBox: 90, shadowMap: (typeof window !== 'undefined' && window.innerWidth < 700) ? 1024 : 2048,
   brick: [0xdccfae, 0xd3c39c, 0xa96c52, 0xb8826a, 0xe7e2d6, 0xc9b48d, 0x9b6a55, 0xe0d7c3],

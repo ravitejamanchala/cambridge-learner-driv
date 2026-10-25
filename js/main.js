@@ -4,15 +4,17 @@ import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
 import { gradeParking } from './parking-geometry.js';
 // Wires the modules together: loads the map area for the chosen drive, builds the world, runs the loop,
 // handles input, cameras, mirrors and the route guide.
-import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL } from './config.js';
-import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet } from './net.js';
+import { CAR, ROUTES, WORLD, HANDLING, AREAS_URL, steerFor } from './config.js';
+import { buildNet, buildRoute, snapWaypoint, along, nearest, laneCentre, ll2xz, inFillet, paved, onPaved } from './net.js';
 import { buildWorld } from './world.js';
 import { kitResources } from './city.js';
+import { attachLamps, setLamps, attachIndicators, setIndicators } from './evening.js';
 import { createTraffic } from './traffic.js';
 import { createPlayer, loadCarModel, makeBoxCar, makeBike, carMetrics } from './car.js';
 import { createGarage } from './garage.js';
 import { createPedestrianFactory } from './pedestrian-models.js';
-import { createTest } from './test.js';
+import { createTest, wheelsOff } from './test.js';
+import { getMode, modeOf, judgeMock } from './assessment.js';
 import { createUI, attachDrag } from './ui.js';
 import { createHub } from './hub.js';
 import { createScenario, evaluate } from './course.js';
@@ -29,6 +31,8 @@ import { loadTrafficModels, loadVehicleModel } from './traffic-models.js';
 import { EMERGENCY_CAR_ID } from './cars.js';
 import { createVehicleState, createAutomaticState, createManoeuvreState, selectGear, operate } from './vehicle-state.js';
 import { buildReport, runDetail } from './reports.js';
+import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from './free-drive.js';
+import { centreLine, onCarriageway } from './motorway.js';
 
 initAuth().catch(() => {});
 
@@ -65,10 +69,15 @@ async function boot() {
   // Each pooled traffic car is a wrapper group holding one body. It starts as a coloured box and is
   // swapped for a supplied model once those have loaded, so traffic never waits on the network.
   let trafficModels = [];
+  // evening drives (issue #10): every vehicle carries lamps, lit only at dusk
+  let dusk = false, lowPower = false;
+  // one spot light lights the road ahead of the learner (left out on low-power graphics, where the lamps
+  // alone show the headlights are on). Each map area gets a new scene, so it moves with the camera.
+  const headBeam = new T.SpotLight(0xfff1d6, 1.3, 75, 0.46, 0.65, 1.2); headBeam.visible = false;
   const dressCar = (slot, index) => {
     const body = trafficModels.length ? trafficModels[index % trafficModels.length].clone(true) : shadowed(makeBoxCar(slot.userData.colour, false));
     slot.userData.model = trafficModels.length ? index % trafficModels.length : -1;
-    slot.remove(...slot.children); slot.add(body);
+    slot.remove(...slot.children); slot.add(body); attachLamps(body); attachIndicators(body); setLamps(body, dusk);
   };
   const makeCar = (c) => {
     let m = carPool[carI];
@@ -98,10 +107,10 @@ async function boot() {
       const d = await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group); carI = bikeI = pedI = 0;
+      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
       const net = buildNet(d);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn);
+      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
@@ -117,11 +126,11 @@ async function boot() {
   const learnerScope = () => hub.Profiles.scope() + ":" + hub.Profiles.current()?.id;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
-  const startS = (pl) => { if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
-  const startPos = (s0 = 0) => {
+  const startS = (pl) => { if (pl.kind === 'free') return 0; if (pl.lesson?.startAt !== undefined) return pl.lesson.startAt; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startPos = (s0 = 0, lane = 0) => {
     let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
     const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
-    const p = along(st.e, ts, st.dir, laneCentre(st.e, st.dir, 0)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz));
+    const p = along(st.e, ts, st.dir, laneCentre(st.e, st.dir, lane)); player.place(p.x, p.z, Math.atan2(-p.tx, -p.tz));
     return route.stepS[k] + ts;
   };
   // examiner callouts for places the route builder can't describe (e.g. a one-way gyratory)
@@ -133,31 +142,95 @@ async function boot() {
     }
     r.instructions.sort((a, b) => (a.final ? 1 : 0) - (b.final ? 1 : 0) || a.s - b.s);
   }
+  // ---------- free drive ----------
+  // Ungraded and endless. The route is a lap and a quarter; the examiner steps progress back a lap as
+  // the car comes round (test.js useLap), and if the learner leaves at a junction, a route back onto
+  // the circuit is built from wherever they are. What it measured is shown when they stop.
+  let freeStats = null, freeJunctions = [];
+  function startFreeDrive(pl, test) {
+    const lapRoute = buildRoute(A.net, pl.drive.lap.map(w => snapWaypoint(A.net, w)));
+    const lapAt = (r) => r.len - lapRoute.len * 1.25; // where the full lap starts on a route ending a lap and a quarter on
+    const M = A.net.motorway, line = centreLine();
+    // on the carriageway, one countdown instruction per junction passed, in place of "pull up on the left";
+    // off it (leaving at a junction, and the way back on), the route's own directions at each turn
+    const junctionsOn = (r) => {
+      const ins = r.instructions.filter(i => !i.final && i.approach && i.approach.e.way.cls !== 'motorway');
+      for (const j of (M?.junctions || []).filter(j => j.side === 'A')) {
+        const p = onCarriageway(line, M.lanes, 'A', j.diverge);
+        for (let i = 1; i < r.xs.length - 1; i++) {
+          const d = Math.hypot(r.xs[i] - p.x, r.zs[i] - p.z);
+          if (d < 25 && d <= Math.hypot(r.xs[i - 1] - p.x, r.zs[i - 1] - p.z) && d <= Math.hypot(r.xs[i + 1] - p.x, r.zs[i + 1] - p.z))
+            ins.push({ s: r.cum[i], kind: 'straight', icon: 'straight', text: `Junction ${j.n} for ${j.to}`, short: `Junction ${j.n}`, signal: null, road: 'M100', junction: j.n, to: j.to });
+        }
+      }
+      const fin = r.instructions.find(i => i.final);
+      r.instructions = ins.sort((a, b) => a.s - b.s).concat(fin ? [fin] : []);
+      return r;
+    };
+    junctionsOn(route);
+    test.useLap(route, 0, lapRoute.len);
+    test.onOffRoute = (from, along) => {
+      try {
+        const r = junctionsOn(buildRoute(A.net, [from, along, ...pl.drive.waypoints.map(w => snapWaypoint(A.net, w))]));
+        route = r; test.useLap(r, Math.max(0, lapAt(r)), lapRoute.len); test.snapProgress(); test.rerouted++; ui.renderSteps(r, 0); lastStep = -1;
+      } catch (_) { /* no way back from here yet: try again in a moment */ }
+    };
+    test.onLap = () => { if (freeStats) freeStats.laps++; };
+    freeStats = createFreeStats();
+    freeJunctions = (M?.junctions || []).filter(j => j.side === 'A').map(j => ({ ...onCarriageway(centreLine(), M.lanes, 'A', j.diverge), n: j.n, at: -1e9 }));
+  }
+  function stepFreeDrive(dt) {
+    if (!freeStats || !A.test?.running) return;
+    const nr = A.test.ctx, limit = nr ? nr.way.mph : 70;
+    stepFreeStats(freeStats, dt, player.v, Math.abs(player.v) * 2.23694, limit, wheelsOff(A.net, player).wheels);
+    for (const j of freeJunctions) if (A.traffic.clock - j.at > 60 && Math.hypot(j.x - player.x, j.z - player.z) < 30) { j.at = A.traffic.clock; freeStats.junctions++; }
+  }
+  // the payoff for an ungraded drive: what it measured, said plainly, and nothing written to the record
+  function showFreeSummary() {
+    if (A.test) A.test.running = false; paused = false; $('pauseSheet').hidden = true;
+    const st = freeStats || createFreeStats(), mi = st.distance / 1609.34, min = st.seconds / 60;
+    $('endTag').textContent = 'Free drive'; const v = $('verdict'); v.textContent = mi >= 0.1 ? `${mi.toFixed(1)} miles driven` : 'Drive ended'; v.className = 'verdict pass';
+    $('rD').textContent = '–'; $('rS').textContent = '–';
+    $('rNote').textContent = plan.drive.title + ' · ungraded, nothing added to your record';
+    const lines = freeSummaryLines(st, min);
+    $('rReasons').innerHTML = lines.map(l => `<li>${l}</li>`).join('');
+    $('coachingReport').textContent = ''; $('nextBtn').hidden = true; $('runDetailList').innerHTML = ''; $('againBtn').textContent = 'Drive again'; $('resultSheet').hidden = false; setMode('lobby'); document.body.classList.remove('free-drive');
+  }
+
   // load a plan (lesson, puzzle or mock route) in the current area without starting it: the car moves to the start
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
-    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
+    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
     nodes = wps.map(w => snapWaypoint(A.net, w));
-    route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.lesson.title });
+    route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
-    const s0 = startPos(startS(pl));
+    const s0 = startPos(startS(pl), pl.lesson?.startLane || 0);
+    if (pl.kind === 'free') { player.v = 22.4; player.steer = 0; test.parked = false; } // 50 mph in lane 1, nothing to move off from
+    if (pl.lesson?.startMph) { player.v = pl.lesson.startMph * 0.44704; player.steer = 0; test.parked = false; } // a motorway lesson starts at speed, in its lane
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
     test.ctx = nearest(A.net,player.x,player.z);
+    test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
+    // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
+    test.marking = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
+    test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
+    applyTimeOfDay(test.timeOfDay); setHeadlights(false);
+    if (test.ungraded) startFreeDrive(pl, test);
     test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
-    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : (pl.lesson.maxD ?? 2));
-    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free' ? 0 : (pl.lesson.maxD ?? 2));
+    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    document.body.classList.toggle('free-drive', pl.kind === 'free'); $('quitBtn').textContent = pl.kind === 'free' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
@@ -220,6 +293,7 @@ async function boot() {
     else if (e.code === 'KeyB') look('interior');
     else if (e.code === 'KeyI') cockpitAction('engine');
     else if (e.code === 'KeyP') cockpitAction('parkingBrake');
+    else if (e.code === 'KeyH') setHeadlights(!player.headlights);
     else if (e.code === 'Space' && A.test && A.test.running) e.preventDefault();
   });
   window.addEventListener('keyup', e => {
@@ -350,12 +424,31 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; } };
+  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+    // memory as the renderer and the scenery see it, for the sustained-drive benchmark
+    perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
+    get freeStats() { return freeStats; }, steerFor };
   let botInput = null, botMode = false, pinMesh = null,botSeed=null;
   function readInput() {
     if (botInput) { const r = botInput(); if (r) return r; }
     for (const fn of extraInputs) { const r = fn(); if (r) return r; }
-    return { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    const k = { throttle: key.up || tch.up ? 1 : 0, brake: key.down || tch.down ? 1 : 0, steer: (key.left || tch.left ? 1 : 0) - (key.right || tch.right ? 1 : 0) };
+    if (k.throttle || k.brake || k.steer) return k; // keys and touch always win
+    return readPad() || k;
+  }
+  // A game controller or a USB wheel (the browser's standard mapping): the left stick or the wheel steers,
+  // the right trigger accelerates and the left brakes; LB and RB indicate, Y checks the mirrors. It takes
+  // over only once it has been touched, so a controller left plugged in never fights the keyboard.
+  let padUsed = false; const padWas = [];
+  function readPad() {
+    const g = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null; if (!g) return null;
+    const b = (i) => (g.buttons[i] ? g.buttons[i].value : 0), tap = (i) => { const on = b(i) > 0.5, was = padWas[i]; padWas[i] = on; return on && !was; };
+    if (tap(4)) { player.signal('L'); sigBtns(); } if (tap(5)) { player.signal('R'); sigBtns(); } if (tap(3)) look('interior');
+    // a small dead zone, then a gentle curve so small movements of the stick make small corrections
+    const ax = g.axes[0] || 0, dz = 0.08, x = Math.abs(ax) < dz ? 0 : Math.sign(ax) * ((Math.abs(ax) - dz) / (1 - dz)) ** 1.6;
+    const thr = b(7), brk = b(6);
+    if (x || thr > 0.05 || brk > 0.05) padUsed = true;
+    return padUsed ? { throttle: thr, brake: brk, steer: -x, analog: true } : null;
   }
 
   // ---------- drive flow ----------
@@ -369,7 +462,7 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (scenario) scenario.stop();
+    const test = A.test; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -377,22 +470,24 @@ async function boot() {
       const report = buildReport({ lessonId: plan.lesson.id, scenarioId: plan.scenarioDefinition?.id, pass: res.pass, faults: test.faults, duration: test.elapsed, objectives: plan.lesson.objectives || plan.lesson.steps, evidence: { observations: player.observations.map(e => ({ ...e })), controls: player.operation.events.map(e => ({ ...e })), scenarioEvents: scenario?.events || [], objectiveResult: scenario?.result ? scenario.result() : null } });
       $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
       showRunDetail({ kind: plan.kind, lesson: plan.lesson, test, scenario });
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report }); // bot runs never touch a learner's progress
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode }); // bot runs never touch a learner's progress
       $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
       v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
-      const n = res.pass ? (test.D === 0 ? 3 : test.D <= 1 ? 2 : 1) : 0;
-      $('rNote').innerHTML = (pz ? `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` : '') + plan.lesson.title.replace(/[<>&]/g, '');
+      // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
+      const n = res.stars || 0, mode = modeOf(res.mode);
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
       $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
     } else {
-      const pass = test.passed();
-      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
+      const j = judgeMock(test.marking, test), pass = j.pass, mode = modeOf(j.mode);
+      if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
-      $('rNote').textContent = pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
-        : (test.S ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : 'More than 15 driving faults means a fail. The marking sheet shows what to work on.');
+      const real = mode.id === 'hard' ? '' : ` Marked on ${mode.title}; the real test is Hard (15 driving faults, no serious).`;
+      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+        : (test.S > j.maxS ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : j.collision ? 'A collision is never forgiven. The marking sheet shows what to work on.' : `More than ${j.maxD} driving faults means a fail. The marking sheet shows what to work on.`)) + real;
       $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       showRunDetail({ kind: 'mock', lesson: null, test, scenario });
       reasons.innerHTML = ''; next.hidden = true;
@@ -403,6 +498,7 @@ async function boot() {
   function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
+    document.body.classList.remove('free-drive'); applyTimeOfDay('day');
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
   }
@@ -413,21 +509,21 @@ async function boot() {
     loadPlan(plan);
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : createScenario(plan.lesson, deps);
+    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
-    stats.distance = 0; stats.topSpeed = 0;
+    stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
   }
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume); $('resumeX').addEventListener('click', resume);
-  $('quitBtn').addEventListener('click', toLobby); $('hubBtn').addEventListener('click', toLobby);
+  $('quitBtn').addEventListener('click', () => plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
   $('nextBtn').addEventListener('click', () => { const b = $('nextBtn'); pickPlan(hub.select(b.dataset.kind, b.dataset.id), true); });
   $('againBtn').addEventListener('click', begin); $('restartBtn').addEventListener('click', begin);
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
@@ -447,12 +543,20 @@ async function boot() {
   sens.value = HANDLING.steerSensitivity;
   sens.addEventListener('input', () => { HANDLING.steerSensitivity = +sens.value; prefs.sens = +sens.value; savePrefs(); });
   document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.addEventListener('click', () => setCam(+b.dataset.cam, true)));
-  const setSh = (on) => { shadowsOn = on; if (A.world) A.world.setShadows(on); seg('#shSeg [data-sh]', 'sh', on ? 1 : 0); prefs.sh = on ? 1 : 0; savePrefs(); };
+  const setSh = (on) => { shadowsOn = on; if (A.world) A.world.setShadows(on && !lowPower); seg('#shSeg [data-sh]', 'sh', on ? 1 : 0); prefs.sh = on ? 1 : 0; savePrefs(); };
   document.querySelectorAll('#shSeg [data-sh]').forEach(b => b.addEventListener('click', () => setSh(b.dataset.sh === '1')));
   const setMi = (on) => { mirrors.enabled = on; document.body.classList.toggle('no-mirrors', !on); seg('#miSeg [data-mi]', 'mi', on ? 1 : 0); prefs.mi = on ? 1 : 0; savePrefs(); layoutSoon(); };
   document.querySelectorAll('#miSeg [data-mi]').forEach(b => b.addEventListener('click', () => setMi(b.dataset.mi === '1')));
   // Coaching: a running line of instruction for learners who want one. Off by default, because the
   // lesson card has already said what to do and the view is what matters while driving.
+  // Low-power graphics: fewer pixels, no shadows, no light pools or headlight beam. For phones and
+  // older laptops; the drive and the assessment are exactly the same.
+  const setLp = (on) => {
+    lowPower = on; renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
+    if (A.world) { A.world.setShadows(on ? false : shadowsOn); A.world.setTimeOfDay(dusk ? 'dusk' : 'day', { lowPower }); }
+    seg('#lpSeg [data-lp]', 'lp', on ? 1 : 0); prefs.lp = on ? 1 : 0; savePrefs(); resize();
+  };
+  document.querySelectorAll('#lpSeg [data-lp]').forEach(b => b.addEventListener('click', () => setLp(b.dataset.lp === '1')));
   const setCo = (on) => { coaching = on; seg('#coSeg [data-co]', 'co', on ? 1 : 0); prefs.co = on ? 1 : 0; savePrefs(); if (A.test) A.test.coach = null; };
   document.querySelectorAll('#coSeg [data-co]').forEach(b => b.addEventListener('click', () => setCo(b.dataset.co === '1')));
   const setGd = (on) => { guide.enabled = on; seg('#gdSeg [data-gd]', 'gd', on ? 1 : 0); prefs.gd = on ? 1 : 0; savePrefs(); };
@@ -527,8 +631,18 @@ async function boot() {
     mirrors.mount(cockpit, seat.x);
     camInit = false;
   }
-  player.onModel = fitCockpit;
-  if (player.model) fitCockpit(player.model);
+  player.onModel = (m) => { fitCockpit(m); if (!m.getObjectByName('lamps')) attachLamps(m); };
+  if (player.model) player.onModel(player.model);
+  if (!player.mesh.getObjectByName('lamps')) attachLamps(player.mesh);
+  // the learner's dipped headlights: H, or the lights button, which only shows at dusk
+  const setHeadlights = (on) => { player.headlights = on; $('lightsBtn').setAttribute('aria-pressed', on ? 'true' : 'false'); };
+  $('lightsBtn').addEventListener('click', () => setHeadlights(!player.headlights));
+  function applyTimeOfDay(tod) {
+    dusk = tod === 'dusk'; document.body.classList.toggle('dusk', dusk);
+    if (A.world) A.world.setTimeOfDay(tod, { lowPower });
+    for (const slot of carPool) setLamps(slot.children[0], dusk);
+    $('lightsBtn').hidden = !dusk;
+  }
 
   // ---------- overhead view: drag to pan, wheel or pinch to zoom ----------
   const ov = { px: 0, pz: 0, h: 95 };
@@ -610,9 +724,24 @@ async function boot() {
     const p = portrait(); if (p !== wasPortrait) { if (wasPortrait !== null || p) setCam(plan?.lesson?.manoeuvre ? 2 : p ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); wasPortrait = p; } // upright phones default to the outside view
   }
   new ResizeObserver(resize).observe(stage); resize();
-  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1);
+  setCam(portrait() ? (prefs.camP ?? 0) : (prefs.cam ?? 1)); setSh(prefs.sh !== 0); setMi(prefs.mi !== 0); setGd(prefs.gd !== 0); setCo(prefs.co === 1); setLp(prefs.lp === 1);
 
   let last = performance.now(), uiT = 0, mapT = 0, sigT = 0, chunkT = 0, lastStep = -1, lastRoute = null;
+  // In the chase view the mirrors are always on screen, and the car's surroundings with them, so there is
+  // nothing to check by pressing a key: mirror and shoulder checks count as made the whole time and are not
+  // marked. The result says so. The mirror-practice lesson, whose whole point is the routine, still asks for
+  // it; the Bot lab and the browser checks make their own looks.
+  let chaseAuto = -1;
+  function chaseMirrors(dt, now) {
+    if (cam !== 0 || botMode || plan?.lesson?.scenario === 'mirrors') return;
+    stats.chaseSeconds = (stats.chaseSeconds || 0) + dt;
+    if (now - chaseAuto < 0.4 && now >= chaseAuto) return;
+    chaseAuto = now;
+    const obs = player.observations, keepFrom = now - 15;
+    for (let i = obs.length - 1; i >= 0; i--) if (obs[i].auto && obs[i].at < keepFrom) obs.splice(i, 1);
+    for (const view of ['interior', 'left', 'right', 'blindspot']) obs.push({ view, at: now, x: player.x, z: player.z, auto: true });
+    player.lookAt = now;
+  }
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
@@ -620,9 +749,12 @@ async function boot() {
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
-      player.update(dt, readInput(), nr && nr.d > nr.way.w / 2 + 2.6 && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
+      player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
+      chaseMirrors(dt, traffic.clock);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
+      if (plan?.kind === 'free') stepFreeDrive(dt);
       updateHeldLooks();
       if (test.running && plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
       test.nearZebra = net.zebras.some(z => Math.abs(z.x - player.x) < 70 && Math.abs(z.z - player.z) < 70);
@@ -649,6 +781,11 @@ async function boot() {
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
     chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
+    // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
+    setLamps(player.mesh, dusk, !!player.headlights);
+    { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's
+    headBeam.visible = dusk && !!player.headlights && !lowPower;
+    if (headBeam.visible) { const fx = -Math.sin(player.th), fz = -Math.cos(player.th); headBeam.position.set(player.x + fx * 2, 0.8, player.z + fz * 2); headBeam.target.position.set(player.x + fx * 32, 0, player.z + fz * 32); }
     updateCamera(dt); world.updateSun(cam === 2 && drive ? player.x + ov.px : player.x, cam === 2 && drive ? player.z + ov.pz : player.z);
     guide.update(test, traffic.clock, A.net); guide.group.visible = guide.group.visible && drive && !plan?.lesson?.manoeuvre;
     if (plan?.lesson?.manoeuvre && scenario?.progress) { const p = scenario.progress; world.setParkingTarget(p.target,p.path,gradeParking(p.target,player)); world.showParkingGuide(guide.enabled); }
@@ -680,10 +817,13 @@ async function boot() {
     estopBanner: () => A.test?.alert?.tone === 'stop',
     setInput: (fn) => { botInput = fn; },
     botMode: (on) => { botMode = on; manual = on; },
-    async start(kind, id, seed) {
+    async start(kind, id, seed, { traffic = 'lesson' } = {}) {
       botSeed=seed;
       const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
       await pickPlan(pl, true); await areaChain;
+      // random traffic on top of whatever the lesson places, from this run's seed: a lesson with its own
+      // scripted traffic otherwise meets exactly the same drive every time
+      if (traffic === 'random') { A.traffic.setDensity('normal'); A.traffic.reset(player.x, player.z, seed); }
     },
     result: () => plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
     plans: [...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]

@@ -79,6 +79,8 @@ export function createGuide() {
     chev.count = n; chev.instanceMatrix.needsUpdate = true;
     const tp = lanePoint(R, ins.final ? Math.max(0, R.len - 6) : ins.kind === 'rb' && test.sRoute > ins.s - 15 ? ins.exitS + 4 : ins.s);
     marker.position.set(tp.x, 0, tp.z);
+    // a junction you drive straight past (free drive's countdown) is not a place to turn: no beacon
+    marker.visible = !ins.junction;
     head.position.y = 7.6 + Math.sin(clock * 3) * 0.25; head.rotation.y = clock;
     ring.scale.setScalar(1 + (clock * 0.8 % 1) * 0.35); ring.material.opacity = 0.85 * (1 - (clock * 0.8 % 1));
   }

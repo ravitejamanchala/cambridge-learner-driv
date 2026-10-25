@@ -104,6 +104,20 @@ export function createUI(net) {
     if (!t.faults.length) { ul.innerHTML = '<li class="empty">No faults yet. Keep left, watch your speed and signal before turning.</li>'; return; }
     ul.innerHTML = t.faults.slice(0, 30).map(f => `<li><span class="badge ${f.kind === 'S' ? 's' : ''}">${f.kind}</span><div class="fx"><strong>${esc(f.cat)}</strong><span>${esc(f.text)}</span></div></li>`).join('');
   }
+  // The instruction box sits centred at the top, and grows with what it carries (a junction name, a
+  // lane strip). On a mid-width window that can reach the speedometer cluster: slide it left just far
+  // enough to clear whatever shares its band on the right, but never into the map. Measured from the
+  // real elements every update, never cached, as the interface guidelines ask.
+  function fitNextBox(box) {
+    box.style.setProperty('--nudge', '0px');
+    const b = box.getBoundingClientRect(); if (!b.width) return;
+    const band = (r) => r.width > 0 && r.top < b.bottom && r.bottom > b.top;
+    let need = 0;
+    for (const el of document.querySelectorAll('.hud-right > *')) { const r = el.getBoundingClientRect(); if (band(r)) need = Math.max(need, b.right - (r.left - 8)); }
+    if (need <= 0) return;
+    const map = document.querySelector('.hud-map')?.getBoundingClientRect(), room = map && band(map) ? b.left - (map.right + 8) : b.left - 8;
+    box.style.setProperty('--nudge', Math.max(0, Math.min(need, room)) + 'px');
+  }
   function hud(p, t, running) {
     const mph = Math.round(Math.abs(p.v) * MPH), ctx = t.ctx, way = ctx && ctx.d < 30 ? ctx.way : null;
     const limit = way ? way.mph : 30, over = mph > limit + 1;
@@ -125,13 +139,17 @@ export function createUI(net) {
     lb.classList.toggle('ask', running && t.parked && !looked); lb.classList.toggle('done', running && t.parked && looked);
     if (!running && !t.done) dtxt = 'Press start';
     // sign-first: the icon says what to do; show the distance, and words only for prompts that need them
-    const prompt = /Look round|Move off|Signal left|Finding|Pull up|Leave at/.test(short) ? short.replace('Look round (B), then move off', 'Look round · B').replace('Move off when it is safe', 'Move off').replace('Signal left now: your exit is next', 'Signal left').replace('Finding a new route', 'New route').replace('Leave at the next exit', 'Exit next').replace('Pull up on the left', 'Pull up left') : '';
+    // free drive counts down to the next motorway junction: the number and where it goes
+    const prompt = s.junction && !t.offRoute && !t.parked ? `J${s.junction} · ${s.to}` : /Look round|Move off|Signal left|Finding|Pull up|Leave at/.test(short) ? short.replace('Look round (B), then move off', 'Look round · B').replace('Move off when it is safe', 'Move off').replace('Signal left now: your exit is next', 'Signal left').replace('Finding a new route', 'New route').replace('Leave at the next exit', 'Exit next').replace('Pull up on the left', 'Pull up left') : '';
     $('hudNext').textContent = !running && !t.done ? 'Ready' : t.parked ? '' : (dtxt === 'now' || dtxt === 'on the roundabout' ? 'now' : dtxt.replace(/^in /, '').replace('follow the road', '…'));
     $('hudDist').textContent = prompt;
     $('hudNextBox').setAttribute('aria-label', s.text);
     const ex = $('hudExit'), exN = s.kind === 'rb' && !t.offRoute && !t.parked ? s.exitN : 0; ex.hidden = !exN; ex.textContent = exN || '';
-    const ln = $('hudLanes'), showL = s.laneOK && s.lanes >= 2 && s.lanes <= 4 && !t.offRoute && s.s - t.sRoute < 250 && s.s > t.sRoute - 2;
-    ln.hidden = !showL; if (showL) { const k = s.lanes + ':' + s.laneOK.join(','); if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: s.lanes }, (_, i) => `<i class="${s.laneOK.includes(i) ? 'on' : ''}"></i>`).join(''); } }
+    // lanes: the arrows' lanes before a junction, or on a motorway lesson the lanes that are right for you
+    // now (amber) and the one you are in (marked underneath): an instrument, not a sentence
+    const mw = running && t.laneGuide, ln = $('hudLanes'), showL = mw || (s.laneOK && s.lanes >= 2 && s.lanes <= 4 && !t.offRoute && s.s - t.sRoute < 250 && s.s > t.sRoute - 2);
+    const lanes = mw ? mw.lanes : s.lanes, ok = mw ? mw.ok : s.laneOK, here = mw ? mw.here : -1;
+    ln.hidden = !showL; if (showL) { const k = lanes + ':' + ok.join(',') + ':' + here; if (ln.dataset.k !== k) { ln.dataset.k = k; ln.innerHTML = Array.from({ length: lanes }, (_, i) => `<i class="${[ok.includes(i) ? 'on' : '', i === here ? 'me' : ''].join(' ').trim()}"></i>`).join(''); } }
     if (ico !== lastIco) { $('hudIco').innerHTML = ICON[ico]; lastIco = ico; }
     if (running) $('testState').textContent = t.rerouted ? `In progress · re-routed ${t.rerouted}×` : 'In progress';
     // Getting started: the state goes on the instruments, not into a sentence over the road.
@@ -165,6 +183,7 @@ export function createUI(net) {
       $('hudChecks').hidden = true; $('hudExit').hidden = true; $('hudLanes').hidden = true;
       boxEl.setAttribute('aria-label', alert.label);
     }
+    fitNextBox(boxEl);
     // tip
     let key = 'keep';
     if (mph > limit + 1) key = 'speed';

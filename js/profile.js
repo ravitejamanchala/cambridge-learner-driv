@@ -43,12 +43,14 @@ export const Profiles = {
     const L = p.lessons[id] || { attempts: 0, passed: false, bestD: null };
     L.attempts++; L.last = Date.now(); if (r.pass) L.passed = true;
     if (r.pass && (L.bestD === null || r.D < L.bestD)) L.bestD = r.D;
+    if (r.pass && Number.isFinite(r.stars)) L.bestStars = Math.max(L.bestStars ?? 0, r.stars); // the best marking passed on (js/assessment.js)
+    if (r.mode) L.lastMode = r.mode;
     L.latestReport = r.report || null;
     p.lessons[id] = L; this.recordHistory({ ...r, lessonId: id }); save();
   },
   recordMock(routeId, r) {
     const p = this.current(); if (!p) return;
-    p.mocks.unshift({ route: routeId, at: Date.now(), D: r.D, S: r.S, pass: r.pass }); p.mocks = p.mocks.slice(0, 50); this.recordHistory({ ...r, routeId }); save();
+    p.mocks.unshift({ route: routeId, at: Date.now(), D: r.D, S: r.S, pass: r.pass, ...(r.mode ? { mode: r.mode, stars: r.stars } : {}) }); p.mocks = p.mocks.slice(0, 50); this.recordHistory({ ...r, routeId }); save();
   },
   recordHistory(r) { const p = this.current(); if (!p) return; p.history ||= []; p.practiceSeconds ||= 0;
     const duration = Number.isFinite(r.duration) ? Math.max(0, r.duration) : 0;
