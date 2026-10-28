@@ -3,6 +3,7 @@ import {ukProfile,rectangularOutline,styleUKBuilding,UK_STYLES} from '../js/uk-b
 const object=()=>({id:'osm-house-42',type:'building',x:30,z:40,y:0,sx:8,sy:7,sz:10,rotation:0,properties:{tags:{building:'house','building:levels':'2'}}});
 test('UK profiles respect use, roof and level tags and are deterministic',()=>{
  const o=object();assert.deepEqual(ukProfile(o),ukProfile(structuredClone(o)));assert.equal(ukProfile(o).floors,2);
+ for(const unknown of ['__proto__','constructor','toString','unknown']){o.properties.ukStyle=unknown;assert.ok(Object.hasOwn(UK_STYLES,ukProfile(o).style));}delete o.properties.ukStyle;
  o.properties.tags.building='warehouse';assert.equal(ukProfile(o).style,'industrial');assert.equal(ukProfile(o).pitched,false);
  o.properties.ukStyle='terrace';o.properties.tags['roof:shape']='flat';assert.equal(ukProfile(o).pitched,false);
  delete o.properties.tags['roof:shape'];assert.equal(ukProfile(o).style,'terrace');assert.equal(ukProfile(o).pitched,true);

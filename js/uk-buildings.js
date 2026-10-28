@@ -7,7 +7,7 @@ export const ukBuildingResources=()=>[...textures.values()];
 function seedOf(o){let s=0;for(const c of String(o.properties?.osmId??o.properties?.overtureId??o.id))s=(Math.imul(s,31)+c.charCodeAt(0))>>>0;return s;}
 export function ukProfile(o){
  const p=o.properties||{},t=p.tags||{},kind=t.building||p.class||'',material=t['building:material']||t.material||'';
- let style=p.ukStyle;if(!UK_STYLES[style])style=/industrial|warehouse|shed|garage/.test(kind)?'industrial':t.shop||/retail|commercial/.test(kind)?'shop':/apartments|office/.test(kind)?'apartment':/church|cathedral|university|school|civic/.test(kind)||/stone/.test(material)?'stone':/plaster|render/.test(material)?'render':/terrace/.test(kind)?'terrace':o.sy>18?'apartment':seedOf(o)%3===0?'terrace':'buff-brick';
+ let style=p.ukStyle;if(!Object.hasOwn(UK_STYLES,style))style=/industrial|warehouse|shed|garage/.test(kind)?'industrial':t.shop||/retail|commercial/.test(kind)?'shop':/apartments|office/.test(kind)?'apartment':/church|cathedral|university|school|civic/.test(kind)||/stone/.test(material)?'stone':/plaster|render/.test(material)?'render':/terrace/.test(kind)?'terrace':o.sy>18?'apartment':seedOf(o)%3===0?'terrace':'buff-brick';
  const levels=Number(t['building:levels']);const floors=Math.max(1,Math.min(50,Number.isFinite(levels)&&levels>0?Math.round(levels):Math.round(o.sy/3)));
  const roofShape=t['roof:shape']||(style==='render'?'hipped':'gabled');
  const flat=!['gabled','hipped','pitched'].includes(roofShape)||(!t['roof:shape']&&['stone','shop','apartment','industrial'].includes(style));
