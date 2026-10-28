@@ -22,7 +22,7 @@ export function addUKFrontage(T,mesh,o,profile,{outline,front,brick,roofFraction
   const centre=[a[0]+u[0]*t-N[0]*fromBoundary,y-o.sy/2,a[1]+u[1]*t-N[1]*fromBoundary],verts=[];
   for(const [x,dy,z]of [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]])verts.push([(centre[0]+u[0]*x*w/2+N[0]*z*depth/2)/o.sx,(centre[1]+dy*h/2)/o.sy,(centre[2]+u[1]*x*w/2+N[1]*z*depth/2)/o.sz]);
   const col=new T.Color(color);
-  for(const face of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]])for(const k of [0,1,2,0,2,3]){positions.push(...verts[face[k]]);colours.push(col.r,col.g,col.b);}
+  for(const face of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]])for(const k of (u[0]*N[1]-u[1]*N[0]<0?[0,2,1,0,3,2]:[0,1,2,0,2,3])){positions.push(...verts[face[k]]);colours.push(col.r,col.g,col.b);}
  };
  const window=(t,bottom,w,h,bay=false)=>{
   const d=bay?.12:.21;
