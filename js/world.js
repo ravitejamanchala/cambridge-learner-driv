@@ -1,7 +1,7 @@
 import {applyMappedRoadTags} from './mapped-road-tags.js';
 import {roadsidePosition} from './road-space.js';
 import {objectBlocker,fitRoadCorners} from './roadside-clearance.js';
-import {joinedRoadSurfaces,surfaceGeometry} from './road-surfaces.js';
+import {joinedRoadSurfaces,surfaceGeometry,raisedSurfaceGeometry,PAVEMENT_HEIGHT} from './road-surfaces.js';
 import {ribbon,dash,roadBoundsVisible} from './road-ribbon.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
@@ -188,9 +188,9 @@ export function buildWorld(scene, net, traffic, options = {}) {
   let studsOn = false, studAt = { x: 0, z: 0 };
   const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
   if(joined){
-    pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x777b79);
-    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',pm,.02,1],['kerb',kerbMat,.03,1.5],['road',rm,.04,2]]){
-      if(!tile[kind].length)continue;const m=new T.Mesh(surfaceGeometry(T,tile[kind]),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
+    pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x969792);
+    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',pm,0,1],['kerb',kerbMat,0,1.5],['road',rm,.04,2]]){
+      if(!tile[kind].length)continue;const m=new T.Mesh(kind==='road'?surfaceGeometry(T,tile[kind]):raisedSurfaceGeometry(T,tile[kind],{bounds:tile.bounds,top:PAVEMENT_HEIGHT}),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
     }
   }
   for (const [key, A] of roadChunks) {

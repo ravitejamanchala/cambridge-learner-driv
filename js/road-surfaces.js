@@ -13,10 +13,26 @@ export function polygonOperation(subject,other,operation='union'){
 }
 export function offsetPolygons(polys,distance){
  const paths=polys.flatMap(poly=>poly.map((ring,i)=>{const path=ring.map(([x,z])=>({X:Math.round(x*1000),Y:Math.round(z*1000)}));if(Clipper.Clipper.Orientation(path)!==(i===0))path.reverse();return path;}));
- const offset=new Clipper.ClipperOffset(2,.25),out=[];offset.AddPaths(paths,Clipper.JoinType.jtRound,Clipper.EndType.etClosedPolygon);offset.Execute(out,distance*1000);
+ const offset=new Clipper.ClipperOffset(2,5),out=[];offset.AddPaths(paths,Clipper.JoinType.jtRound,Clipper.EndType.etClosedPolygon);offset.Execute(out,distance*1000);
  // Preserve the offset path orientation so holes remain subtractive.
  const tree=new Clipper.PolyTree(),c=new Clipper.Clipper();c.AddPaths(out,Clipper.PolyType.ptSubject,true);c.Execute(Clipper.ClipType.ctUnion,tree,Clipper.PolyFillType.pftNonZero,Clipper.PolyFillType.pftNonZero);
  const result=[],ring=n=>n.Contour().map(p=>[p.X/1000,p.Y/1000]);const visit=n=>{for(const child of n.Childs()){if(!child.IsHole())result.push([ring(child),...child.Childs().filter(c=>c.IsHole()).map(ring)]);visit(child);}};visit(tree);return result;
+}
+// Round only the exposed convex tips; never move source centreline vertices.
+export function roundedSurface(polys,radius=.25){
+ return polys.flatMap(poly=>{const inner=offsetPolygons([poly],-radius);return inner.length?offsetPolygons(inner,radius):[poly];});
+}
+export const ROAD_HEIGHT=.04,PAVEMENT_HEIGHT=.19;
+// Real vertical faces rather than a flat pale decal. Tile cuts are not kerbs.
+export function raisedSurfaceGeometry(T,polygons,{bottom=.02,top=PAVEMENT_HEIGHT,bounds}={}){
+ const flat=surfaceGeometry(T,polygons),g=flat.index?flat.toNonIndexed():flat;
+ const positions=Array.from(g.attributes.position.array);for(let i=1;i<positions.length;i+=3)positions[i]=top;
+ for(const poly of polygons)for(const ring of poly)for(let i=0;i<ring.length;i++){
+  const a=ring[i],b=ring[(i+1)%ring.length];
+  if(bounds&&([0,2].some(k=>Math.abs(a[0]-bounds[k])<.002&&Math.abs(b[0]-bounds[k])<.002)||[1,3].some(k=>Math.abs(a[1]-bounds[k])<.002&&Math.abs(b[1]-bounds[k])<.002)))continue;
+  positions.push(a[0],bottom,a[1],b[0],top,b[1],b[0],bottom,b[1],a[0],bottom,a[1],a[0],top,a[1],b[0],top,b[1]);
+ }
+ const result=new T.BufferGeometry();result.setAttribute('position',new T.Float32BufferAttribute(positions,3));result.computeVertexNormals();g.dispose();if(flat!==g)flat.dispose();return result;
 }
 const surfaceCache=new Map();
 // Union per render chunk: no stacked kerbs or pavement wedges in the road.
@@ -32,10 +48,15 @@ export function joinedRoadSurfaces(net){
  const result=[];
  for(const tile of tiles.values()){
   const x=tile.x*C,z=tile.z*C,boundary=[[[[x,z],[x+C,z],[x+C,z+C],[x,z+C]]]];
-  const road=polygonOperation(polygonOperation(tile.road,[]),boundary,'intersection');
-  const rim=polygonOperation(offsetPolygons(road,.08),boundary,'intersection'),kerb=polygonOperation(rim,road,'difference');
-  const pave=polygonOperation(polygonOperation(polygonOperation(tile.pave,[]),boundary,'intersection'),rim,'difference');
-  result.push({x:x+C/2,z:z+C/2,road,kerb,pave:pave.filter(p=>ringArea(p[0])>.08)});
+  // Offset the uncut road: offsetting after clipping made a false square kerb
+  // at every 400 m tile edge. Round pavement tips before clipping as well.
+  const fullRoad=polygonOperation(tile.road,[]),road=polygonOperation(fullRoad,boundary,'intersection');
+  const fullPave=roundedSurface(polygonOperation(tile.pave,[]));
+  const outside=polygonOperation(fullPave,fullRoad,'difference');
+  const rim=polygonOperation(offsetPolygons(fullRoad,.14),fullRoad,'difference');
+  const kerb=polygonOperation(polygonOperation(outside,rim,'intersection'),boundary,'intersection');
+  const pave=polygonOperation(polygonOperation(outside,rim,'difference'),boundary,'intersection');
+  result.push({x:x+C/2,z:z+C/2,bounds:[x,z,x+C,z+C],road,kerb,pave:pave.filter(p=>ringArea(p[0])>.08)});
  }
  if(surfaceCache.size>=3)surfaceCache.delete(surfaceCache.keys().next().value);surfaceCache.set(key,result);return result;
 }

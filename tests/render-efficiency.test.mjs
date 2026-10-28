@@ -21,8 +21,8 @@ test('swept obstacle index preserves collisions with rotated polygons, courtyard
  const origin=track.spawn;assert.ok(index.near(origin,origin).length<objects.length*.1);
 });
 test('separate road segments share a filled bevel instead of a triangular outer notch',()=>{
- const data={...track.network,nodes:[0,0,0,200,200,400],ways:[[0,0,30,0,0,6,0,2]],edges:[[0,1,0,[0,0,0,200]],[1,2,0,[0,200,200,400]]],stops:[],giveways:[],zebras:[],minis:[],rbs:[],arrows:[],cycleRings:[]};const net=buildNet(data),joins=roadJoinRings(net);assert.equal(joins.length,1);const bare=net.edges.flatMap(e=>ribbonRings(e).map(r=>[r]));assert.ok(polygonOperation([[joins[0].ring]],bare,'difference').reduce((s,p)=>s+ringArea(p[0]),0)>.1);
- const surfaces=joinedRoadSurfaces(net).flatMap(t=>t.road);assert.equal(polygonOperation([[joins[0].ring]],surfaces,'difference').reduce((s,p)=>s+ringArea(p[0]),0),0);
+ const data={...track.network,nodes:[0,0,0,200,200,400],ways:[[0,0,30,0,0,6,0,2]],edges:[[0,1,0,[0,0,0,200]],[1,2,0,[0,200,200,400]]],stops:[],giveways:[],zebras:[],minis:[],rbs:[],arrows:[],cycleRings:[]};const net=buildNet(data),joins=roadJoinRings(net);assert.ok(joins.length>=1);const bare=net.edges.flatMap(e=>ribbonRings(e).map(r=>[r]));assert.ok(polygonOperation(joins.map(j=>[j.ring]),bare,'difference').reduce((s,p)=>s+ringArea(p[0]),0)>.1);
+ const surfaces=joinedRoadSurfaces(net).flatMap(t=>t.road);assert.equal(polygonOperation(joins.map(j=>[j.ring]),surfaces,'difference').reduce((s,p)=>s+ringArea(p[0]),0),0);
 });
 test('uploaded 340-road map has rendered triangles across sampled lanes and chunk boundaries',()=>{
  const clean=clearRoadside(track),net=buildNet(clean.network);fitRoadCorners(net,clean.objects);applyMappedRoadTags(net,clean.osm.ways);
