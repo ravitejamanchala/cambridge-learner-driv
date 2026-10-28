@@ -225,4 +225,4 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
 
 // Authored footprints share the simulator's facade textures and palette, without
 // generating replacement boxes or moving the surveyed building outline.
-export function styleEditorBuilding(mesh, object) { return styleUKBuilding(T,mesh,object); }
+export function styleEditorBuilding(mesh, object, net) { const near=net&&nearest(net,object.x,object.z),p=near&&posAt(near.e,near.s);return styleUKBuilding(T,mesh,object,{front:p?{x:p.x-object.x,z:p.z-object.z}:null}); }

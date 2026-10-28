@@ -1,3 +1,4 @@
+import {addUKFrontage} from './uk-architecture.js';
 // Original procedural UK facades. Source footprints, transforms and total heights
 // remain authoritative; visual roofs never extend outside the mapped outline.
 export const UK_STYLES={terrace:'Red-brick terrace','buff-brick':'Cambridge buff brick',render:'Rendered house',stone:'Stone / institutional',shop:'High-street shop',apartment:'Modern apartments',industrial:'Industrial / warehouse'};
@@ -48,7 +49,7 @@ function facade(T,style,floors){return canvasTexture(T,`wall:${style}:${floors}`
  g.fillStyle='rgba(35,39,35,.18)';g.fillRect(0,H-5,W,5);g.fillRect(0,0,W,5);
 });}
 function roofTexture(T){return canvasTexture(T,'slate',(g,W,H)=>{g.fillStyle='#d3d8da';g.fillRect(0,0,W,H);for(let y=0;y<H;y+=32)for(let x=-32;x<W;x+=64){g.fillStyle=(x+y)%128?'#b1b9bc':'#c2c9cc';g.fillRect(x+(y%64?32:0)+2,y+2,60,28);g.fillStyle='#78878d';g.fillRect(x+(y%64?32:0),y,64,2);}});}
-// Find a true rectangle, including rotated rectangles. Courtyards and irregular
+// Find a rectangular or slightly skewed quadrilateral, including rotated ones. Courtyards and irregular
 // outlines keep their own flat roof: no bounding-box roof over empty space.
 export function rectangularOutline(o){
  if(o.properties?.holes?.length)return null;
@@ -57,22 +58,25 @@ export function rectangularOutline(o){
  for(let again=true;again&&r.length>4;){again=false;for(let i=0;i<r.length;i++){const a=r[(i+r.length-1)%r.length],b=r[i],c=r[(i+1)%r.length],length=Math.hypot(c[0]-a[0],c[1]-a[1]);if(length&&Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))/length<.02){r.splice(i,1);again=true;break;}}}
  if(r.length!==4)return null;
  const edges=r.map((p,i)=>[r[(i+1)%4][0]-p[0],r[(i+1)%4][1]-p[1]]),lengths=edges.map(e=>Math.hypot(...e));
- if(lengths.some(l=>l<1)||edges.some((a,i)=>Math.abs(a[0]*edges[(i+1)%4][0]+a[1]*edges[(i+1)%4][1])>lengths[i]*lengths[(i+1)%4]*.015))return null;
+ if(lengths.some(l=>l<1)||edges.some((a,i)=>Math.abs(a[0]*edges[(i+1)%4][0]+a[1]*edges[(i+1)%4][1])>lengths[i]*lengths[(i+1)%4]*.2))return null;
  if(lengths[1]>lengths[0])r.push(r.shift());
+ if(o.properties?.tags?.['roof:orientation']==='across')r.push(r.shift());
+ if(o.properties?.tags?.['roof:direction']!==undefined&&Number.isFinite(direction)){const a=direction*Math.PI/180,u=[Math.sin(a),-Math.cos(a)],dot=i=>{const d=[r[(i+1)%4][0]-r[i][0],r[(i+1)%4][1]-r[i][1]];return Math.abs(d[0]*u[0]+d[1]*u[1])/Math.hypot(...d);};if(dot(1)>dot(0))r.push(r.shift());}
  const xs=r.map(p=>p[0]),zs=r.map(p=>p[1]),cx=(Math.min(...xs)+Math.max(...xs))/2,cz=(Math.min(...zs)+Math.max(...zs))/2,w=Math.max(...xs)-Math.min(...xs),d=Math.max(...zs)-Math.min(...zs);
  return r.map(([x,z])=>[(x-cx)/w,(z-cz)/d]);
 }
-export function styleUKBuilding(T,mesh,o){
+export function styleUKBuilding(T,mesh,o,context={}){
  const profile=ukProfile(o),outline=profile.pitched?rectangularOutline(o):null;
  const fraction=outline?profile.roofHeight/o.sy:0,wallTop=.5-fraction;
  const material=new T.MeshLambertMaterial({map:facade(T,profile.style,profile.floors),color:0xffffff});material.color.multiplyScalar(.91+(profile.seed%9)*.01);
  const roofMap=roofTexture(T);roofMap.wrapT=T.RepeatWrapping;
- const roof=new T.MeshLambertMaterial({map:roofMap,color:PALETTE[profile.style][2],side:T.DoubleSide});
+ const tag=o.properties?.tags||{},roofColour=/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(tag['roof:colour']||'')?tag['roof:colour']:/clay|tile/.test(tag['roof:material']||'')?'#806453':PALETTE[profile.style][2];
+ const roof=new T.MeshLambertMaterial({map:roofMap,color:roofColour,side:T.DoubleSide});
  const geometry=mesh.geometry,p=geometry.attributes.position,normal=geometry.attributes.normal,uv=geometry.attributes.uv;
  for(let i=0;i<p.count;i++){
   if(fraction)p.setY(i,(p.getY(i)+.5)*(1-fraction)-.5);
   const ny=normal.getY(i);
-  if(Math.abs(ny)>.5)uv.setXY(i,p.getX(i)*o.sx/4,p.getZ(i)*o.sz/4);
+  if(Math.abs(ny)>.5)uv.setXY(i,p.getX(i)*o.sx/1.6,p.getZ(i)*o.sz/1.6);
   else uv.setXY(i,(-normal.getZ(i)*p.getX(i)*o.sx+normal.getX(i)*p.getZ(i)*o.sz)/4,(p.getY(i)+.5)/(1-fraction));
  }
  for(const group of geometry.groups){const i=geometry.index?geometry.index.getX(group.start):group.start;group.materialIndex=Math.abs(normal.getY(i))>.5?0:1;}
@@ -83,7 +87,7 @@ export function styleUKBuilding(T,mesh,o){
   const long=Math.hypot((b[0]-a[0])*o.sx,(b[2]-a[2])*o.sz),short=Math.hypot((d[0]-a[0])*o.sx,(d[2]-a[2])*o.sz);
   if(profile.roofShape==='hipped'){const t=Math.min(.35,short/long/2),dx=(r2[0]-r1[0])*t,dz=(r2[2]-r1[2])*t;r1[0]+=dx;r1[2]+=dz;r2[0]-=dx;r2[2]-=dz;}
   const positions=[],uvs=[],groups=[];
-  const face=(verts,index)=>{const start=positions.length/3;for(const v of verts){positions.push(...v);uvs.push(v[0]*o.sx/4,v[2]*o.sz/4);}groups.push([start,verts.length,index]);};
+  const face=(verts,index)=>{const start=positions.length/3;for(const v of verts){positions.push(...v);uvs.push(v[0]*o.sx/1.6,v[2]*o.sz/1.6);}groups.push([start,verts.length,index]);};
   face([a,b,r2,a,r2,r1,d,r1,r2,d,r2,c],0);face([a,r1,d,b,c,r2],profile.roofShape==='hipped'?0:1);
   if(short>4&&long>5){
    const x=a[0]+(b[0]-a[0])*.4+(d[0]-a[0])*.25,z=a[2]+(b[2]-a[2])*.4+(d[2]-a[2])*.25,dx=.22/o.sx,dz=.22/o.sz,lo=.5-fraction*.72,hi=.5;
@@ -94,5 +98,6 @@ export function styleUKBuilding(T,mesh,o){
   const gp=g.attributes.position,gn=g.attributes.normal,gu=g.attributes.uv;for(const [start,count,index]of groups)if(index===1)for(let i=start;i<start+count;i++)gu.setXY(i,(-gn.getZ(i)*gp.getX(i)*o.sx+gn.getX(i)*gp.getZ(i)*o.sz)/4,(gp.getY(i)-wallTop)*o.sy/3);
   const gable=new T.MeshLambertMaterial({map:facade(T,profile.style,0),side:T.DoubleSide});const cap=new T.Mesh(g,[roof.clone(),gable]);cap.userData.ukRoof=true;cap.userData.id=o.id;cap.userData.editorObjectId=o.id;cap.castShadow=true;cap.receiveShadow=true;mesh.add(cap);
  }
+ addUKFrontage(T,mesh,o,profile,{outline:rectangularOutline(o),front:context.front,brick:facade(T,profile.style,0),roofFraction:fraction});
  mesh.userData.ukBuilding={style:profile.style,floors:profile.floors,roof:outline?profile.roofShape:'flat',estimatedStyle:!o.properties?.ukStyle};mesh.castShadow=true;mesh.receiveShadow=true;
 }

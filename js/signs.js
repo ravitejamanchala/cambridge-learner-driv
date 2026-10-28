@@ -1,3 +1,4 @@
+import {roadsidePosition} from './road-space.js';
 // UK road markings and upright signs, derived from the road network:
 // give-way lines, triangles and signs at minor junctions and roundabouts, SLOW before roundabouts,
 // speed-limit roundels and terminal signs where the limit changes, no-entry signs on one-way streets,
@@ -58,7 +59,7 @@ class Batch {
   }
 }
 
-export function buildSigns(scene, net) {
+export function buildSigns(scene, net, {blocked=()=>false,placements=[]}={}) {
   const floorG = new T.PlaneGeometry(1, 1); floorG.rotateX(-Math.PI / 2);
   const floor = (tex) => { const m = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }); return new Batch(floorG, m, 5); };
   const plateG = new T.PlaneGeometry(1, 1), discG = new T.CircleGeometry(0.5, 24);
@@ -81,8 +82,10 @@ export function buildSigns(scene, net) {
   const paint = (batch, e, ts, dir, off, w, l) => { if (ts < 1 || ts > e.len - 1) return; const p = along(e, ts, dir, off); batch.push(p.x, 0.08, p.z, yawOf(p), w, 1, l); };
   const signAt = (batch, back, e, ts, dir, off, size, h = 2.3) => {
     if (ts < 0.5 || ts > e.len - 0.5) return;
-    const p = along(e, ts, dir, off), yaw = Math.atan2(-p.tx, -p.tz); // plate normal points back at approaching drivers
-    const nr = nearest(net, p.x, p.z); if (nr && nr.e !== e && nr.d < nr.way.w / 2 + 0.4) return; // never inside another carriageway
+    const centre=along(e,ts,dir,0),point=roadsidePosition(net,{...centre,w:e.way.w},{radius:size/2,side:off<0?-1:1,blocked});
+    if(!point)return;
+    const p={...centre,...point},yaw=Math.atan2(-p.tx,-p.tz);
+    placements.push({kind:'sign',x:p.x,z:p.z,hidden:false});
     batch.push(p.x, h, p.z, yaw, size, size, 1);
     if (back) back.push(p.x + p.tx * 0.02, h, p.z + p.tz * 0.02, yaw + Math.PI, size, size, 1);
     B.poles.push(p.x + p.tx * 0.05, 0, p.z + p.tz * 0.05, 0, 1, h - size * 0.4, 1);

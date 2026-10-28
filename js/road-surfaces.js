@@ -1,0 +1,38 @@
+import Clipper from './vendor/clipper.js';
+import {roadSpace,ribbonRings,ringArea} from './road-space.js';
+// Integer millimetres prevent near-coincident OSM vertices from leaving slivers.
+export function polygonOperation(subject,other,operation='union'){
+ const paths=polys=>polys.flatMap(poly=>poly.map((ring,i)=>{const path=ring.map(([x,z])=>({X:Math.round(x*1000),Y:Math.round(z*1000)}));if(Clipper.Clipper.Orientation(path)!==(i===0))path.reverse();return path;}));
+ const clip=new Clipper.Clipper(),tree=new Clipper.PolyTree();
+ clip.AddPaths(paths(subject),Clipper.PolyType.ptSubject,true);clip.AddPaths(paths(other),Clipper.PolyType.ptClip,true);
+ const op={union:Clipper.ClipType.ctUnion,difference:Clipper.ClipType.ctDifference,intersection:Clipper.ClipType.ctIntersection}[operation];
+ if(!clip.Execute(op,tree,Clipper.PolyFillType.pftNonZero,Clipper.PolyFillType.pftNonZero))return [];
+ const output=[],ring=n=>n.Contour().map(p=>[p.X/1000,p.Y/1000]);
+ const visit=n=>{for(const child of n.Childs()){if(!child.IsHole())output.push([ring(child),...child.Childs().filter(c=>c.IsHole()).map(ring)]);visit(child);}};visit(tree);return output;
+}
+export function offsetPolygons(polys,distance){
+ const paths=polys.flatMap(poly=>poly.map((ring,i)=>{const path=ring.map(([x,z])=>({X:Math.round(x*1000),Y:Math.round(z*1000)}));if(Clipper.Clipper.Orientation(path)!==(i===0))path.reverse();return path;}));
+ const offset=new Clipper.ClipperOffset(2,.25),out=[];offset.AddPaths(paths,Clipper.JoinType.jtRound,Clipper.EndType.etClosedPolygon);offset.Execute(out,distance*1000);
+ // Preserve the offset path orientation so holes remain subtractive.
+ const tree=new Clipper.PolyTree(),c=new Clipper.Clipper();c.AddPaths(out,Clipper.PolyType.ptSubject,true);c.Execute(Clipper.ClipType.ctUnion,tree,Clipper.PolyFillType.pftNonZero,Clipper.PolyFillType.pftNonZero);
+ const result=[],ring=n=>n.Contour().map(p=>[p.X/1000,p.Y/1000]);const visit=n=>{for(const child of n.Childs()){if(!child.IsHole())result.push([ring(child),...child.Childs().filter(c=>c.IsHole()).map(ring)]);visit(child);}};visit(tree);return result;
+}
+const surfaceCache=new Map();
+// Union per render chunk: no stacked kerbs or pavement wedges in the road.
+export function joinedRoadSurfaces(net){
+ const key=JSON.stringify([net.edges.map(e=>[e.way.w,[...e.px],[...e.pz]]),net.fillets.map(f=>[f.C,f.pts])]);if(surfaceCache.has(key))return surfaceCache.get(key);
+ const C=net.chunkSize,tiles=new Map(),space=roadSpace(net);
+ const add=(ring,kind)=>{const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1]);for(let x=Math.floor(Math.min(...xs)/C);x<=Math.floor(Math.max(...xs)/C);x++)for(let z=Math.floor(Math.min(...zs)/C);z<=Math.floor(Math.max(...zs)/C);z++){const key=x+':'+z;if(!tiles.has(key))tiles.set(key,{x,z,road:[],pave:[]});tiles.get(key)[kind].push([ring]);}};
+ for(const p of space.patches)add(p.ring,'road');
+ for(const e of net.edges)for(const ring of ribbonRings(e,2))add(ring,'pave');
+ const result=[];
+ for(const tile of tiles.values()){
+  const x=tile.x*C,z=tile.z*C,boundary=[[[[x,z],[x+C,z],[x+C,z+C],[x,z+C]]]];
+  const road=polygonOperation(polygonOperation(tile.road,[]),boundary,'intersection');
+  const rim=polygonOperation(offsetPolygons(road,.08),boundary,'intersection'),kerb=polygonOperation(rim,road,'difference');
+  const pave=polygonOperation(polygonOperation(polygonOperation(tile.pave,[]),boundary,'intersection'),rim,'difference');
+  result.push({x:x+C/2,z:z+C/2,road,kerb,pave:pave.filter(p=>ringArea(p[0])>.08)});
+ }
+ if(surfaceCache.size>=3)surfaceCache.delete(surfaceCache.keys().next().value);surfaceCache.set(key,result);return result;
+}
+export function surfaceGeometry(T,polygons){const shapes=polygons.map(poly=>{const path=(ring,Type)=>{const p=new Type();ring.forEach(([x,z],i)=>i?p.lineTo(x,-z):p.moveTo(x,-z));p.closePath();return p;};const s=path(poly[0],T.Shape);s.holes=poly.slice(1).map(h=>path(h,T.Path));return s;});const g=new T.ShapeGeometry(shapes);g.rotateX(-Math.PI/2);return g;}

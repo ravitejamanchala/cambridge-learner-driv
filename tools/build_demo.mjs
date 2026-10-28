@@ -40,3 +40,5 @@ if (process.argv.includes('--pages-preview')) {
   fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG={BROWSER_AUTHORING:true};');
 } else if (preview) fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG = {"PREVIEW":true};\n');
 else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
+
+fs.copyFileSync(path.join(SRC,'js/vendor/THIRD-PARTY-LICENSES.txt'),path.join(OUT,'THIRD-PARTY-LICENSES.txt'));

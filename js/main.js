@@ -1,3 +1,4 @@
+import {fitRoadCorners} from './roadside-clearance.js';
 import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
 import { addEditorObjects } from './local-world.js';
 import { obstacleContact } from './editor-collisions.js';
@@ -113,13 +114,14 @@ async function boot() {
       if (A.test) A.test.running = false;
       const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
       const net = buildNet(d.network || d);
+      if(d.network)fitRoadCorners(net,d.objects||[]);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
       // Local navigation inserts waypoint nodes; the original graph keeps road
       // paint continuous through those artificial cuts. Signals share cluster/group
       // identifiers with traffic, so both graphs display the same live phase.
       const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
-      const world = buildWorld(scene, visualNet, traffic, {authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
-      if(d.network) addEditorObjects(T,scene,d);
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      if(d.network) addEditorObjects(T,scene,d,visualNet);
       world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
@@ -441,7 +443,8 @@ async function boot() {
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
-    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,ukBuilding:m.userData.ukBuilding||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
+    get roadsidePlacements(){return A.world?.placements||[];},
+    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; }, steerFor };

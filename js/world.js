@@ -1,3 +1,6 @@
+import {roadsidePosition} from './road-space.js';
+import {objectBlocker,fitRoadCorners} from './roadside-clearance.js';
+import {joinedRoadSurfaces,surfaceGeometry} from './road-surfaces.js';
 import {ribbon,dash,roadBoundsVisible} from './road-ribbon.js';
 // Builds the 3D city from the road network: road surfaces, markings, roundabouts, signals, zebras,
 // and lazily generated buildings and trees in 400 m chunks around the driver.
@@ -24,6 +27,9 @@ function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, sid
 
 export function buildWorld(scene, net, traffic, options = {}) {
   const W = WORLD;
+  const joined=!!options.authored&&!net.edges.some(e=>e.way.cls==='motorway');
+  if(joined)fitRoadCorners(net,options.objects||[]);
+  const blocked=objectBlocker(options.objects||[]),placements=[];
   scene.background = new T.Color(W.sky); scene.fog = new T.Fog(W.sky, W.fogNear, W.fogFar);
   const hemi = new T.HemisphereLight(0xe3ecf5, 0x7d7666, 0.78); scene.add(hemi);
   // warm low sun; its shadow box follows the driver so shadows stay sharp nearby
@@ -87,8 +93,8 @@ export function buildWorld(scene, net, traffic, options = {}) {
   for (const e of net.edges) {
     if (isMway(e.way)) { motorwayEdge(e); continue; }
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
-    ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
-    ribbon(road, e, -w / 2, w / 2, 0.04);
+    if(!joined){ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
+    ribbon(road, e, -w / 2, w / 2, 0.04);}
     if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
       const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
@@ -125,7 +131,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     }
   }
   // rounded kerbs at junction corners (see net.js junctionFillets)
-  for (const f of net.fillets) { const road = accFor(f.C[0], f.C[1]).road; for (let k = 0; k < f.pts.length - 1; k++) road.quad(f.C[0], f.C[1], f.pts[k][0], f.pts[k][1], f.pts[k + 1][0], f.pts[k + 1][1], f.pts[k + 1][0], f.pts[k + 1][1], 0.04); }
+  if(!joined)for (const f of net.fillets) { const road = accFor(f.C[0], f.C[1]).road; for (let k = 0; k < f.pts.length - 1; k++) road.quad(f.C[0], f.C[1], f.pts[k][0], f.pts[k][1], f.pts[k + 1][0], f.pts[k + 1][1], f.pts[k + 1][0], f.pts[k + 1][1], 0.04); }
   for (const st of net.stops) bar(accFor(st.x, st.z).white, st, st.e.way.oneway ? -st.w / 2 + 0.3 : 0.2, st.w / 2 - 0.3, 0.35);
   for (const g of net.giveways) {
     const white = accFor(g.x, g.z).white;
@@ -179,6 +185,12 @@ export function buildWorld(scene, net, traffic, options = {}) {
     } }
   let studsOn = false, studAt = { x: 0, z: 0 };
   const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
+  if(joined){
+    pm.color.setHex(0xa7a398);rm.color.setHex(0x444a4e);const kerbMat=flatMat(0x777b79);
+    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',pm,.02,1],['kerb',kerbMat,.03,1.5],['road',rm,.04,2]]){
+      if(!tile[kind].length)continue;const m=new T.Mesh(surfaceGeometry(T,tile[kind]),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
+    }
+  }
   for (const [key, A] of roadChunks) {
     for (const [acc, mat, ord] of [[A.pave, pm, 1], [A.road, rm, 2], [A.cyc, cm, 3], [A.white, wm, 4]]) {
       if (!acc.idx.length) continue; const m = acc.mesh(mat, ord); m.frustumCulled = true; m.receiveShadow = true; A.meshes.push(m); scene.add(m);
@@ -240,15 +252,11 @@ export function buildWorld(scene, net, traffic, options = {}) {
   const heads = new T.InstancedMesh(headG, new T.MeshLambertMaterial({ color: 0x15181a }), nS);
   const lamps = [0, 1, 2].map(() => new T.InstancedMesh(lampG, new T.MeshBasicMaterial({ color: 0xffffff }), nS));
   // a pole must stand on the pavement or an island, never in a carriageway or on a cycle track
-  const clear = (x, z) => { const nr = nearest(net, x, z); if (nr && nr.d < paved(nr.way) + 0.6) return false; return !net.cycleRings.some(r => Math.abs(Math.hypot(x - r.x, z - r.z) - r.r) < 1.8); };
   S.forEach((st, i) => {
-    const nx = st.tz, nz = -st.tx; // left of travel
-    let px = st.x + nx * (st.w / 2 + 1.0), pz = st.z + nz * (st.w / 2 + 1.0);
-    // left kerb first; then a little further back; then the right-hand side (a central island or the far kerb)
-    for (const [side, back] of [[1, 0], [1, 2.5], [1, 5], [-1, 0], [-1, 2.5], [1, -2]]) {
-      const o = side * (st.w / 2 + 1.0), x = st.x + nx * o - st.tx * back, z = st.z + nz * o - st.tz * back;
-      if (clear(x, z)) { px = x; pz = z; break; }
-    }
+    const point=st.e.way.oneway&&st.dir<0?null:roadsidePosition(net,st,{blocked:(x,z,r)=>blocked(x,z,r)||placements.some(p=>p.x!==null&&Math.hypot(x-p.x,z-p.z)<r+.4)});
+    placements.push({kind:'signal',id:st.id,x:point?.x??null,z:point?.z??null,hidden:!point});
+    if(!point){M4.makeScale(0,0,0);for(const mesh of [poles,heads,...lamps])mesh.setMatrixAt(i,M4);st.px=st.pz=null;return;}
+    const px=point.x,pz=point.z;
     st.px = px; st.pz = pz;
     M4.makeTranslation(px, 0, pz); poles.setMatrixAt(i, M4);
     E.set(0, Math.atan2(-st.tx, -st.tz), 0); Q.setFromEuler(E);
@@ -262,13 +270,15 @@ export function buildWorld(scene, net, traffic, options = {}) {
   const globeMat = new T.MeshBasicMaterial({ color: 0xffb21a });
   const globes = new T.InstancedMesh(new T.SphereGeometry(0.28, 12, 8), globeMat, Z.length * 2);
   Z.forEach((z, i) => [-1, 1].forEach((sd, k) => {
-    let bx = z.x + z.tz * sd * (z.w / 2 + 1.3), bz = z.z - z.tx * sd * (z.w / 2 + 1.3);
-    for (const along of [0, -1.2, 1.2, -2.4, 2.4]) { const x = bx + z.tx * along, y = bz + z.tz * along; if (clear(x, y)) { bx = x; bz = y; break; } } // step along the kerb until clear of other roads
+    const point=roadsidePosition(net,z,{side:sd,radius:.3,blocked});
+    placements.push({kind:'beacon',id:i*2+k,x:point?.x??null,z:point?.z??null,hidden:!point});
+    if(!point){M4.makeScale(0,0,0);bPole.setMatrixAt(i*2+k,M4);globes.setMatrixAt(i*2+k,M4);return;}
+    const bx=point.x,bz=point.z;
     M4.makeTranslation(bx, 0, bz); bPole.setMatrixAt(i * 2 + k, M4); M4.makeTranslation(bx, 2.75, bz); globes.setMatrixAt(i * 2 + k, M4);
   }));
   for (const m of [bPole, globes]) { m.frustumCulled = false; scene.add(m); }
 
-  buildSigns(scene, net);
+  buildSigns(scene, net, {blocked,placements});
 
   // Central reservation: a concrete step barrier along the motorway's centre line, one instance per
   // segment so the whole circuit is a single draw call.
@@ -387,7 +397,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   function setShadows(on) { sun.castShadow = !!on; }
   // roadside parallel parking draws its markings, parked cars and guide over the ordinary world
   const roadside = createRoadsideParkingView(scene);
-  return { updateChunks, updateSignals, updateSun, setShadows, setTimeOfDay, lighting, studs: studMeshes, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
+  return { placements, updateChunks, updateSignals, updateSun, setShadows, setTimeOfDay, lighting, studs: studMeshes, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
 }
 
 function bikeTexture() {
