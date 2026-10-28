@@ -1,3 +1,5 @@
+import {correctApproaches} from './junction-approaches.js';
+import {joinMappedPaths} from './path-joins.js';
 import {buildNet,nearest,posAt} from './net.js';
 import {roadSpace,roadsidePosition,insideRing,pointSegment,solidOverlap,invalidateRoadSpace} from './road-space.js';
 // Local object footprint in world metres, including holes and authored transforms.
@@ -35,9 +37,9 @@ export function fitRoadCorners(net,objects){
 const MOVABLE=new Set(['tree','lamp','bench','bin','postBox','bicycleParking','busStop','sign']);
 export function clearRoadside(track,{margin=.35}={}){
  const rejectedSignals=track.osm?track.network.stops.filter(s=>track.network.ways[track.network.edges[s[0]][2]][4]&&s[2]<0):[];
- const network=rejectedSignals.length?{...track.network,stops:track.network.stops.filter(s=>!rejectedSignals.includes(s))}:track.network;
- const net=buildNet(network);fitRoadCorners(net,track.objects);const space=roadSpace(net),objects=[],adjustments=[],excluded=[],blocked=objectBlocker(track.objects),placed=[];
- for(const source of track.objects){
+ let network=rejectedSignals.length?{...track.network,stops:track.network.stops.filter(s=>!rejectedSignals.includes(s))}:track.network;
+ let net=buildNet(network);fitRoadCorners(net,track.objects);const approaches=correctApproaches(network,net);network=approaches.network;if(approaches.changes.length){net=buildNet(network);fitRoadCorners(net,track.objects);}const space=roadSpace(net),objects=[],adjustments=[],excluded=[],blocked=objectBlocker(track.objects),placed=[];
+ for(const source of joinMappedPaths(track.objects)){
   if(!roadObstacle(source)){objects.push(source);continue;}
   const hits=[...new Set(space.overlaps(objectRings(source),source.type==='building'?0:margin))];if(!hits.length){objects.push(source);continue;}
   const movable=MOVABLE.has(source.properties?.mapFeature)||['light','sign'].includes(source.type),near=movable&&nearest(net,source.x,source.z);
@@ -48,5 +50,5 @@ export function clearRoadside(track,{margin=.35}={}){
  }
  const previous=track.roadsideClearance||{},archive=[...(previous.excluded||[])],ids=new Set(archive.map(e=>e.object.id));for(const e of excluded)if(!ids.has(e.object.id)){archive.push(e);ids.add(e.object.id);}
  const counts={};for(const o of objects)if(o.properties?.mapFeature)counts[o.properties.mapFeature]=(counts[o.properties.mapFeature]||0)+1;
- return {...track,...(track.mapFeatures?{mapFeatures:{...track.mapFeatures,counts}}:{}),network,objects,roadsideClearance:{version:1,margin,adjustedCorners:net.adjustedCorners,excludedSignals:[...(previous.excludedSignals||[]),...rejectedSignals],signalsRemovedThisPass:rejectedSignals.length,adjustments:[...(previous.adjustments||[]),...adjustments],excluded:archive,movedThisPass:adjustments.length,excludedThisPass:excluded.length}};
+ return {...track,...(track.mapFeatures?{mapFeatures:{...track.mapFeatures,counts}}:{}),network,objects,roadsideClearance:{version:1,margin,approaches:[...(previous.approaches||[]),...approaches.changes],unresolvedApproaches:approaches.unresolved,adjustedCorners:net.adjustedCorners,excludedSignals:[...(previous.excludedSignals||[]),...rejectedSignals],signalsRemovedThisPass:rejectedSignals.length,adjustments:[...(previous.adjustments||[]),...adjustments],excluded:archive,movedThisPass:adjustments.length,excludedThisPass:excluded.length}};
 }

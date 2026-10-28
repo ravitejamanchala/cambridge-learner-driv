@@ -120,7 +120,7 @@ async function boot() {
       // paint continuous through those artificial cuts. Signals share cluster/group
       // identifiers with traffic, so both graphs display the same live phase.
       const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
-      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
       if(d.network) addEditorObjects(T,scene,d,visualNet);
       world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);

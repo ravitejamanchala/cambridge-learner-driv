@@ -1,3 +1,4 @@
+import {ribbon} from './road-ribbon.js';
 import Clipper from './vendor/clipper.js';
 import {roadSpace,ribbonRings,ringArea} from './road-space.js';
 // Integer millimetres prevent near-coincident OSM vertices from leaving slivers.
@@ -20,11 +21,14 @@ export function offsetPolygons(polys,distance){
 const surfaceCache=new Map();
 // Union per render chunk: no stacked kerbs or pavement wedges in the road.
 export function joinedRoadSurfaces(net){
- const key=JSON.stringify([net.edges.map(e=>[e.way.w,[...e.px],[...e.pz]]),net.fillets.map(f=>[f.C,f.pts])]);if(surfaceCache.has(key))return surfaceCache.get(key);
+ const key=JSON.stringify([net.edges.map(e=>[e.way.w,e.way.sidewalkWidths,[...e.px],[...e.pz]]),net.fillets.map(f=>[f.C,f.pts])]);if(surfaceCache.has(key))return surfaceCache.get(key);
  const C=net.chunkSize,tiles=new Map(),space=roadSpace(net);
  const add=(ring,kind)=>{const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1]);for(let x=Math.floor(Math.min(...xs)/C);x<=Math.floor(Math.max(...xs)/C);x++)for(let z=Math.floor(Math.min(...zs)/C);z<=Math.floor(Math.max(...zs)/C);z++){const key=x+':'+z;if(!tiles.has(key))tiles.set(key,{x,z,road:[],pave:[]});tiles.get(key)[kind].push([ring]);}};
  for(const p of space.patches)add(p.ring,'road');
- for(const e of net.edges)for(const ring of ribbonRings(e,2))add(ring,'pave');
+ for(const e of net.edges){
+  const [left,right]=e.way.sidewalkWidths||[2,2],h=e.way.w/2;
+  for(const [width,lo,hi]of [[left,h,h+left],[right,-h-right,-h]])if(width>0)ribbon({quad:(...v)=>{const ring=[];for(let i=0;i<8;i+=2)ring.push([v[i],v[i+1]]);if(ringArea(ring)>.00001)add(ring,'pave');}},e,lo,hi,0);
+ }
  const result=[];
  for(const tile of tiles.values()){
   const x=tile.x*C,z=tile.z*C,boundary=[[[[x,z],[x+C,z],[x+C,z+C],[x,z+C]]]];

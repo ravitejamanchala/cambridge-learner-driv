@@ -1,3 +1,4 @@
+import {applyMappedRoadTags} from './mapped-road-tags.js';
 import {roadsidePosition} from './road-space.js';
 import {objectBlocker,fitRoadCorners} from './roadside-clearance.js';
 import {joinedRoadSurfaces,surfaceGeometry} from './road-surfaces.js';
@@ -27,6 +28,7 @@ function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, sid
 
 export function buildWorld(scene, net, traffic, options = {}) {
   const W = WORLD;
+  if(options.authored)applyMappedRoadTags(net,options.osmWays);
   const joined=!!options.authored&&!net.edges.some(e=>e.way.cls==='motorway');
   if(joined)fitRoadCorners(net,options.objects||[]);
   const blocked=objectBlocker(options.objects||[]),placements=[];
@@ -95,10 +97,10 @@ export function buildWorld(scene, net, traffic, options = {}) {
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
     if(!joined){ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
     ribbon(road, e, -w / 2, w / 2, 0.04);}
-    if (wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
+    if (wy.laneMarkings!==false && wy.rb && wy.lanes >= 2) { // lane line round a two-lane roundabout
       const L = laneInfo(e, 1); for (let k = 1; k < L.n; k++) { const o = L.outer - L.laneW * k; for (let s = 2; s < e.len - 2; s += 4.5) dash(white, e, s, 2.2, o, 0.07); }
     }
-    if (!wy.rb && e.len > 5 && w >= 5.5) {
+    if (wy.laneMarkings!==false && !wy.rb && e.len > 5 && w >= 5.5) {
       // How far the markings stay clear of the junction at each end. A road is cut into an edge per
       // junction, so a fixed clearance left every short edge bare: a stretch of Hills Road 12 m long
       // got no centre line at all, and the road looked unmarked between two marked stretches.
