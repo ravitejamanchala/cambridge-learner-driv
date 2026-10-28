@@ -1,0 +1,29 @@
+{
+  "profile": {
+    "render": {
+      "chunks": 13,
+      "geometries": 1032,
+      "textures": 35,
+      "calls": 1209,
+      "triangles": 72965,
+      "programs": 19,
+      "heap": 91
+    },
+    "stepMedianMs": 0.29999998211860657,
+    "stepP95Ms": 0.800000011920929
+  },
+  "url": "http://127.0.0.1:8791/cambridge-learner-driv/",
+  "release": {
+    "sourceCommit": "a7a3c263fa10fe88d7a8ab7d49d5a8840f5f1e09",
+    "sourceDirty": true,
+    "lessons": 45
+  },
+  "roads": 184,
+  "objects": 882,
+  "buildings": 327,
+  "mappedDetails": 555,
+  "driving": {
+    "distance": 4.165941219213454,
+    "assessmentRunning": true
+  }
+}

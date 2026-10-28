@@ -1,3 +1,4 @@
+import {roadJoinRings} from './road-joins.js';
 import {ribbon} from './road-ribbon.js';
 // The rendered carriageway, including every intersecting arm and rounded corner.
 // A nearest-centreline query alone cannot describe a junction's free space.
@@ -14,6 +15,7 @@ export function roadSpace(net){
  const patches=[],grid=new Map();
  const add=(ring,edge)=>{if(ringArea(ring)<.00001)return;const p={ring,edge,minX:Math.min(...ring.map(p=>p[0])),maxX:Math.max(...ring.map(p=>p[0])),minZ:Math.min(...ring.map(p=>p[1])),maxZ:Math.max(...ring.map(p=>p[1]))};patches.push(p);for(let x=Math.floor(p.minX/CELL);x<=Math.floor(p.maxX/CELL);x++)for(let z=Math.floor(p.minZ/CELL);z<=Math.floor(p.maxZ/CELL);z++){const k=x+':'+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(p);}};
  for(const e of net.edges)for(const r of ribbonRings(e))add(r,e.id);
+ for(const j of roadJoinRings(net))add(j.ring,'join:'+j.node);
  for(const f of net.fillets)for(let i=1;i<f.pts.length;i++)add([f.C,f.pts[i-1],f.pts[i]],'junction:'+f.node);
  const nearby=(x0,z0,x1,z1)=>{const found=new Set();for(let x=Math.floor(x0/CELL);x<=Math.floor(x1/CELL);x++)for(let z=Math.floor(z0/CELL);z<=Math.floor(z1/CELL);z++)for(const p of grid.get(x+':'+z)||[])found.add(p);return [...found].filter(p=>p.minX<=x1&&p.maxX>=x0&&p.minZ<=z1&&p.maxZ>=z0);};
  const disk=(x,z,r=0)=>nearby(x-r,z-r,x+r,z+r).some(p=>insideRing([x,z],p.ring)||p.ring.some((v,i)=>pointSegment([x,z],v,p.ring[(i+1)%p.ring.length])<=r+EPS));

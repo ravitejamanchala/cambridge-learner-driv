@@ -21,7 +21,7 @@ export function offsetPolygons(polys,distance){
 const surfaceCache=new Map();
 // Union per render chunk: no stacked kerbs or pavement wedges in the road.
 export function joinedRoadSurfaces(net){
- const key=JSON.stringify([net.edges.map(e=>[e.way.w,e.way.sidewalkWidths,[...e.px],[...e.pz]]),net.fillets.map(f=>[f.C,f.pts])]);if(surfaceCache.has(key))return surfaceCache.get(key);
+ const key=JSON.stringify([net.edges.map(e=>[e.a,e.b,e.way.w,e.way.sidewalkWidths,[...e.px],[...e.pz]]),net.fillets.map(f=>[f.C,f.pts])]);if(surfaceCache.has(key))return surfaceCache.get(key);
  const C=net.chunkSize,tiles=new Map(),space=roadSpace(net);
  const add=(ring,kind)=>{const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1]);for(let x=Math.floor(Math.min(...xs)/C);x<=Math.floor(Math.max(...xs)/C);x++)for(let z=Math.floor(Math.min(...zs)/C);z<=Math.floor(Math.max(...zs)/C);z++){const key=x+':'+z;if(!tiles.has(key))tiles.set(key,{x,z,road:[],pave:[]});tiles.get(key)[kind].push([ring]);}};
  for(const p of space.patches)add(p.ring,'road');

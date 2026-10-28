@@ -37,3 +37,7 @@ test('recreated modular frontage follows the road and retains rotated footprint 
  const before=rectangularOutline(o);o.properties.tags['roof:orientation']='across';const across=rectangularOutline(o);assert.deepEqual(across[0],before[1]);
  }finally{delete globalThis.document;}
 });
+
+test('mapped numeric roof directions are accepted and orient the roof',()=>{
+ const o=object();o.properties.tags['roof:direction']='90';const east=rectangularOutline(o);o.properties.tags['roof:direction']='0';const north=rectangularOutline(o);assert.notDeepEqual(east,north);
+});

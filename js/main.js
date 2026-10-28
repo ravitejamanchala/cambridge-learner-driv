@@ -1,3 +1,4 @@
+import {createObstacleIndex} from './obstacle-index.js';
 import {fitRoadCorners} from './roadside-clearance.js';
 import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
 import { addEditorObjects } from './local-world.js';
@@ -112,7 +113,7 @@ async function boot() {
       const d = localTracks.get(id) || await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
+      const old = scene; scene = new T.Scene(); scene.matrixAutoUpdate=!Array.isArray(d.objects); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
       const net = buildNet(d.network || d);
       if(d.network)fitRoadCorners(net,d.objects||[]);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
@@ -126,7 +127,7 @@ async function boot() {
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
-      Object.assign(A, { id, net, traffic, world, test, trafficInit: false });
+      Object.assign(A, { id, net, traffic, world, test, obstacleIndex: d.objects?createObstacleIndex(d.objects):null, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
     }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; throw err; });
@@ -775,7 +776,7 @@ async function boot() {
       player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       chaseMirrors(dt, traffic.clock);
       const authored = localTracks.get(A.id);
-      if(authored && obstacleContact(player,authored.objects.filter(o=>["building","scenery","sign","light"].includes(o.type)),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
+      if(authored && obstacleContact(player,A.obstacleIndex.near(previous,player),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);
@@ -804,7 +805,7 @@ async function boot() {
     $('sigL').classList.toggle('on', player.indicator === 'L' && Math.floor(traffic.clock * 3) % 2 === 0);
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
-    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
+    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1, o ? WORLD.fogFar + 200 + ov.h : 0); }
     // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
     setLamps(player.mesh, dusk, !!player.headlights);
     { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's

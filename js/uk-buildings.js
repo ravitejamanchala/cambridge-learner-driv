@@ -1,3 +1,4 @@
+import {compactMaterialGroups} from './material-groups.js';
 import {addUKFrontage} from './uk-architecture.js';
 // Original procedural UK facades. Source footprints, transforms and total heights
 // remain authoritative; visual roofs never extend outside the mapped outline.
@@ -20,8 +21,8 @@ function facade(T,style,floors){return canvasTexture(T,`wall:${style}:${floors}`
  const rows=floors?Math.max(12,floors*24):40,bh=H/rows,bw=style==='stone'?38:25;
  if(!['render','industrial'].includes(style))for(let row=0;row<rows;row++)for(let col=-1;col<W/bw+1;col++){
   const x=col*bw+(row%2?bw/2:0),y=row*bh;
-  g.strokeStyle=mortar;g.lineWidth=Math.max(.5,bh*.09);g.strokeRect(x,y,bw,bh);
-  g.fillStyle=`rgba(${(row*17+col*31)%3===0?'0,0,0':'255,255,255'},.045)`;g.fillRect(x+1,y+1,bw-2,bh-2);
+  g.globalAlpha=.25;g.strokeStyle=mortar;g.lineWidth=Math.max(.5,bh*.09);g.strokeRect(x,y,bw,bh);g.globalAlpha=1;
+  g.fillStyle=`rgba(${(row*17+col*31)%3===0?'0,0,0':'255,255,255'},.02)`;g.fillRect(x+1,y+1,bw-2,bh-2);
  }
  if(style==='industrial'){g.strokeStyle='#62777c';g.lineWidth=1;for(let x=0;x<W;x+=8){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}}
  if(!floors)return;
@@ -38,9 +39,9 @@ function facade(T,style,floors){return canvasTexture(T,`wall:${style}:${floors}`
     g.fillStyle='#d8d4c5';g.fillRect(x-5,y+fh*.18,ww+10,fh*.82);g.fillStyle=style==='terrace'?'#344e5d':'#3c5146';g.fillRect(x,y+fh*.23,ww,fh*.77);
     g.strokeStyle='#758077';g.lineWidth=2;for(let k=0;k<2;k++)g.strokeRect(x+9,y+fh*(.34+k*.3),ww-18,fh*.23);g.fillStyle='#bba479';g.fillRect(x+ww-10,y+fh*.65,3,4);continue;
    }
-   g.fillStyle='rgba(0,0,0,.22)';g.fillRect(x-6,wy-3,ww+13,wh+10);g.fillStyle='#e0dfd2';g.fillRect(x-4,wy-4,ww+8,wh+8);
+   g.fillStyle='rgba(0,0,0,.22)';g.fillRect(x-6,wy-3,ww+13,wh+10);g.fillStyle='#c9c9be';g.fillRect(x-4,wy-4,ww+8,wh+8);
    const gradient=g.createLinearGradient(x,wy,x+ww,wy+wh);gradient.addColorStop(0,'#71858b');gradient.addColorStop(.55,'#a5afb0');gradient.addColorStop(.56,'#3f555e');gradient.addColorStop(1,'#31434b');g.fillStyle=gradient;g.fillRect(x,wy,ww,wh);
-   g.fillStyle='#e3e0d3';g.fillRect(x+ww/2-1,wy,2,wh);g.fillRect(x,wy+wh*.48,ww,2);
+   g.fillStyle='#d0cec3';g.fillRect(x+ww/2-1,wy,2,wh);g.fillRect(x,wy+wh*.48,ww,2);
    if(style==='stone'){g.fillRect(x+ww/3-1,wy,2,wh);g.fillRect(x+ww*2/3-1,wy,2,wh);}
    g.fillStyle='#bdb9ab';g.fillRect(x-7,wy+wh+4,ww+14,Math.max(2,fh*.025));
   }
@@ -48,7 +49,7 @@ function facade(T,style,floors){return canvasTexture(T,`wall:${style}:${floors}`
  // Low plinth and eaves shading anchor the facade without extra geometry.
  g.fillStyle='rgba(35,39,35,.18)';g.fillRect(0,H-5,W,5);g.fillRect(0,0,W,5);
 });}
-function roofTexture(T){return canvasTexture(T,'slate',(g,W,H)=>{g.fillStyle='#d3d8da';g.fillRect(0,0,W,H);for(let y=0;y<H;y+=32)for(let x=-32;x<W;x+=64){g.fillStyle=(x+y)%128?'#b1b9bc':'#c2c9cc';g.fillRect(x+(y%64?32:0)+2,y+2,60,28);g.fillStyle='#78878d';g.fillRect(x+(y%64?32:0),y,64,2);}});}
+function roofTexture(T){return canvasTexture(T,'slate',(g,W,H)=>{g.fillStyle='#d3d8da';g.fillRect(0,0,W,H);for(let y=0;y<H;y+=32)for(let x=-32;x<W;x+=64){g.fillStyle=(x+y)%128?'#c6cdcf':'#cdd2d4';g.fillRect(x+(y%64?32:0)+2,y+2,60,28);g.fillStyle='#bcc5c8';g.fillRect(x+(y%64?32:0),y,64,2);}});}
 // Find a rectangular or slightly skewed quadrilateral, including rotated ones. Courtyards and irregular
 // outlines keep their own flat roof: no bounding-box roof over empty space.
 export function rectangularOutline(o){
@@ -61,6 +62,7 @@ export function rectangularOutline(o){
  if(lengths.some(l=>l<1)||edges.some((a,i)=>Math.abs(a[0]*edges[(i+1)%4][0]+a[1]*edges[(i+1)%4][1])>lengths[i]*lengths[(i+1)%4]*.2))return null;
  if(lengths[1]>lengths[0])r.push(r.shift());
  if(o.properties?.tags?.['roof:orientation']==='across')r.push(r.shift());
+ const direction=Number(o.properties?.tags?.['roof:direction']);
  if(o.properties?.tags?.['roof:direction']!==undefined&&Number.isFinite(direction)){const a=direction*Math.PI/180,u=[Math.sin(a),-Math.cos(a)],dot=i=>{const d=[r[(i+1)%4][0]-r[i][0],r[(i+1)%4][1]-r[i][1]];return Math.abs(d[0]*u[0]+d[1]*u[1])/Math.hypot(...d);};if(dot(1)>dot(0))r.push(r.shift());}
  const xs=r.map(p=>p[0]),zs=r.map(p=>p[1]),cx=(Math.min(...xs)+Math.max(...xs))/2,cz=(Math.min(...zs)+Math.max(...zs))/2,w=Math.max(...xs)-Math.min(...xs),d=Math.max(...zs)-Math.min(...zs);
  return r.map(([x,z])=>[(x-cx)/w,(z-cz)/d]);
@@ -77,7 +79,7 @@ export function styleUKBuilding(T,mesh,o,context={}){
   if(fraction)p.setY(i,(p.getY(i)+.5)*(1-fraction)-.5);
   const ny=normal.getY(i);
   if(Math.abs(ny)>.5)uv.setXY(i,p.getX(i)*o.sx/1.6,p.getZ(i)*o.sz/1.6);
-  else uv.setXY(i,(-normal.getZ(i)*p.getX(i)*o.sx+normal.getX(i)*p.getZ(i)*o.sz)/4,(p.getY(i)+.5)/(1-fraction));
+  else uv.setXY(i,(-normal.getZ(i)*p.getX(i)*o.sx+normal.getX(i)*p.getZ(i)*o.sz)/5.2,(p.getY(i)+.5)/(1-fraction));
  }
  for(const group of geometry.groups){const i=geometry.index?geometry.index.getX(group.start):group.start;group.materialIndex=Math.abs(normal.getY(i))>.5?0:1;}
  p.needsUpdate=true;uv.needsUpdate=true;geometry.computeBoundingBox();geometry.computeBoundingSphere();
@@ -95,9 +97,10 @@ export function styleUKBuilding(T,mesh,o,context={}){
    for(const [a,b,c,d]of [[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7],[4,5,6,7]])face([v[a],v[b],v[c],v[a],v[c],v[d]],1);
   }
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));g.computeVertexNormals();for(const group of groups)g.addGroup(...group);
-  const gp=g.attributes.position,gn=g.attributes.normal,gu=g.attributes.uv;for(const [start,count,index]of groups)if(index===1)for(let i=start;i<start+count;i++)gu.setXY(i,(-gn.getZ(i)*gp.getX(i)*o.sx+gn.getX(i)*gp.getZ(i)*o.sz)/4,(gp.getY(i)-wallTop)*o.sy/3);
-  const gable=new T.MeshLambertMaterial({map:facade(T,profile.style,0),side:T.DoubleSide});const cap=new T.Mesh(g,[roof.clone(),gable]);cap.userData.ukRoof=true;cap.userData.id=o.id;cap.userData.editorObjectId=o.id;cap.castShadow=true;cap.receiveShadow=true;mesh.add(cap);
+  const gp=g.attributes.position,gn=g.attributes.normal,gu=g.attributes.uv;for(const [start,count,index]of groups)if(index===1)for(let i=start;i<start+count;i++)gu.setXY(i,(-gn.getZ(i)*gp.getX(i)*o.sx+gn.getX(i)*gp.getZ(i)*o.sz)/5.2,(gp.getY(i)-wallTop)*o.sy/3);
+  const gable=new T.MeshLambertMaterial({map:facade(T,profile.style,0),side:T.DoubleSide});compactMaterialGroups(g);const cap=new T.Mesh(g,[roof.clone(),gable]);cap.userData.ukRoof=true;cap.userData.id=o.id;cap.userData.editorObjectId=o.id;cap.castShadow=true;cap.receiveShadow=true;mesh.add(cap);
  }
  addUKFrontage(T,mesh,o,profile,{outline:rectangularOutline(o),front:context.front,brick:facade(T,profile.style,0),roofFraction:fraction});
+ compactMaterialGroups(mesh.geometry);
  mesh.userData.ukBuilding={style:profile.style,floors:profile.floors,roof:outline?profile.roofShape:'flat',estimatedStyle:!o.properties?.ukStyle};mesh.castShadow=true;mesh.receiveShadow=true;
 }

@@ -188,7 +188,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   let studsOn = false, studAt = { x: 0, z: 0 };
   const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
   if(joined){
-    pm.color.setHex(0xa7a398);rm.color.setHex(0x444a4e);const kerbMat=flatMat(0x777b79);
+    pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x777b79);
     for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',pm,.02,1],['kerb',kerbMat,.03,1.5],['road',rm,.04,2]]){
       if(!tile[kind].length)continue;const m=new T.Mesh(surfaceGeometry(T,tile[kind]),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
     }
@@ -355,7 +355,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     });
     scene.remove(g);
   }
-  function updateChunks(px, pz, budget) {
+  function updateChunks(px, pz, budget, viewRadius = 0) {
     if (studsOn) updateStuds(px, pz);
     const r = Math.ceil(WORLD.buildRadius / C), pcx = Math.floor(px / C), pcz = Math.floor(pz / C);
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) {
@@ -375,7 +375,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
       if (d > WORLD.freeRadius) { freeChunk(g); chunks.delete(k); }
     }
     for (const A of roadChunks.values()) {
-      const vis = roadBoundsVisible(A.bounds, px, pz, WORLD.hideRadius + 200), far = !roadBoundsVisible(A.bounds, px, pz, WORLD.freeRadius);
+      const radius=Math.max(WORLD.hideRadius+200,viewRadius),vis = roadBoundsVisible(A.bounds, px, pz, radius), far = !roadBoundsVisible(A.bounds, px, pz, Math.max(WORLD.freeRadius,radius+200));
       for (const m of A.meshes) m.visible = vis;
       // The road itself is built once for the whole map, but a hidden mesh keeps its GPU buffers from
       // the last time it was drawn, so a lap of the motorway left every section it had passed on the

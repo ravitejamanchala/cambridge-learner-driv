@@ -10,7 +10,7 @@ export function approachBar(feature,back=0){
 export function approachConflicts(net,feature,back=0){
  const ring=approachBar(feature,back),xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1]);
  return roadSpace(net).nearby(Math.min(...xs)-.5,Math.min(...zs)-.5,Math.max(...xs)+.5,Math.max(...zs)+.5).filter(p=>{
-  if(p.edge===feature.e.id)return false;
+  if(p.edge===feature.e.id||String(p.edge).startsWith('join:'))return false;
   // A collinear continuation is the same approach, not a crossing arm.
   if(typeof p.edge==='number'){
    const e=net.edges[p.edge],a=posAt(e,e.len/2);
