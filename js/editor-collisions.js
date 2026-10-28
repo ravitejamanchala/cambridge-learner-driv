@@ -7,6 +7,7 @@ export function sceneryIndex(THREE){let seen=new Set(),grid=new Map();const matr
 function inside(p,ring){let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;}return hit;}
 function intersects(a,b,c,d){const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);return cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;}
 export function footprintContact(pose,o){
+ if(o.properties?.mapFeature==='tree')return rectanglesOverlap(pose,{x:o.x,z:o.z,th:o.rotation||0,width:o.sx*.14,length:o.sz*.14});
  const ring=o.properties?.footprint;if(!ring?.length)return rectanglesOverlap(pose,{x:o.x,z:o.z,th:o.rotation||0,width:o.sx,length:o.sz});
  const xs=ring.map(p=>p.x),zs=ring.map(p=>p.z),cx=(Math.min(...xs)+Math.max(...xs))/2,cz=(Math.min(...zs)+Math.max(...zs))/2,w=Math.max(.01,Math.max(...xs)-Math.min(...xs)),d=Math.max(.01,Math.max(...zs)-Math.min(...zs)),angle=o.rotation||0,c=Math.cos(angle),s=Math.sin(angle);
  const transform=p=>{const x=(p.x-cx)/w*o.sx,z=(p.z-cz)/d*o.sz;return {x:o.x+c*x+s*z,z:o.z-s*x+c*z};},outer=ring.map(transform),holes=(o.properties.holes||[]).map(h=>h.map(transform)),car=rectangleCorners(pose),solid=p=>inside(p,outer)&&!holes.some(h=>inside(p,h));
