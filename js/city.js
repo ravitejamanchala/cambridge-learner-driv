@@ -1,3 +1,4 @@
+import {styleUKBuilding,ukBuildingResources} from './uk-buildings.js';
 // Stylised city dressing for each 400 m chunk: houses with pitched roofs, shops with awnings,
 // taller blocks with rooftop gardens, street lamps and trees. Everything is instanced per chunk.
 import { posAt, nearest, paved } from './net.js';
@@ -58,9 +59,9 @@ function prismGeo() {
 let K = null;
 // shared geometry, materials and textures that must survive a map-area change
 export function kitResources() {
-  if (!K) return [];
+  if (!K) return ukBuildingResources();
   const mats = Object.values(K.mats);
-  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean)];
+  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean), ...ukBuildingResources()];
 }
 function kit() {
   if (K) return K;
@@ -224,27 +225,4 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
 
 // Authored footprints share the simulator's facade textures and palette, without
 // generating replacement boxes or moving the surveyed building outline.
-export function styleEditorBuilding(mesh, object) {
-  const kind = object.sy > 13 ? 'block' : object.sy > 8 ? 'shop' : 'house';
-  const floors = kind === 'block' ? 5 : kind === 'shop' ? 3 : 2;
-  let seed = 0;
-  for (const c of String(object.properties?.osmId ?? object.id)) seed = (Math.imul(seed, 31) + c.charCodeAt(0)) >>> 0;
-  const wall = kit().mats[kind].clone();
-  wall.color.setHex(TYPES[kind].tints[seed % TYPES[kind].tints.length]);
-  wall.map.wrapS = wall.map.wrapT = T.RepeatWrapping;
-  const roof = new T.MeshLambertMaterial({color: [0x585b60,0x6c5146,0x655d55][seed % 3]});
-  const geometry = mesh.geometry, p = geometry.attributes.position, normal = geometry.attributes.normal, uv = geometry.attributes.uv;
-  for (let i=0;i<p.count;i++) {
-    if (Math.abs(normal.getY(i)) > .5) continue;
-    // Physical dimensions keep windows at a consistent scale on long OSM walls.
-    const u = (-normal.getZ(i)*p.getX(i)*object.sx + normal.getX(i)*p.getZ(i)*object.sz) / 8;
-    uv.setXY(i,u,(p.getY(i)+.5)*object.sy/(floors*3));
-  }
-  uv.needsUpdate = true;
-  for (const group of geometry.groups) {
-    const i=geometry.index ? geometry.index.getX(group.start) : group.start;
-    group.materialIndex = Math.abs(normal.getY(i)) > .5 ? 0 : 1;
-  }
-  for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]) material.dispose();
-  mesh.material=[roof,wall];mesh.castShadow=true;mesh.receiveShadow=true;
-}
+export function styleEditorBuilding(mesh, object) { return styleUKBuilding(T,mesh,object); }

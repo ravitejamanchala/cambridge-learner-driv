@@ -1,7 +1,7 @@
 name: Verify simulator and API
 on:
   push:
-    branches: ['recovery/**', 'development/local-mock-library']
+    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery']
   pull_request:
 permissions:
   contents: read

@@ -3,6 +3,7 @@ const colors={grass:0x82926b,forest:0x5b7956,park:0x7f9567,garden:0x739160,sport
 // Own simple meshes; no competitor code or models. The native object envelope stays unchanged.
 export function mappedAppearance(T,m,o){
  const kind=o.properties?.mapFeature;if(!kind)return false;
+ m.userData.mapFeature=kind;
  m.geometry.dispose();(Array.isArray(m.material)?m.material:[m.material]).forEach(v=>v.dispose());
  const mat=color=>new T.MeshLambertMaterial({color});
  if(o.properties.footprint?.length>2){m.geometry=footprintGeometry(T,o.properties.footprint,o.properties.holes||[]);const material=mat(colors[kind]||0x8d9887);m.material=[material,material];}
