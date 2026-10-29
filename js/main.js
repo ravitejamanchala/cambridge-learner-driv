@@ -1,3 +1,9 @@
+import {createCockpit} from './cockpit.js';
+import {createObstacleIndex} from './obstacle-index.js';
+import {fitRoadCorners} from './roadside-clearance.js';
+import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
+import { addEditorObjects } from './local-world.js';
+import { obstacleContact } from './editor-collisions.js';
 import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
 import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
@@ -48,6 +54,7 @@ async function boot() {
   const assetURL = url => release ? url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(release) : url;
   const ix = await fetch(assetURL(AREAS_URL + 'index.json')); if (!ix.ok) throw new Error('Map index did not load (' + ix.status + ')');
   const index = await ix.json();
+  const localTracks = await loadLocalLibrary(index, ROUTES);
   const meta = (key) => index.plans[key] || { len: 0, n: 0, first: '' };
 
   let camInit = false, paused = false;
@@ -103,18 +110,25 @@ async function boot() {
       $('areaLoad').textContent = 'Loading map…';
       const info = index.areas.find(a => a.id === id); if (!info) throw new Error('Unknown map area ' + id);
       $('areaLoad').hidden = false;
-      const r = await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
-      const d = await r.json();
+      const r = localTracks.has(id) ? {ok:true} : await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
+      const d = localTracks.get(id) || await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
-      const net = buildNet(d);
+      const old = scene; scene = new T.Scene(); scene.matrixAutoUpdate=!Array.isArray(d.objects); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
+      const net = buildNet(d.network || d);
+      if(d.network)fitRoadCorners(net,d.objects||[]);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn && !lowPower);
+      // Local navigation inserts waypoint nodes; the original graph keeps road
+      // paint continuous through those artificial cuts. Signals share cluster/group
+      // identifiers with traffic, so both graphs display the same live phase.
+      const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      if(d.network) addEditorObjects(T,scene,d,visualNet);
+      world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
-      Object.assign(A, { id, net, traffic, world, test, trafficInit: false });
+      Object.assign(A, { id, net, traffic, world, test, obstacleIndex: d.objects?createObstacleIndex(d.objects):null, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
     }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; throw err; });
@@ -201,15 +215,18 @@ async function boot() {
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
     const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
-    nodes = wps.map(w => snapWaypoint(A.net, w));
+    nodes = pl.kind==='mock' && ROUTES[pl.index].localNodes ? [...ROUTES[pl.index].localNodes] : wps.map(w => snapWaypoint(A.net, w));
     route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
+    test.experimental = localTracks.get(A.id)?.practiceMode === 'experimental';
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl), pl.lesson?.startLane || 0);
+    const authored = localTracks.get(A.id);
+    if(authored) player.place(authored.spawn.x, authored.spawn.z, authored.spawn.heading);
     if (pl.kind === 'free') { player.v = 22.4; player.steer = 0; test.parked = false; } // 50 mph in lane 1, nothing to move off from
     if (pl.lesson?.startMph) { player.v = pl.lesson.startMph * 0.44704; player.steer = 0; test.parked = false; } // a motorway lesson starts at speed, in its lane
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
@@ -229,12 +246,14 @@ async function boot() {
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
     ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free' ? 0 : (pl.lesson.maxD ?? 2));
-    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    $('backBtn').textContent = test.experimental ? 'Reset to spawn' : 'Back to last instruction';
+    $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
     document.body.classList.toggle('free-drive', pl.kind === 'free'); $('quitBtn').textContent = pl.kind === 'free' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    notifyLocalRoute(pl);
     if(start&&!canAccessPlan(pl)){hub.requestAccess();return false;}
     if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
     if (pl.kind === 'lesson' && !pl.lesson.questions) pl = { ...pl, scenarioDefinition: resolveScenario(pl.lesson, pl.scenarioId) };
@@ -247,7 +266,8 @@ async function boot() {
     if (tok !== pickTok || !A.net || A.id !== areaOf(pl)) return false;
     loadPlan(pl); if (start) begin();
   }
-  const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  const hub = createHub({ meta, initialMockId: preferredLocalRoute(), onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
     if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
@@ -277,7 +297,7 @@ async function boot() {
   const setCam = (c, save) => {
     cam = c; $('camBtn').textContent = 'View: ' + CAMS[cam];
     document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.cam === cam));
-    document.body.classList.toggle('cam-over', cam === 2); layoutSoon();
+    document.body.classList.toggle('cam-over', cam === 2); document.body.classList.toggle('driver-view',cam===1); layoutSoon();
     if (save) { if (portrait()) prefs.camP = cam; else prefs.cam = cam; savePrefs(); }
   };
   window.addEventListener('keydown', e => {
@@ -425,6 +445,8 @@ async function boot() {
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+    get roadsidePlacements(){return A.world?.placements||[];},
+    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; }, steerFor };
@@ -462,7 +484,7 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
+    const test = A.test; if (test.experimental) return; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -509,14 +531,14 @@ async function boot() {
     loadPlan(plan);
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
+    scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
     stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = A.test.experimental ? 'Experimental practice · no grading or recorded results' : plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
@@ -530,6 +552,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('backBtn').addEventListener('click', () => {
     if (plan?.lesson?.manoeuvre) return;
+    if (A.test.experimental) { begin(); return; }
     const test = A.test, r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
     let best = 0; for (let k = 0; k < r.cum.length; k++) if (r.cum[k] <= s) best = k;
     const a = best, b = Math.min(r.xs.length - 1, best + 1), tx = r.xs[b] - r.xs[a], tz = r.zs[b] - r.zs[a], L = Math.hypot(tx, tz) || 1;
@@ -552,7 +575,7 @@ async function boot() {
   // Low-power graphics: fewer pixels, no shadows, no light pools or headlight beam. For phones and
   // older laptops; the drive and the assessment are exactly the same.
   const setLp = (on) => {
-    lowPower = on; renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
+    lowPower = on; mirrors.quality(on); renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
     if (A.world) { A.world.setShadows(on ? false : shadowsOn); A.world.setTimeOfDay(dusk ? 'dusk' : 'day', { lowPower }); }
     seg('#lpSeg [data-lp]', 'lp', on ? 1 : 0); prefs.lp = on ? 1 : 0; savePrefs(); resize();
   };
@@ -565,72 +588,13 @@ async function boot() {
   const ctl = $('ctlSize'), setTs = (v) => { document.querySelector('.touch').style.setProperty('--ts', v / 100); $('ctlSizeV').textContent = v + '%'; ctl.value = v; };
   setTs(prefs.ts || 300); ctl.addEventListener('input', () => { prefs.ts = +ctl.value; savePrefs(); setTs(prefs.ts); });
 
-  // ---------- driver's-seat cockpit, attached to the camera (UK right-hand drive) ----------
-  const cockpit = new T.Group(); scene.add(camera); camera.add(cockpit); cockpit.visible = false;
-  const dashM = new T.MeshLambertMaterial({ color: 0x1d2124 }), trimM = new T.MeshLambertMaterial({ color: 0x2b3135 });
-  const bonnetM = new T.MeshLambertMaterial({ color: 0x1d6a46 });
-  // Parts that run the width of the car. They are placed on the car's centre line rather than the
-  // driver's, and widen together when a wider car is selected.
-  const spanning = [];
-  const across = (mesh) => { spanning.push(mesh); cockpit.add(mesh); return mesh; };
-  const bonnet = across(new T.Mesh(new T.BoxGeometry(1.9, 0.06, 1.7), bonnetM)); bonnet.position.set(-CAR.seat.x, -0.66, -1.95); bonnet.rotation.x = 0.06;
-  // The dashboard: a top roll running across under the windscreen, and a face below it that closes off
-  // the bottom of the view. Without the face you looked under the dash and out at the road beneath.
-  const dash = across(new T.Mesh(new T.BoxGeometry(2.3, 0.22, 0.72), dashM)); dash.position.set(-CAR.seat.x, -0.56, -1.02);
-  const dashFace = across(new T.Mesh(new T.BoxGeometry(2.3, 0.75, 0.42), trimM)); dashFace.position.set(-CAR.seat.x, -1.02, -0.80);
-  // Windscreen header: the top of the frame, so the glass has an edge and the mirror has something
-  // to hang from.
-  const header = across(new T.Mesh(new T.BoxGeometry(2.3, 0.10, 0.62), dashM)); header.position.set(-CAR.seat.x, 0.63, -0.95);
-  const roof = across(new T.Mesh(new T.BoxGeometry(2.3, 0.05, 1.1), trimM)); roof.position.set(-CAR.seat.x, 0.66, -0.2);
-  // The instrument binnacle sits behind the wheel, on the driver's own centre line.
-  const binn = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.22, 22, 1, true), trimM);
-  binn.rotation.x = Math.PI / 2 - 0.35; binn.position.set(0, -0.33, -0.82); cockpit.add(binn);
-  // The steering wheel: a rim, a centre hub and three spokes, tilted on its column. It is spun about
-  // its own axis by the driver's input, so what the hands are doing is visible — a single bar gave no
-  // sense of rotation at all, because a bar at 180 degrees looks exactly like a bar at 0.
-  const rimM = new T.MeshLambertMaterial({ color: 0x191d20 });
-  const wheel = new T.Group(); wheel.position.set(0, -0.33, -0.68); wheel.rotation.x = -0.35; cockpit.add(wheel);
-  wheel.add(new T.Mesh(new T.TorusGeometry(0.23, 0.032, 10, 40), rimM));
-  const wheelHub = new T.Mesh(new T.CylinderGeometry(0.062, 0.062, 0.036, 18), trimM); wheelHub.rotation.x = Math.PI / 2; wheel.add(wheelHub);
-  for (const a of [Math.PI, 0, -Math.PI / 2]) { // three spokes: left, right and down, as on most cars
-    const sp = new T.Mesh(new T.BoxGeometry(0.17, 0.034, 0.02), trimM);
-    sp.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0); sp.rotation.z = a; wheel.add(sp);
-  }
-  // How far the rim turns at full lock. Not the real 450 degrees: that spins out of sight on a
-  // keyboard, where full lock is one key press away.
-  const WHEEL_LOCK = 2.3;
-  // A-pillars at the edges of the windscreen, and a door top under each wing mirror so the mirror is
-  // mounted on something rather than hanging in mid-air.
-  const pillars = [-1, 1].map(sx => { const pil = new T.Mesh(new T.BoxGeometry(0.06, 1.3, 0.07), dashM); pil.position.set(-CAR.seat.x + sx * 0.99, 0.2, -1.22); pil.rotation.z = -sx * 0.28; pil.rotation.x = -0.4; cockpit.add(pil); return pil; });
-  // Each side gets a roof rail and a door waist, with the side window as the gap between them. That
-  // gap is what the wing mirror is seen through, and it is what makes the windscreen read as glass in
-  // a frame rather than the view simply running off the edge of the screen.
-  const doors = [];
-  for (const sx of [-1, 1]) {
-    const rail = new T.Mesh(new T.BoxGeometry(0.1, 0.09, 1.9), dashM); rail.position.set(-CAR.seat.x + sx * 1.02, 0.5, -0.1);
-    const waist = new T.Mesh(new T.BoxGeometry(0.12, 0.85, 1.9), trimM); waist.position.set(-CAR.seat.x + sx * 1.02, -0.62, -0.1);
-    cockpit.add(rail, waist); doors.push(rail, waist);
-  }
-  mirrors.mount(cockpit, CAR.seat.x); mirrors.mountChase(camera);
-  // Fit the driver's seat to the car that is actually selected: its colour over the bonnet, its width,
-  // how high the bonnet sits ahead of you, and an eye line that is higher in a tall car than a low one.
-  // The hand-built cockpit is an impression of a car rather than a model of one, and the proportions
-  // that read well were arrived at by eye. So keep them, and vary only what actually differs between
-  // the cars in the garage: the paint over the bonnet, how wide it is, and a slightly higher eye line
-  // in a taller car.
-  const REFERENCE = { width: 1.9, height: 1.33 };
-  function fitCockpit(model) {
-    const m = carMetrics(model); if (!m) return;
-    bonnetM.color.setHex(m.colour);
-    const width = Math.max(1.5, Math.min(2.2, m.width));
-    seat.x = CAR.seat.x * (width / REFERENCE.width);
-    seat.y = CAR.seat.y + Math.max(-0.12, Math.min(0.2, (m.height - REFERENCE.height) * 0.5));
-    for (const part of spanning) { part.scale.x = width / REFERENCE.width; part.position.x = -seat.x; }
-    for (const [i, d] of doors.entries()) d.position.x = -seat.x + (i < 2 ? -1 : 1) * width * 0.54;
-    for (const [i, pil] of pillars.entries()) pil.position.x = -seat.x + (i ? 1 : -1) * width * 0.52;
-    mirrors.mount(cockpit, seat.x);
-    camInit = false;
-  }
+  // Shared physical cockpit; instruments read the simulation without changing it.
+  const interior = createCockpit(T,{camera,mirrors,seat,car:CAR});
+  const cockpit=interior.group,wheel=interior.wheel,bonnetM=interior.bonnetMaterial;
+  scene.add(camera);
+  const WHEEL_LOCK=2.3;
+  function fitCockpit(model){interior.fit(carMetrics(model));camInit=false;}
+  Object.defineProperty(window.cambridgeDrive,'cockpit',{get:()=>interior.telemetry});
   player.onModel = (m) => { fitCockpit(m); if (!m.getObjectByName('lamps')) attachLamps(m); };
   if (player.model) player.onModel(player.model);
   if (!player.mesh.getObjectByName('lamps')) attachLamps(player.mesh);
@@ -745,13 +709,16 @@ async function boot() {
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
-    if (test.running) test.elapsed = (test.elapsed || 0) + dt;
+    if (test.running && !test.experimental) test.elapsed = (test.elapsed || 0) + dt;
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
+      const previous = {x:player.x,z:player.z};
       const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
       player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       chaseMirrors(dt, traffic.clock);
+      const authored = localTracks.get(A.id);
+      if(authored && obstacleContact(player,A.obstacleIndex.near(previous,player),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);
@@ -780,7 +747,7 @@ async function boot() {
     $('sigL').classList.toggle('on', player.indicator === 'L' && Math.floor(traffic.clock * 3) % 2 === 0);
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
-    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
+    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1, o ? WORLD.fogFar + 200 + ov.h : 0); }
     // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
     setLamps(player.mesh, dusk, !!player.headlights);
     { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's
@@ -792,6 +759,7 @@ async function boot() {
     mirrors.layoutChase(camera, drive && cam === 0, drive && cam === 0 ? hudChaseBox() : null);
     if (drive && cam === 1) mirrors.fitView(camera);
     if (drive && cam < 2) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player, cam === 1 ? 'cockpit' : 'chase'); guide.group.visible = gv; }
+    if(drive&&cam===1)interior.update(player,test,A.net,traffic.clock,{lowPower});
     if(drive||botMode)renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }

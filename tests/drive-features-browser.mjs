@@ -15,8 +15,10 @@ const heading=page=>page.evaluate(()=>{
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 try{
  for(let i=0;i<200;i++){try{const r=await fetch(url);await r.arrayBuffer();if(r.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
- browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(process.env.CI?undefined:'/usr/bin/chromium'),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const page=await browser.newPage({deviceScaleFactor:Number(process.env.TEST_DPR)||1}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const resizeTo=async vp=>{await page.setViewportSize(vp);await page.waitForFunction(()=>Math.abs(cambridgeDrive.camera.aspect-innerWidth/innerHeight)<.001);};
+ if(process.env.TEST_LOW_POWER==='1')await page.addInitScript(()=>localStorage.setItem('cambridge-learner-drive.prefs',JSON.stringify({lp:1,sh:0})));
  await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));
  await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
@@ -25,7 +27,9 @@ try{
 
  // ---------- hold to look: the camera swings, the car does not ----------
  await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','controlled-stop',true);window.cambridgeDrive.manual(true);window.cambridgeDrive.frame(0);});
- const settle=async()=>{for(let i=0;i<40;i++)await page.evaluate(()=>window.cambridgeDrive.frame(0.05));};
+ // Two seconds of the exponential camera settling; fewer submissions keep the
+ // software-WebGL check practical without shortening the simulated observation.
+ const settle=async()=>{for(let i=0;i<8;i++)await page.evaluate(()=>window.cambridgeDrive.frame(0.25));};
  for(const view of [0,1]){
   await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),view);
   await settle();
@@ -108,7 +112,7 @@ try{
   return {...r,hit,w:window.innerWidth,h:window.innerHeight};
  });
  for(const vp of [{width:1280,height:720},{width:390,height:844},{width:844,height:390}]){
-  await page.setViewportSize(vp); await page.waitForTimeout(260); await frames(6);
+  await resizeTo(vp); await frames(6);
   const r=await panelRect();
   const at=`${vp.width}x${vp.height}`;
   assert.ok(r,`${at}: the rear-view panel is not on screen in the chase view`);
@@ -122,7 +126,7 @@ try{
  // ---------- and the glass itself stays on screen in the cockpit, phone included ----------
  // An upright phone starts in the chase view, so the driver view is chosen again after each resize.
  for(const vp of [{width:1280,height:720},{width:390,height:844}]){
-  await page.setViewportSize(vp); await page.waitForTimeout(260);
+  await resizeTo(vp);
   await page.evaluate(v=>document.querySelector(`#camSeg [data-cam="${v}"]`)?.click(),1); await frames(6);
   const glass=await page.evaluate(()=>{
    const cam=window.cambridgeDrive.camera; let m=null;
@@ -133,11 +137,11 @@ try{
     const v=new THREE.Vector3(x*p.width,y*p.height,0).applyMatrix4(m.matrixWorld).project(cam);
     xs.push((v.x*0.5+0.5)*window.innerWidth); ys.push((-v.y*0.5+0.5)*window.innerHeight);
    }
-   return {left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)};
+   return {left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys),aspect:cam.aspect,fov:cam.fov,position:m.parent.position.toArray()};
   });
   const at=`${vp.width}x${vp.height}`;
   assert.ok(glass,`${at}: no mirror glass in the cockpit`);
-  assert.ok(glass.left>=0&&glass.right<=vp.width,`${at}: the rear-view mirror runs off the side of the screen`);
+  assert.ok(glass.left>=0&&glass.right<=vp.width,`${at}: the rear-view mirror runs off the side of the screen: ${JSON.stringify(glass)}`);
   assert.ok(glass.top>=0&&glass.bottom<=vp.height,`${at}: the rear-view mirror runs off the top or bottom`);
   console.log(` rear-view glass at ${at}: on screen at x ${Math.round(glass.left)}–${Math.round(glass.right)}`);
  }

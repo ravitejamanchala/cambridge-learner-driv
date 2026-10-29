@@ -31,10 +31,11 @@ function progress(p) {
 }
 
 // meta(key) -> { len, n, first } for 'route:<id>', 'lesson:<id>', 'puzzle:<id>' (from data/areas/index.json)
-export function createHub({ meta, onPick, onStart }) {
+export function createHub({ meta, onPick, onStart, initialMockId = null }) {
   Profiles.init();
   window.addEventListener('learner-account-change', () => render());
   const st = { kind: 'lesson', lesson: VISIBLE_LESSONS[0].id, puzzle: PUZZLES[0].id, route: 0, free: FREE_DRIVES[0].id, scenarioId: null };
+  const initialRoute=ROUTES.findIndex(r=>r.id===initialMockId);if(initialRoute>=0){st.kind='mock';st.route=initialRoute;}
   const status = (id) => { const L = Profiles.lesson(id); return !L ? ['New', 'new'] : L.passed ? ['Passed', 'ok'] : ['Tried ' + L.attempts + '×', 'try']; };
   const firstOpen = () => (recommendedLesson(hasFullAccess()?VISIBLE_LESSONS:VISIBLE_LESSONS.filter(l=>isFreeLesson(l.id)), Profiles.current()) || VISIBLE_LESSONS[0]).id;
   const tierOpen = (ti) => ti === 0 || PUZZLES.some(z => z.tier === TIERS[ti - 1].id && (Profiles.lesson(z.id) || {}).passed);
@@ -137,14 +138,15 @@ export function createHub({ meta, onPick, onStart }) {
   function renderMock() {
     $('routePick').innerHTML = ROUTES.map((R, i) => {
       const s = Profiles.mockStats(R.id), m = meta('route:' + R.id);
-      const tag = s ? `<span class="tag ${s.passes ? 'ok' : 'try'}">${s.passes ? 'Passed' : 'Tried'} ${s.tries}×</span>` : '<span class="tag new">New</span>';
+      const tag = R.practiceMode === 'experimental' ? '<span class="tag new">Experimental</span>' : s ? `<span class="tag ${s.passes ? 'ok' : 'try'}">${s.passes ? 'Passed' : 'Tried'} ${s.tries}×</span>` : '<span class="tag new">New</span>';
       return `<button class="item" role="radio" aria-checked="${st.kind === 'mock' && st.route === i}" data-i="${i}"><span class="no">${i + 1}</span><span><span class="nm">${esc(R.name)}</span><span class="sub">${miles(m.len)} mi · ${m.n} instructions</span></span>${tag}</button>`;
     }).join('');
     const R = ROUTES[st.route], s = Profiles.mockStats(R.id), m = meta('route:' + R.id);
+    const experimental = R.practiceMode === 'experimental';
     $('mockDetail').innerHTML = `<h3>${esc(R.name)}</h3><p>${esc(R.blurb)}</p><p class="muted">First instruction: ${esc(m.first)}</p>
-
-      ${s ? `<p class="muted">Last try: ${s.last.pass ? 'pass' : 'fail'}, ${s.last.D} driving and ${s.last.S} serious faults.</p>` : ''}
-      ${modePicker(true)}<div class="btns"><button class="cbtn go" data-start>Start mock test</button></div>`;
+      ${experimental ? '<div class="rule"><b>Experimental practice</b><span>Generated roads may be inaccurate. No grading, pass/fail, timed assessment or saved results. Physical collisions remain enabled.</span></div>' : ''}
+      ${!experimental && s ? `<p class="muted">Last try: ${s.last.pass ? 'pass' : 'fail'}, ${s.last.D} driving and ${s.last.S} serious faults.</p>` : ''}
+      ${experimental ? '' : modePicker(true)}<div class="btns"><button class="cbtn go" data-start>${experimental ? 'Start practice' : 'Start mock test'}</button></div>`;
   }
   $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick(); });
 
@@ -191,7 +193,7 @@ export function createHub({ meta, onPick, onStart }) {
       $('eventIco').innerHTML = document.querySelector('[data-open=freeSheet] .disc').innerHTML;
     } else {
       const R = ROUTES[st.route], m = meta(pl.key);
-      $('eventKind').textContent = 'Mock test'; $('eventTitle').textContent = R.name; $('eventSub').textContent = `${miles(m.len)} mi · ${m.n} instructions`;
+      $('eventKind').textContent = R.practiceMode === 'experimental' ? 'Experimental practice' : 'Mock test'; $('eventTitle').textContent = R.name; $('eventSub').textContent = `${miles(m.len)} mi · ${m.n} instructions`;
       $('eventIco').innerHTML = '<svg viewBox="0 0 40 40"><rect x="8" y="7" width="24" height="28" rx="4" fill="#fff" stroke="#8a6ae3" stroke-width="2"/><rect x="14" y="4" width="12" height="7" rx="2.5" fill="#b49cf5" stroke="#8a6ae3" stroke-width="2"/><path d="M13 19l3 3 6-6M13 28h14" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     }
   }
@@ -248,7 +250,7 @@ export function createHub({ meta, onPick, onStart }) {
     if (pl.kind === 'puzzle') { const i = PUZZLES.findIndex(z => z.id === pl.lesson.id), z = PUZZLES[i + 1]; return z && puzzleOpen(z) ? { kind: 'puzzle', id: z.id, title: z.title } : null; }
     return null;
   }
-  function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; else if (kind === 'free') st.free = id; return plan(); }
+  function select(kind, id) { st.scenarioId = null; st.kind = kind; if (kind === 'lesson') st.lesson = id; else if (kind === 'puzzle') st.puzzle = id; else if (kind === 'free') st.free = id; else if(kind === 'mock'){const i=ROUTES.findIndex(r=>r.id===id);if(i<0)throw Error('Unknown mock route');st.route=i;} return plan(); }
   if (Profiles.current()) st.lesson = firstOpen();
   return { open, render, next, select, plan, openSheet, closeSheets, anyOpen, Profiles, starsFor, startQuiz, requestAccess };
 }

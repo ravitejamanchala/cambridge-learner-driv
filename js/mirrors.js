@@ -7,7 +7,7 @@ export function createMirrors(renderer) {
   // pos/look: camera position and target in car space (x right, y up, z backward from the car centre)
   // at: glass position relative to the driver's eye; rot: turn the glass towards the driver
   const defs = [
-    { w: 512, h: 150, fov: 28, pos: [0, 1.3, 2.3], look: [0, 1.05, 40], size: [0.24, 0.068], at: [-1, 0.26, -0.95], rot: [-0.1, 0.3] },
+    { w: 640, h: 200, fov: 28, pos: [0, 1.3, 2.3], look: [0, 1.05, 40], size: [0.432, 0.135], at: [-1, 0.31, -0.95], rot: [0.3, 0.3] },
     { w: 256, h: 190, fov: 36, pos: [-1.16, 1.05, -0.5], look: [-9, 0.9, 40], size: [0.2, 0.15], at: [-1, -0.17, -1.45], rot: [0, 0.62] },
     { w: 256, h: 190, fov: 36, pos: [1.16, 1.05, -0.5], look: [9, 0.9, 40], size: [0.17, 0.13], at: [1, -0.13, -1.0], rot: [0, -0.5] }
   ];
@@ -20,8 +20,9 @@ export function createMirrors(renderer) {
     d.glass = new T.Mesh(g, new T.MeshBasicMaterial({ map: d.rt.texture }));
     const box = new T.Mesh(new T.BoxGeometry(d.size[0] + 0.03, d.size[1] + 0.03, 0.035), housing); box.position.z = -0.02;
     d.group = new T.Group(); d.group.add(box, d.glass); d.group.rotation.set(d.rot[0], d.rot[1], 0, 'YXZ');
+    d.group.userData.interiorRearMirror = d === defs[0];
   }
-  let frame = 0, enabled = true, mounted = null, chase = null;
+  let frame = 0, enabled = true, mounted = null, chase = null, lowPower=false;
   const v = new T.Vector3(), q = new T.Vector3();
   const toWorld = (p, out, [lx, ly, lz]) => { const s = Math.sin(p.th), c = Math.cos(p.th); return out.set(p.x + c * lx + s * lz, ly, p.z - s * lx + c * lz); };
 
@@ -74,8 +75,17 @@ export function createMirrors(renderer) {
   function fitView(camera) {
     if (!mounted) return;
     const d = defs[0], z = Math.abs(d.at[2]);
-    const room = Math.tan(Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect)) * z - d.size[0] * 0.8;
-    d.group.position.x = -Math.min(seatAt, Math.max(0.04, room));
+    const halfWidth = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * z;
+    // Keep the larger housing in the windscreen, including narrow portrait views.
+    const compact = window.innerWidth < 600 || window.innerHeight < 500;
+    const scale = Math.min(compact ? 0.88 : 1, halfWidth * 1.7 / (d.size[0] + 0.03));
+    d.group.scale.setScalar(scale);
+    const room = Math.max(0, halfWidth - (d.size[0] / 2 + 0.025) * scale);
+    d.group.position.x = -Math.min(seatAt, room * 0.9);
+    d.group.position.y = compact ? 0.21 : d.at[1];
+    // The glass faces the driver's eye below and to the right of the mirror.
+    // Recompute both angles after fitting, so portrait mode does not leave it skewed.
+    d.group.rotation.set(Math.atan2(d.group.position.y, Math.hypot(d.group.position.x, z)), Math.atan2(-d.group.position.x, z), 0, 'YXZ');
   }
   // render one mirror per frame (the rear-view one every other frame); the glass on the windscreen
   // while the cockpit is showing, the corner panel while the chase view is
@@ -83,9 +93,11 @@ export function createMirrors(renderer) {
     for (const d of defs) d.group.visible = enabled && mode === 'cockpit';
     if (!enabled) return;
     frame++;
+    if(lowPower&&frame%2===0)return;
     if (mode === 'chase') { if (chase?.visible && frame % 2) draw(defs[0], scene, player); return; }
     if (!mounted || !mounted.visible) return;
-    draw(frame % 2 ? defs[0] : defs[1 + ((frame >> 1) % 2)], scene, player);
+    const cycle=lowPower?Math.ceil(frame/2):frame;
+    draw(cycle % 2 ? defs[0] : defs[1 + ((cycle >> 1) % 2)], scene, player);
   }
   function draw(d, scene, player) {
     toWorld(player, v, d.pos); toWorld(player, q, d.look);
@@ -100,5 +112,6 @@ export function createMirrors(renderer) {
     for (const [o, was] of hid) o.visible = was;
     player.mesh.visible = carVis; renderer.shadowMap.autoUpdate = auto;
   }
-  return { mount, mountChase, layoutChase, fitView, update, set enabled(b) { enabled = b; }, get enabled() { return enabled; } };
+  function quality(low){if(lowPower===low)return;lowPower=low;for(const d of defs)d.rt.setSize(Math.round(d.w*(low?.5:1)),Math.round(d.h*(low?.5:1)));}
+  return { mount, mountChase, layoutChase, fitView, update, quality, set enabled(b) { enabled = b; }, get enabled() { return enabled; } };
 }

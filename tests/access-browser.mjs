@@ -6,7 +6,7 @@ for(const spec of specs){
  let full=false,checkouts=0;
  const browser=await spec.engine.launch(spec.engine===chromium?{executablePath:process.env.CHROMIUM_PATH,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});
  try{
-  const page=await browser.newPage(spec.preset),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({...spec.preset,...(process.env.TEST_DPR?{deviceScaleFactor:Number(process.env.TEST_DPR)}:{})}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:process.cwd()+'/node_modules/three/build/three.min.js',contentType:'application/javascript'}));
   await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:process.cwd()+'/node_modules/three/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));
   await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
@@ -48,7 +48,7 @@ for(const spec of specs){
   await page.evaluate(async()=>{await window.cambridgeDrive.pick('lesson','move-off',true);});assert.equal(await page.locator('body').getAttribute('data-mode'),'drive');
   full=false;await page.evaluate(()=>document.querySelector('[data-access]').click());await page.waitForFunction(()=>document.body.dataset.mode==='lobby');
   assert.equal(await page.locator('[data-open=mockSheet]').getAttribute('aria-disabled'),'true');
-  assert.deepEqual(errors,[]);await mkdir('../../outputs/subscription-tests',{recursive:true});if(!await page.locator('#profileSheet').isVisible())await page.locator('#profBtn2').click();await page.screenshot({path:'../../outputs/subscription-tests/'+spec.name+'.png'});
+  assert.deepEqual(errors,[]);await mkdir('test-results/subscription',{recursive:true});if(!await page.locator('#profileSheet').isVisible())await page.locator('#profBtn2').click();await page.screenshot({path:'test-results/subscription/'+spec.name+'.png'});
   console.log('PASS '+spec.name+': free lessons drive, paid gates, checkout redirect, verified unlock, expiry lock; no page errors');
  }finally{await browser.close();}
 }

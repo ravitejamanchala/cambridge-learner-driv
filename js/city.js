@@ -1,3 +1,4 @@
+import {styleUKBuilding,ukBuildingResources} from './uk-buildings.js';
 // Stylised city dressing for each 400 m chunk: houses with pitched roofs, shops with awnings,
 // taller blocks with rooftop gardens, street lamps and trees. Everything is instanced per chunk.
 import { posAt, nearest, paved } from './net.js';
@@ -58,9 +59,9 @@ function prismGeo() {
 let K = null;
 // shared geometry, materials and textures that must survive a map-area change
 export function kitResources() {
-  if (!K) return [];
+  if (!K) return ukBuildingResources();
   const mats = Object.values(K.mats);
-  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean)];
+  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean), ...ukBuildingResources()];
 }
 function kit() {
   if (K) return K;
@@ -221,3 +222,7 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
   inst(k.headG, k.mats.lampHead, lamps, ([x, z, dx, dz]) => { E.set(0, Math.atan2(dx, dz), 0, 'YXZ'); Q.setFromEuler(E); M.compose(V.set(x + dx * 0.6, 6.95, z + dz * 0.6), Q, S.set(1, 1, 1)); }, false);
   return grp;
 }
+
+// Authored footprints share the simulator's facade textures and palette, without
+// generating replacement boxes or moving the surveyed building outline.
+export function styleEditorBuilding(mesh, object, net) { const near=net&&nearest(net,object.x,object.z),p=near&&posAt(near.e,near.s);return styleUKBuilding(T,mesh,object,{front:p?{x:p.x-object.x,z:p.z-object.z}:null}); }

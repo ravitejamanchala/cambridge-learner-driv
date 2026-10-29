@@ -1,5 +1,5 @@
 import { basicProgressAllowed, isFreeLesson, FREE_LESSON_IDS } from '../../shared/access-policy.mjs';
-import { billingConfigured, paidAccess, stripeClient, checkout, reconcile, verifyEvent, BILLING_EVENTS, WEB_URL } from './billing.mjs';
+import { billingConfigured, paidAccess, stripeClient, checkout, reconcile, verifyEvent, BILLING_EVENTS, billingOrigin } from './billing.mjs';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { bodyLimit } from 'hono/body-limit';
@@ -8,7 +8,7 @@ import { createClerkClient, verifyToken } from '@clerk/backend';
 import { createStore } from './store';
 import { progressInput, sessionInput, pageInput } from './validation.mjs';
 import { z } from 'zod';
-type Env = { DATABASE_URL: string; CLERK_SECRET_KEY: string; FRONTEND_URL: string; STRIPE_SECRET_KEY?: string; STRIPE_PRICE_ID?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PORTAL_CONFIG_ID?: string; RATE_LIMITER: { limit(input: {key: string}): Promise<{success: boolean}> } };
+type Env = { DATABASE_URL: string; CLERK_SECRET_KEY: string; FRONTEND_URL: string; STRIPE_SECRET_KEY?: string; STRIPE_PRICE_ID?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PORTAL_CONFIG_ID?: string; BILLING_PREVIEW?: string; RATE_LIMITER: { limit(input: {key: string}): Promise<{success: boolean}> } };
 export function createApp(deps: { store?: any; verify?: any; stripe?: any; getAccess?: (subject: string, env: Env) => Promise<boolean> } = {}) {
  const storeFor=(env:Env)=>deps.store||createStore(env.DATABASE_URL,undefined,env.STRIPE_SECRET_KEY?.startsWith('sk_live_')?'live':'test');
  const app = new Hono<{ Bindings: Env; Variables: { full: boolean; manual: boolean; subject: string; user: string; store: ReturnType<typeof createStore> } }>();
@@ -25,6 +25,7 @@ export function createApp(deps: { store?: any; verify?: any; stripe?: any; getAc
   const stripe=deps.stripe||stripeClient(c.env);
   let event;
   try{event=await verifyEvent(stripe,await c.req.text(),c.req.header('Stripe-Signature')||'',c.env.STRIPE_WEBHOOK_SECRET);}catch{return c.json({error:'invalid_signature'},400);}
+  if(event.livemode !== c.env.STRIPE_SECRET_KEY?.startsWith('sk_live_'))return c.json({error:'billing_mode_mismatch'},400);
   if(!BILLING_EVENTS.has(event.type))return c.json({received:true});
   const store=storeFor(c.env);
   if(await store.billingEvent(event.id))return c.json({received:true});
@@ -35,6 +36,7 @@ export function createApp(deps: { store?: any; verify?: any; stripe?: any; getAc
  });
  app.use('/api/*', bodyLimit({ maxSize: 262144, onError: c => c.json({error:'body_too_large'},413) }));
  app.use('/api/*', async (c,next) => {
+  if (c.env.BILLING_PREVIEW==='true'&&!billingConfigured(c.env))return c.json({error:'preview_not_configured'},503);
   if (!c.env.CLERK_SECRET_KEY || !c.env.DATABASE_URL || !c.env.RATE_LIMITER || !c.env.FRONTEND_URL) return c.json({error:'not_configured'},503);
   const origin = c.req.header('Origin');
   if (origin && origin !== c.env.FRONTEND_URL) return c.json({error:'origin_not_allowed'},403);
@@ -67,7 +69,7 @@ export function createApp(deps: { store?: any; verify?: any; stripe?: any; getAc
  app.post('/api/billing/portal',async c=>{
   if(!billingConfigured(c.env))return c.json({error:'billing_not_configured'},503);
   const account=await c.get('store').billing(c.get('user'));if(!account)return c.json({error:'no_subscription'},404);
-  const session=await (deps.stripe||stripeClient(c.env)).billingPortal.sessions.create({customer:account.customerId,configuration:c.env.STRIPE_PORTAL_CONFIG_ID,return_url:WEB_URL+'?subscription=manage'});
+  const session=await (deps.stripe||stripeClient(c.env)).billingPortal.sessions.create({customer:account.customerId,configuration:c.env.STRIPE_PORTAL_CONFIG_ID,return_url:billingOrigin(c.env)+'/?subscription=manage'});
   return c.json({url:session.url});
  });
  app.get('/api/progress', async c => c.json(await c.get('store').progress(c.get('user'))));

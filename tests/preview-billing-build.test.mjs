@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+test('actual billing build has test auth, isolated backend and no authoring or guest-access bypass',()=>{
+ const out=fs.mkdtempSync(path.join(os.tmpdir(),'billing-preview-'));
+ try{execFileSync(process.execPath,['tools/build_demo.mjs','.',out,'--billing-preview'],{stdio:'pipe',env:{...process.env,PREVIEW_CLERK_PUBLISHABLE_KEY:'pk_test_ZXhhbXBsZS5jb20k',BILLING_PREVIEW_API_URL:'https://learner-drive-pr-42-billing.example.workers.dev',PREVIEW_FRONTEND_URL:'https://pr-42-billing.learner-drive-app.pages.dev'}});const raw=fs.readFileSync(path.join(out,'auth-config.js'),'utf8'),config=JSON.parse(raw.slice(raw.indexOf('=')+1).replace(/;\s*$/,''));assert.equal(config.BILLING_PREVIEW,true);assert.equal(config.PREVIEW,undefined);assert.equal(config.BROWSER_AUTHORING,undefined);assert.match(config.API_BASE_URL,/learner-drive-pr-42-billing/);assert.ok(!raw.includes('STRIPE_SECRET'));}finally{fs.rmSync(out,{recursive:true,force:true});}
+});

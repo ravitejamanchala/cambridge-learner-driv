@@ -1,11 +1,15 @@
+import { authoringEnabled } from './local-library.js';
 import { setAccess, hasFullAccess, setAuthConfigured, setSignedIn } from './access.js';
 import { Profiles } from './profile.js';
 import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
- setAccess(false);
  const config = window.LEARNER_CONFIG;
+ if(config?.BILLING_PREVIEW&&(config.PREVIEW||config.BROWSER_AUTHORING||config.LOCAL_AUTHORING)){setAuthConfigured(true);setAccess(false);throw Error('Billing preview cannot bypass authentication');}
+ if(authoringEnabled()){setAccess(true);return;}
+ setAccess(false);
  // Pull-request preview builds (tools/build_demo.mjs --preview) open the whole course to a guest so a
  // reviewer can reach every lesson. Only a preview build writes this flag; production never does.
+ if(config?.BILLING_PREVIEW){setAuthConfigured(true);if(config.PREVIEW||!config.CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_'))throw Error('Invalid billing preview configuration');}
  if (config?.PREVIEW === true) { setAccess(true); return; }
  if (!config?.CLERK_PUBLISHABLE_KEY || !config?.API_BASE_URL) return;
  const base = new URL(config.API_BASE_URL);
@@ -20,7 +24,8 @@ export async function initAuth() {
  panel.querySelectorAll('button').forEach(button => { button.className='cbtn'; button.type='button'; });
  const el = s => panel.querySelector('[data-'+s+']');
  const status = text => { el('status').textContent = text; el('retry').hidden = !sync; el('local').hidden = el('cloud').hidden = !sync?.conflict; };
- let sync, unsubscribe, activeId, generation=0, authenticatedRequest, pendingSubscribe=false;
+ let sync, unsubscribe, activeId, generation=0, authenticatedRequest, pendingSubscribe=false,confirmationAttempts=0,confirmationTimer;
+ if(config.BILLING_PREVIEW){const note=document.createElement('p');note.className='billing-preview-note';note.textContent='Stripe sandbox · test accounts and test cards only. No real payments.';panel.prepend(note);}
  let billingConfig={enabled:false,testMode:false};
  fetch(base.origin+'/billing/config',{signal:AbortSignal.timeout(10000)}).then(r=>r.ok?r.json():null).then(value=>{if(value){billingConfig=value;el('billing-mode').hidden=!value.testMode;}}).catch(()=>{});
  try {
@@ -50,7 +55,7 @@ export async function initAuth() {
   async function activate(user, force=false) {
    if (!force && (user?.id || null) === activeId) return;
    setAccess(false);setSignedIn(!!user);authenticatedRequest=null;el('manage').hidden=true;el('subscribe').hidden=false;
-   activeId = user?.id || null; const epoch=++generation; unsubscribe?.(); sync?.close(); sync=null;
+   activeId = user?.id || null; clearTimeout(confirmationTimer); const epoch=++generation; unsubscribe?.(); sync?.close(); sync=null;
    clerk.unmountUserButton(el('avatar'));
    el('avatar').replaceChildren(); el('login').hidden=!!user; el('logout').hidden=!user; el('import').hidden=true; el('access').hidden=!user;
    if (!user) { Profiles.useAccount(null); billingStatus('Sign in to start');status('Sign in to start driving. Your progress is saved to your account.'); return; }
@@ -78,7 +83,7 @@ export async function initAuth() {
     const end=billing.paidUntil?new Date(billing.paidUntil).toLocaleDateString('en-GB'):'';
     billingStatus(billing.complimentary?'Complimentary full access':allowed?(billing.cancelAtPeriodEnd?'Plus access until '+end+' · renewal cancelled':'Plus subscription active'):'Free plan'+(billing.status==='past_due'?' · payment needs attention':''));
     const result=new URL(location.href).searchParams.get('subscription');
-    if(result==='success'&&!allowed)billingStatus('Payment confirmation is pending. Use Refresh access in a moment. Free lessons are available meanwhile.');
+    if(result==='success'&&!allowed){billingStatus('Payment confirmation is pending — checking… Free lessons remain available.');if(confirmationAttempts++<4)confirmationTimer=setTimeout(()=>{if(epoch===generation&&clerk.user?.id===userId)activate(clerk.user,true).catch(()=>billingStatus('Payment confirmation is pending. Use Refresh access to check again.'));},2500);else billingStatus('Payment confirmation is pending. Use Refresh access to check again.');}
     if(result==='cancelled')billingStatus('Checkout cancelled. You still have free access.');
    } catch { if(epoch===generation){current.close();sync=null;status('Could not verify your account. Free lessons remain available; try Refresh access again.');}return; }
    unsubscribe=Profiles.subscribe((kind,value)=>{if(kind==='session') current.session(cloudSession(value));else if(value) current.save(cloudProfile(value));});

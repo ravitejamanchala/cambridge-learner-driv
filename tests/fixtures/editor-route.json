@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "title": "Local browser test road",
+  "kind": "mock",
+  "network": {
+    "version": 1,
+    "source": "OpenStreetMap",
+    "origin": [
+      52.2015,
+      0.1215
+    ],
+    "kx": 68226.51040038739,
+    "kz": 110574,
+    "names": [
+      "Local fixture road"
+    ],
+    "classes": [
+      "residential"
+    ],
+    "nodes": [
+      -341,
+      553,
+      -341,
+      -553
+    ],
+    "ways": [
+      [
+        0,
+        0,
+        30,
+        1,
+        0,
+        6.4,
+        0,
+        2,
+        0,
+        0,
+        15
+      ]
+    ],
+    "edges": [
+      [
+        0,
+        1,
+        0,
+        [
+          -341,
+          553,
+          -341,
+          -553
+        ]
+      ]
+    ],
+    "stops": [],
+    "zebras": [],
+    "giveways": [],
+    "minis": [],
+    "rbs": []
+  },
+  "plan": {
+    "waypoints": [
+      {
+        "x": -34.1,
+        "z": 55.3
+      },
+      {
+        "x": -34.1,
+        "z": -55.3
+      }
+    ]
+  },
+  "spawn": {
+    "x": -34.1,
+    "z": 55.3,
+    "heading": 0
+  },
+  "objects": [
+    {
+      "id": "c06fd400-386b-4459-819a-abf4cc502c27",
+      "type": "building",
+      "name": "Test building",
+      "x": -14.100000000000001,
+      "z": 25.299999999999997,
+      "y": 0,
+      "rotation": 0,
+      "sx": 12,
+      "sy": 10,
+      "sz": 12,
+      "properties": {}
+    }
+  ],
+  "attribution": "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright",
+  "sceneryMode": "authored",
+  "osm": {
+    "ways": [
+      {
+        "osmId": 10,
+        "tags": {
+          "highway": "residential",
+          "name": "Local fixture road"
+        },
+        "flags": [
+          "Width estimated",
+          "Lane count estimated"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "osmWayId": 10,
+        "startOsmNode": 1,
+        "endOsmNode": 2
+      }
+    ],
+    "warnings": [],
+    "dataTimestamp": null
+  },
+  "georeference": {
+    "bounds": [
+      52.2,
+      0.12,
+      52.203,
+      0.123
+    ],
+    "provider": "OpenStreetMap",
+    "importedAt": "2026-10-21T23:19:09.621Z"
+  }
+}
