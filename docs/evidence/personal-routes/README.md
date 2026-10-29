@@ -23,3 +23,7 @@ Reproduce: `npm run evidence -- personal` (Chromium and ffmpeg required). Indivi
 - The fixture first section has 26 buildings and rendered 117 calls / 8,252 triangles in the sampled frame. This is evidence of bounded scene work, not a mobile FPS promise.
 
 Existing course, camera/blue-light, device controls, parking, access/billing gates, car assets, steering/controller and imported/experimental track browser suites also passed locally. Additional build and hosted verification results are recorded in PR CI artifacts. Local network policy denies the live map hosts, Cloudflare and GitHub API, so live checks run explicitly in the authorised preview workflow.
+
+The deployed preview at commit `23925d1` passed the cockpit smoke check, route interaction/recovery check and all 52 panel layouts. Its separate **live** provider check found Cambridge, routed a 95 m street section, and converted current OSM data into 97 native road edges and 169 buildings. This small live sample does not establish accuracy or service capacity for every location.
+
+An additional rendered motorway free-drive suite stopped at its courtesy-driver final-speed assertion (the driver yielded, but its final speed had increased). Focused native traffic/courtesy/rejoining checks then passed on both untouched `main` and this branch. The full motorway soak is not claimed as passing; its traffic code was not changed here.
