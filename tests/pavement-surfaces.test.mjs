@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import fs from 'node:fs';
 import {buildNet} from '../js/net.js';
-import {joinedRoadSurfaces,raisedSurfaceGeometry,polygonOperation,PAVEMENT_HEIGHT} from '../js/road-surfaces.js';
+import {joinedRoadSurfaces,raisedSurfaceGeometry,polygonOperation,solidSurface,PAVEMENT_HEIGHT} from '../js/road-surfaces.js';
 import {roadJoinRings} from '../js/road-joins.js';
 import {ringArea,roadSpace} from '../js/road-space.js';
 import {mappedPavementPolygons,styleMappedPavement} from '../js/pavement.js';
@@ -38,4 +38,18 @@ test('two-arm road bends use round shoulders within the declared half-width',()=
  const arcs=roadJoinRings(net).filter(j=>j.ring.length>8);assert.equal(arcs.length,2);
  for(const arc of arcs)for(const p of arc.ring.slice(1))assert.ok(Math.abs(Math.hypot(p[0],p[1]-200)-3)<1e-8);
  assert.ok(roadSpace(net).disk(-2.1,202.1),'outer shoulder is a round arc rather than a straight bevel');
+});
+
+test('hairline polygons cannot become long raised kerb walls',()=>{
+ const hairline=[[[[0,0],[20,0],[20,.001],[0,.001]]]],kerb=[[[[0,0],[20,0],[20,.14],[0,.14]]]];
+ assert.deepEqual(solidSurface(hairline),[]);assert.ok(area(solidSurface(kerb))>2.7);
+ // Also remove a connected millimetre-wide spike, not just tiny islands.
+ const spiked=[[[[0,0],[2,0],[2,1],[20,1],[20,1.001],[2,1.001],[2,2],[0,2]]]];
+ const clean=solidSurface(spiked);assert.ok(clean.flat(2).every(p=>p[0]<2.01));
+});
+
+test('a narrow inter-road gap does not produce a kerb without a footway behind it',()=>{
+ const net=buildNet(data([0,0,0,1000,61,0,61,1000],[way(6)],[[0,1,0,[0,0,0,1000]],[2,3,0,[61,0,61,1000]]]));
+ const tiles=joinedRoadSurfaces(net),probe=[[[[3.01,20],[3.09,20],[3.09,80],[3.01,80]]]];
+ assert.equal(area(polygonOperation(tiles.flatMap(t=>[...t.kerb,...t.pave]),probe,'intersection')),0);
 });

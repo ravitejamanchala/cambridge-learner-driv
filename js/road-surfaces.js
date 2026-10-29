@@ -22,6 +22,11 @@ export function offsetPolygons(polys,distance){
 export function roundedSurface(polys,radius=.25){
  return polys.flatMap(poly=>{const inner=offsetPolygons([poly],-radius);return inner.length?offsetPolygons(inner,radius):[poly];});
 }
+// Boolean operations at millimetre precision can leave hairline fragments.
+// They have negligible area but become long false walls when extruded.
+export function solidSurface(polys,radius=.02){
+ return polys.flatMap(poly=>{const inner=offsetPolygons([poly],-radius);return inner.length?offsetPolygons(inner,radius-.001):[];});
+}
 export const ROAD_HEIGHT=.04,PAVEMENT_HEIGHT=.19;
 // Real vertical faces rather than a flat pale decal. Tile cuts are not kerbs.
 export function raisedSurfaceGeometry(T,polygons,{bottom=.02,top=PAVEMENT_HEIGHT,bounds}={}){
@@ -45,17 +50,23 @@ export function joinedRoadSurfaces(net){
   const [left,right]=e.way.sidewalkWidths||[2,2],h=e.way.w/2;
   for(const [width,lo,hi]of [[left,h,h+left],[right,-h-right,-h]])if(width>0)ribbon({quad:(...v)=>{const ring=[];for(let i=0;i<8;i+=2)ring.push([v[i],v[i+1]]);if(ringArea(ring)>.00001)add(ring,'pave');}},e,lo,hi,0);
  }
+ // Continue generated pavements around fitted corners where every connected
+ // arm supports pavements on both sides. Explicit no/separate tags win.
+ for(const f of net.fillets){
+  const widths=net.inc[f.node].flatMap(({e})=>e.way.sidewalkWidths||[2,2]);
+  if(widths.length&&!widths.some(w=>w<=0))for(const poly of offsetPolygons([[ [f.C,...f.pts] ]],Math.min(...widths)))add(poly[0],'pave');
+ }
  const result=[];
  for(const tile of tiles.values()){
   const x=tile.x*C,z=tile.z*C,boundary=[[[[x,z],[x+C,z],[x+C,z+C],[x,z+C]]]];
-  // Offset the uncut road: offsetting after clipping made a false square kerb
-  // at every 400 m tile edge. Round pavement tips before clipping as well.
+  // Build outlines before clipping, so tile cuts never become kerb walls.
   const fullRoad=polygonOperation(tile.road,[]),road=polygonOperation(fullRoad,boundary,'intersection');
   const fullPave=roundedSurface(polygonOperation(tile.pave,[]));
-  const outside=polygonOperation(fullPave,fullRoad,'difference');
+  // A narrow residual gap must not become a kerb with no pavement behind it.
+  const outside=solidSurface(polygonOperation(fullPave,fullRoad,'difference'),.12);
   const rim=polygonOperation(offsetPolygons(fullRoad,.14),fullRoad,'difference');
-  const kerb=polygonOperation(polygonOperation(outside,rim,'intersection'),boundary,'intersection');
-  const pave=polygonOperation(polygonOperation(outside,rim,'difference'),boundary,'intersection');
+  const kerb=polygonOperation(solidSurface(polygonOperation(outside,rim,'intersection')),boundary,'intersection');
+  const pave=polygonOperation(solidSurface(polygonOperation(outside,rim,'difference')),boundary,'intersection');
   result.push({x:x+C/2,z:z+C/2,bounds:[x,z,x+C,z+C],road,kerb,pave:pave.filter(p=>ringArea(p[0])>.08)});
  }
  if(surfaceCache.size>=3)surfaceCache.delete(surfaceCache.keys().next().value);surfaceCache.set(key,result);return result;

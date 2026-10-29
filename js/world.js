@@ -188,8 +188,8 @@ export function buildWorld(scene, net, traffic, options = {}) {
   let studsOn = false, studAt = { x: 0, z: 0 };
   const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
   if(joined){
-    pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x969792);
-    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',pm,0,1],['kerb',kerbMat,0,1.5],['road',rm,.04,2]]){
+    pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x969792),paveMat=pm.clone();paveMat.depthWrite=true;kerbMat.depthWrite=true;rm.depthWrite=true;
+    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',paveMat,0,1],['kerb',kerbMat,0,1.5],['road',rm,.04,2]]){
       if(!tile[kind].length)continue;const m=new T.Mesh(kind==='road'?surfaceGeometry(T,tile[kind]):raisedSurfaceGeometry(T,tile[kind],{bounds:tile.bounds,top:PAVEMENT_HEIGHT}),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
     }
   }
