@@ -1,3 +1,4 @@
+import {createCockpit} from './cockpit.js';
 import {createObstacleIndex} from './obstacle-index.js';
 import {fitRoadCorners} from './roadside-clearance.js';
 import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
@@ -296,7 +297,7 @@ async function boot() {
   const setCam = (c, save) => {
     cam = c; $('camBtn').textContent = 'View: ' + CAMS[cam];
     document.querySelectorAll('#camSeg [data-cam]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.cam === cam));
-    document.body.classList.toggle('cam-over', cam === 2); layoutSoon();
+    document.body.classList.toggle('cam-over', cam === 2); document.body.classList.toggle('driver-view',cam===1); layoutSoon();
     if (save) { if (portrait()) prefs.camP = cam; else prefs.cam = cam; savePrefs(); }
   };
   window.addEventListener('keydown', e => {
@@ -574,7 +575,7 @@ async function boot() {
   // Low-power graphics: fewer pixels, no shadows, no light pools or headlight beam. For phones and
   // older laptops; the drive and the assessment are exactly the same.
   const setLp = (on) => {
-    lowPower = on; renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
+    lowPower = on; mirrors.quality(on); renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1) * 0.8 : Math.min(window.devicePixelRatio || 1, 1.75));
     if (A.world) { A.world.setShadows(on ? false : shadowsOn); A.world.setTimeOfDay(dusk ? 'dusk' : 'day', { lowPower }); }
     seg('#lpSeg [data-lp]', 'lp', on ? 1 : 0); prefs.lp = on ? 1 : 0; savePrefs(); resize();
   };
@@ -587,72 +588,13 @@ async function boot() {
   const ctl = $('ctlSize'), setTs = (v) => { document.querySelector('.touch').style.setProperty('--ts', v / 100); $('ctlSizeV').textContent = v + '%'; ctl.value = v; };
   setTs(prefs.ts || 300); ctl.addEventListener('input', () => { prefs.ts = +ctl.value; savePrefs(); setTs(prefs.ts); });
 
-  // ---------- driver's-seat cockpit, attached to the camera (UK right-hand drive) ----------
-  const cockpit = new T.Group(); scene.add(camera); camera.add(cockpit); cockpit.visible = false;
-  const dashM = new T.MeshLambertMaterial({ color: 0x1d2124 }), trimM = new T.MeshLambertMaterial({ color: 0x2b3135 });
-  const bonnetM = new T.MeshLambertMaterial({ color: 0x1d6a46 });
-  // Parts that run the width of the car. They are placed on the car's centre line rather than the
-  // driver's, and widen together when a wider car is selected.
-  const spanning = [];
-  const across = (mesh) => { spanning.push(mesh); cockpit.add(mesh); return mesh; };
-  const bonnet = across(new T.Mesh(new T.BoxGeometry(1.9, 0.06, 1.7), bonnetM)); bonnet.position.set(-CAR.seat.x, -0.66, -1.95); bonnet.rotation.x = 0.06;
-  // The dashboard: a top roll running across under the windscreen, and a face below it that closes off
-  // the bottom of the view. Without the face you looked under the dash and out at the road beneath.
-  const dash = across(new T.Mesh(new T.BoxGeometry(2.3, 0.22, 0.72), dashM)); dash.position.set(-CAR.seat.x, -0.56, -1.02);
-  const dashFace = across(new T.Mesh(new T.BoxGeometry(2.3, 0.75, 0.42), trimM)); dashFace.position.set(-CAR.seat.x, -1.02, -0.80);
-  // Windscreen header: the top of the frame, so the glass has an edge and the mirror has something
-  // to hang from.
-  const header = across(new T.Mesh(new T.BoxGeometry(2.3, 0.10, 0.62), dashM)); header.position.set(-CAR.seat.x, 0.63, -0.95);
-  const roof = across(new T.Mesh(new T.BoxGeometry(2.3, 0.05, 1.1), trimM)); roof.position.set(-CAR.seat.x, 0.66, -0.2);
-  // The instrument binnacle sits behind the wheel, on the driver's own centre line.
-  const binn = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.22, 22, 1, true), trimM);
-  binn.rotation.x = Math.PI / 2 - 0.35; binn.position.set(0, -0.33, -0.82); cockpit.add(binn);
-  // The steering wheel: a rim, a centre hub and three spokes, tilted on its column. It is spun about
-  // its own axis by the driver's input, so what the hands are doing is visible — a single bar gave no
-  // sense of rotation at all, because a bar at 180 degrees looks exactly like a bar at 0.
-  const rimM = new T.MeshLambertMaterial({ color: 0x191d20 });
-  const wheel = new T.Group(); wheel.position.set(0, -0.33, -0.68); wheel.rotation.x = -0.35; cockpit.add(wheel);
-  wheel.add(new T.Mesh(new T.TorusGeometry(0.23, 0.032, 10, 40), rimM));
-  const wheelHub = new T.Mesh(new T.CylinderGeometry(0.062, 0.062, 0.036, 18), trimM); wheelHub.rotation.x = Math.PI / 2; wheel.add(wheelHub);
-  for (const a of [Math.PI, 0, -Math.PI / 2]) { // three spokes: left, right and down, as on most cars
-    const sp = new T.Mesh(new T.BoxGeometry(0.17, 0.034, 0.02), trimM);
-    sp.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0); sp.rotation.z = a; wheel.add(sp);
-  }
-  // How far the rim turns at full lock. Not the real 450 degrees: that spins out of sight on a
-  // keyboard, where full lock is one key press away.
-  const WHEEL_LOCK = 2.3;
-  // A-pillars at the edges of the windscreen, and a door top under each wing mirror so the mirror is
-  // mounted on something rather than hanging in mid-air.
-  const pillars = [-1, 1].map(sx => { const pil = new T.Mesh(new T.BoxGeometry(0.06, 1.3, 0.07), dashM); pil.position.set(-CAR.seat.x + sx * 0.99, 0.2, -1.22); pil.rotation.z = -sx * 0.28; pil.rotation.x = -0.4; cockpit.add(pil); return pil; });
-  // Each side gets a roof rail and a door waist, with the side window as the gap between them. That
-  // gap is what the wing mirror is seen through, and it is what makes the windscreen read as glass in
-  // a frame rather than the view simply running off the edge of the screen.
-  const doors = [];
-  for (const sx of [-1, 1]) {
-    const rail = new T.Mesh(new T.BoxGeometry(0.1, 0.09, 1.9), dashM); rail.position.set(-CAR.seat.x + sx * 1.02, 0.5, -0.1);
-    const waist = new T.Mesh(new T.BoxGeometry(0.12, 0.85, 1.9), trimM); waist.position.set(-CAR.seat.x + sx * 1.02, -0.62, -0.1);
-    cockpit.add(rail, waist); doors.push(rail, waist);
-  }
-  mirrors.mount(cockpit, CAR.seat.x); mirrors.mountChase(camera);
-  // Fit the driver's seat to the car that is actually selected: its colour over the bonnet, its width,
-  // how high the bonnet sits ahead of you, and an eye line that is higher in a tall car than a low one.
-  // The hand-built cockpit is an impression of a car rather than a model of one, and the proportions
-  // that read well were arrived at by eye. So keep them, and vary only what actually differs between
-  // the cars in the garage: the paint over the bonnet, how wide it is, and a slightly higher eye line
-  // in a taller car.
-  const REFERENCE = { width: 1.9, height: 1.33 };
-  function fitCockpit(model) {
-    const m = carMetrics(model); if (!m) return;
-    bonnetM.color.setHex(m.colour);
-    const width = Math.max(1.5, Math.min(2.2, m.width));
-    seat.x = CAR.seat.x * (width / REFERENCE.width);
-    seat.y = CAR.seat.y + Math.max(-0.12, Math.min(0.2, (m.height - REFERENCE.height) * 0.5));
-    for (const part of spanning) { part.scale.x = width / REFERENCE.width; part.position.x = -seat.x; }
-    for (const [i, d] of doors.entries()) d.position.x = -seat.x + (i < 2 ? -1 : 1) * width * 0.54;
-    for (const [i, pil] of pillars.entries()) pil.position.x = -seat.x + (i ? 1 : -1) * width * 0.52;
-    mirrors.mount(cockpit, seat.x);
-    camInit = false;
-  }
+  // Shared physical cockpit; instruments read the simulation without changing it.
+  const interior = createCockpit(T,{camera,mirrors,seat,car:CAR});
+  const cockpit=interior.group,wheel=interior.wheel,bonnetM=interior.bonnetMaterial;
+  scene.add(camera);
+  const WHEEL_LOCK=2.3;
+  function fitCockpit(model){interior.fit(carMetrics(model));camInit=false;}
+  Object.defineProperty(window.cambridgeDrive,'cockpit',{get:()=>interior.telemetry});
   player.onModel = (m) => { fitCockpit(m); if (!m.getObjectByName('lamps')) attachLamps(m); };
   if (player.model) player.onModel(player.model);
   if (!player.mesh.getObjectByName('lamps')) attachLamps(player.mesh);
@@ -817,6 +759,7 @@ async function boot() {
     mirrors.layoutChase(camera, drive && cam === 0, drive && cam === 0 ? hudChaseBox() : null);
     if (drive && cam === 1) mirrors.fitView(camera);
     if (drive && cam < 2) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player, cam === 1 ? 'cockpit' : 'chase'); guide.group.visible = gv; }
+    if(drive&&cam===1)interior.update(player,test,A.net,traffic.clock,{lowPower});
     if(drive||botMode)renderer.render(scene, camera);
     uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }

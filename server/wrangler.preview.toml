@@ -1,0 +1,12 @@
+# Deployment tool always supplies an isolated worker name and preview origin.
+name = "learner-drive-cockpit-review-billing"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+compatibility_flags = ["nodejs_compat"]
+[vars]
+BILLING_PREVIEW = "true"
+FRONTEND_URL = "https://cockpit-review-billing.learner-drive-app.pages.dev"
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }

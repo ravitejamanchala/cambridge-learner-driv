@@ -8,7 +8,8 @@
 The original home layout remains. Eight previously selected starter/parking drills remain hidden. The subscribe offer appears in Learners and when opening paid content.
 
 ## URLs
-- Web: https://manchala.co.uk/cambridge-learner-driv/
+- Production web target: https://app.slaydrive.com/
+- Local-track sandbox: https://manchala.co.uk/cambridge-learner-driv/
 - API: https://learner-drive-api.manchala0024.workers.dev
 - Stripe webhook: https://learner-drive-api.manchala0024.workers.dev/billing/webhook
 - Public billing availability: API `/billing/config`
@@ -17,6 +18,9 @@ The original home layout remains. Eight previously selected starter/parking dril
 - Sandbox price: `price_1UQw6HBtAo1tDaNN6U6zBFT9`
 
 ## Secure configuration
+
+The isolated PR billing sandbox and its required environment values are described
+in [COCKPIT-AND-BILLING-REVIEW.md](COCKPIT-AND-BILLING-REVIEW.md).
 `server/.env` is ignored by Git and permission 0600. It holds existing Clerk/Neon/Cloudflare values plus:
 - `STRIPE_SECRET_KEY`: secret server API key, never a browser key.
 - `STRIPE_PRICE_ID`: active GBP 499 minor-unit monthly licensed price.

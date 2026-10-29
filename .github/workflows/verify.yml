@@ -1,13 +1,14 @@
 name: Verify simulator and API
 on:
   push:
-    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery']
+    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery', 'feature/production-cockpit-billing']
   pull_request:
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +29,11 @@ jobs:
           WRANGLER_LOG_PATH: /tmp/wrangler-setup.log
           WRANGLER_SEND_METRICS: 'false'
       - run: npx playwright install --with-deps chromium
+      - run: node tests/cockpit-browser.mjs
+      - run: node tests/drive-features-browser.mjs
+        env:
+          TEST_DPR: '.35'
+          TEST_LOW_POWER: '1'
       - run: node tests/local-tracks-browser.mjs
       - run: node tests/experimental-practice-browser.mjs
       - run: node tests/cambridge-pilot-browser.mjs

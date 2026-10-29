@@ -440,6 +440,16 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 .subscription-offer{margin:12px 0;padding:12px;border:1px solid #c9b8de;border-radius:12px;background:#fffaf3}
 .subscription-offer p{margin:8px 0;font-size:13px;line-height:1.5}
 .subscription-offer button{margin:4px 4px 4px 0}
+
+/* In the wide cockpit the physical dashboard carries speed and navigation.
+   Keep the original HUD for touch/portrait layouts and the other cameras. */
+@media (min-width:1000px) and (min-aspect-ratio: 4/3){
+ body[data-mode="drive"].driver-view .hud-map,
+ body[data-mode="drive"].driver-view .hud-right .speedo{opacity:0;pointer-events:none}
+ body[data-mode="drive"].driver-view .hud-next{top:calc(20px + var(--safe-t));max-width:280px;background:rgba(16,32,37,.76);box-shadow:none;border:1px solid rgba(204,224,222,.18);border-radius:15px}
+ body[data-mode="drive"].driver-view .hud-next.warn,
+ body[data-mode="drive"].driver-view .hud-next.stop{opacity:1}
+}
 </style>
 </head>
 <body>

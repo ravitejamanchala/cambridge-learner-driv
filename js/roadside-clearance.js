@@ -38,7 +38,7 @@ const MOVABLE=new Set(['tree','lamp','bench','bin','postBox','bicycleParking','b
 export function clearRoadside(track,{margin=.35}={}){
  const rejectedSignals=track.osm?track.network.stops.filter(s=>track.network.ways[track.network.edges[s[0]][2]][4]&&s[2]<0):[];
  let network=rejectedSignals.length?{...track.network,stops:track.network.stops.filter(s=>!rejectedSignals.includes(s))}:track.network;
- let net=buildNet(network);fitRoadCorners(net,track.objects);const approaches=correctApproaches(network,net);network=approaches.network;if(approaches.changes.length){net=buildNet(network);fitRoadCorners(net,track.objects);}const space=roadSpace(net),objects=[],adjustments=[],excluded=[],blocked=objectBlocker(track.objects),placed=[];
+ let net=buildNet(network,{tidyLines:false});fitRoadCorners(net,track.objects);const approaches=correctApproaches(network,net);network=approaches.network;if(approaches.changes.length){net=buildNet(network,{tidyLines:false});fitRoadCorners(net,track.objects);}const space=roadSpace(net),objects=[],adjustments=[],excluded=[],blocked=objectBlocker(track.objects),placed=[];
  for(const source of joinMappedPaths(track.objects)){
   if(!roadObstacle(source)){objects.push(source);continue;}
   const hits=[...new Set(space.overlaps(objectRings(source),source.type==='building'?0:margin))];if(!hits.length){objects.push(source);continue;}

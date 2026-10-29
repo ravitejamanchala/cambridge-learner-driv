@@ -1,10 +1,11 @@
-node_modules/
+node_modules
 dist/
 *.log
 __pycache__/
 .env
 .env.*
 !.env.example
+!.env.preview.example
 .dev.vars
 .wrangler/
 .test-build/
@@ -12,3 +13,6 @@ audit-server.json
 
 .local-tracks/
 test-results/
+
+/dist-review/
+/dist-billing/

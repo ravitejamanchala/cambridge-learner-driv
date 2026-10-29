@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Stripe from 'stripe';
 import {createApp} from '../.test-build/app.mjs';
-import {paidAccess,validatePrice,reconcile,checkout} from '../src/billing.mjs';
+import {paidAccess,validatePrice,reconcile,checkout,billingOrigin,billingConfigured} from '../src/billing.mjs';
 import {basicProgressAllowed} from '../../shared/access-policy.mjs';
 const env={DATABASE_URL:'fake',CLERK_SECRET_KEY:'fake',FRONTEND_URL:'https://app.slaydrive.com',RATE_LIMITER:{limit:async()=>({success:true})},STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_PRICE_ID:'price_499',STRIPE_WEBHOOK_SECRET:'whsec_fixture'};
 const period=Math.floor(Date.now()/1000)+86400;
@@ -33,7 +33,7 @@ test('reconciliation requires a paid invoice and matching product, ignores paylo
 });
 test('real Stripe webhook signatures, duplicate delivery, cancellation and unknown customers',async()=>{
  const f=fixture();const send=async(id,customer='cus_1',sig=true)=>{
-  const payload=JSON.stringify({id,type:'customer.subscription.updated',data:{object:{customer,status:'active'}}});
+  const payload=JSON.stringify({id,livemode:false,type:'customer.subscription.updated',data:{object:{customer,status:'active'}}});
   const header=Stripe.webhooks.generateTestHeaderString({payload,secret:env.STRIPE_WEBHOOK_SECRET});
   return f.app.request('/billing/webhook',{method:'POST',headers:{'Stripe-Signature':sig?header:'t=1,v1=fake'},body:payload},env);
  };
@@ -57,4 +57,28 @@ test('free progress cannot create premium lesson results or mock results',()=>{
  assert.equal(basicProgressAllowed({...base,history:[{lessonId:'move-off'}]},null),false);
  assert.equal(basicProgressAllowed({...base,lessons:{paid:{passed:true,attempts:1}}},{...base,lessons:{paid:{attempts:1,passed:true}}}),true);
  const old={...base,lessons:{'move-off':{passed:true}}};assert.equal(basicProgressAllowed(old,old),true);assert.equal(basicProgressAllowed(base,old),false);
+});
+
+test('billing previews refuse live keys and return only to their configured preview origin',async()=>{
+ const preview={...env,BILLING_PREVIEW:'true',FRONTEND_URL:'https://pr-42-billing.learner-drive-app.pages.dev',CLERK_SECRET_KEY:'sk_test_clerk'};
+ assert.equal(billingConfigured(preview),true);assert.equal(billingOrigin(preview),preview.FRONTEND_URL);
+ for(const change of [{STRIPE_SECRET_KEY:'sk_live_bad'},{CLERK_SECRET_KEY:'sk_live_bad'},{FRONTEND_URL:'https://app.slaydrive.com'},{FRONTEND_URL:'https://pr-42-billing.learner-drive-app.pages.dev.evil.example'},{FRONTEND_URL:preview.FRONTEND_URL+'/?next=evil'},{FRONTEND_URL:'https://user:pass@pr-42-billing.learner-drive-app.pages.dev'}])assert.equal(billingConfigured({...preview,...change}),false);
+ const f=fixture();f.setSubscriptions([]);let checkoutArgs;
+ const blocked=await f.app.request('/api/me',{}, {...preview,STRIPE_SECRET_KEY:'sk_live_invalid_preview'});assert.equal(blocked.status,503);
+ f.stripe.checkout.sessions.create=async args=>{checkoutArgs=args;return {url:'https://checkout.stripe.com/test'};};
+ await checkout(f.stripe,f.store,'user-1','clerk-1',preview);
+ assert.equal(checkoutArgs.success_url,preview.FRONTEND_URL+'/?subscription=success');assert.equal(checkoutArgs.cancel_url,preview.FRONTEND_URL+'/?subscription=cancelled');
+});
+test('a signed webhook from the wrong Stripe mode cannot grant access',async()=>{
+ const f=fixture(),payload=JSON.stringify({id:'evt_wrong_mode',livemode:true,type:'customer.subscription.updated',data:{object:{customer:'cus_1'}}});
+ const signature=Stripe.webhooks.generateTestHeaderString({payload,secret:env.STRIPE_WEBHOOK_SECRET});
+ const result=await f.app.request('/billing/webhook',{method:'POST',headers:{'Stripe-Signature':signature},body:payload},env);
+ assert.equal(result.status,400);assert.equal(f.getSaved(),0);
+});
+test('late webhook delivery reconciles current Stripe status instead of old event claims',async()=>{
+ const f=fixture();f.setSubscriptions([{...good,status:'canceled'}]);
+ const payload=JSON.stringify({id:'evt_old_active',livemode:false,type:'customer.subscription.updated',data:{object:{customer:'cus_1',status:'active'}}});
+ const signature=Stripe.webhooks.generateTestHeaderString({payload,secret:env.STRIPE_WEBHOOK_SECRET});
+ assert.equal((await f.app.request('/billing/webhook',{method:'POST',headers:{'Stripe-Signature':signature},body:payload},env)).status,200);
+ assert.equal((await (await f.req('/api/me')).json()).access.full,false);
 });

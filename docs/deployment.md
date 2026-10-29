@@ -28,6 +28,9 @@ The Stripe webhook stays at the Worker URL and needs no change.
 
 ## Pull request previews
 
+For the cockpit branch, the current preview and isolated Stripe sandbox setup is
+documented in [COCKPIT-AND-BILLING-REVIEW.md](COCKPIT-AND-BILLING-REVIEW.md).
+
 Every pull request from a branch in this repository is built and deployed by
 `.github/workflows/preview.yml` to its own Cloudflare Pages branch deployment:
 
@@ -37,7 +40,7 @@ The link is posted as a comment on the pull request and updated on every push. B
 touch production — the project's production branch is `main`, which only `deploy.yml` deploys.
 
 A preview is built with `node tools/build_demo.mjs . dist --preview`. It writes
-`window.LEARNER_CONFIG = {"PREVIEW":true}` instead of the committed account configuration, because the
+`window.LEARNER_CONFIG = {"PREVIEW":true,"BROWSER_AUTHORING":true}` instead of the committed account configuration, because the
 production sign-in key is bound to the production domain and would leave a preview stuck at the sign-in
 gate. The preview runs as a guest with the whole course open, syncs nothing, and shows a small
 "Preview build · <commit>" label in the lobby (never while driving). `tests/preview-build.test.mjs`

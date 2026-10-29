@@ -10,7 +10,7 @@ export async function loadNet(url) {
   return buildNet(await r.json());
 }
 
-export function buildNet(d) {
+export function buildNet(d, { tidyLines = true } = {}) {
   const net = { origin: d.origin, kx: d.kx, kz: d.kz, names: d.names, chunkSize: 400 };
   // motorway extras: the central reservation barrier, the blue junction signs, and the junction list
   net.barriers = (d.barriers || []).map(f => { const out = []; for (let i = 0; i < f.length; i += 2) out.push([f[i] / 10, f[i + 1] / 10]); return out; });
@@ -73,7 +73,7 @@ export function buildNet(d) {
   net.keepClear = (d.keepClear || []).map(([ei, s, dir, len]) => feature(net, { e: edges[ei], s: s / 10, dir, len: (len || 100) / 10 }));
   // yellow box junctions, each over the node at the end of its edge (issue #5); the box itself is js/box-junction.js
   net.boxes = (d.boxes || []).map(([ei, s, dir]) => ({ e: edges[ei], s: s / 10, dir, node: dir > 0 ? edges[ei].b : edges[ei].a }));
-  tidyJunctionLines(net);
+  if (tidyLines) tidyJunctionLines(net);
   net.fillets = junctionFillets(net);
   net.stopGrid = new Map();
   for (const s of net.stops) push(net.stopGrid, ck(Math.floor(s.x / CELL), Math.floor(s.z / CELL)), s);
