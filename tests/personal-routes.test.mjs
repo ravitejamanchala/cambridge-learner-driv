@@ -52,3 +52,8 @@ test('personal drive honours configured sign-in but needs no paid entitlement',a
  setSignedIn(true);assert.equal(canAccessPlan({kind:'personal'}),true);assert.equal(canAccessPlan({kind:'mock'}),false);
  setSignedIn(false);assert.equal(canAccessPlan({kind:'personal'}),false);setAuthConfigured(false);
 });
+test('cancelled section requests do not finish or write map cache',async()=>{
+ const {createJourney,abortableDelay}=await import('../js/personal/client.js');let writes=0;
+ const journey=createJourney(recipe(),{store:{getSection:()=>null,putSection:()=>writes++},fetchSection:async(_,options)=>{await abortableDelay(500,options.signal);return{};},generate:()=>({})});
+ const request=journey.get(0);journey.cancel();await assert.rejects(request,e=>e.name==='AbortError');assert.equal(writes,0);assert.equal(journey.cancelled,true);
+});

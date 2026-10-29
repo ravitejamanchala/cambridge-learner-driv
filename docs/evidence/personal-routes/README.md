@@ -15,11 +15,11 @@ Reproduce: `npm run evidence -- personal` (Chromium and ffmpeg required). Indivi
 
 ## Recorded checks
 
-- 236 frontend unit tests; 23 backend tests and TypeScript check.
-- Personal route UI: actual pin drag, save/reload, quota failure preserving the saved recipe, 429 retry, native acceleration, ungraded/no-scenario state, position and speed surviving a section change, mobile viewport and confirmed delete.
+- 237 frontend unit tests; 23 backend tests and TypeScript check.
+- Personal route UI: actual pin drag, save/reload, quota failure preserving the saved recipe, 429 retry, failed section pause/retry, native acceleration, ungraded/no-scenario state, position and speed surviving a section change, mobile viewport and confirmed delete.
 - Existing Cambridge OSM fixture converts to native roads and mapped buildings.
 - A route over 150 km splits into bounded, overlapping sections with no application distance cap.
-- 13 panels × four viewports (320×568, 390×844, 844×390, 768×1024), plus touch list/detail/back in Course, Puzzles, Mock test and Free drive.
+- 13 panels × four viewports (320×568, 390×844, 844×390, 768×1024), plus touch list/detail/back in Course, Puzzles, Mock test and Free drive. Camera-choice wrapping is also checked with the wider Linux fallback font at 320 px.
 - The fixture first section has 26 buildings and rendered 117 calls / 8,252 triangles in the sampled frame. This is evidence of bounded scene work, not a mobile FPS promise.
 
 Existing course, camera/blue-light, device controls, parking, access/billing gates, car assets, steering/controller and imported/experimental track browser suites also passed locally. Additional build and hosted verification results are recorded in PR CI artifacts. Local network policy denies the live map hosts, Cloudflare and GitHub API, so live checks run explicitly in the authorised preview workflow.

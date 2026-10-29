@@ -57,6 +57,6 @@ npm run build
 
 ## Verification and evidence
 
-See [the review evidence](evidence/personal-routes/README.md). `tests/personal-routes-browser.mjs` uses explicit provider fixtures and exercises actual search, Leaflet pin dragging, localStorage save/reload/quota recovery, native driving, section transitions, ungraded state and mobile layout. It is not a live-provider claim.
+See [the review evidence](evidence/personal-routes/README.md). `tests/personal-routes-browser.mjs` uses explicit provider fixtures and exercises actual search, Leaflet pin dragging, localStorage save/reload/quota recovery, native driving, section transitions and failed-section recovery, ungraded state and mobile layout. It is not a live-provider claim.
 
 `tools/check-personal-providers.mjs` is a separate hosted check of Cambridge search, OSRM routing, bounded OSM import and native generation. Its output is saved as `test-results/personal-providers-live.json` in preview CI. A local networking restriction must not be reported as a provider outage. No Stripe checkout or production database write is part of these checks.

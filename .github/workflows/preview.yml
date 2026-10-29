@@ -62,6 +62,7 @@ jobs:
       - name: Verify mobile panels
         run: node tests/modal-layout-browser.mjs
       - name: Verify live map providers separately
+        if: ${{ !cancelled() && steps.deploy.outcome == 'success' }}
         run: node tools/check-personal-providers.mjs
       - name: Prepare isolated Stripe test-mode backend when configured
         id: billing
