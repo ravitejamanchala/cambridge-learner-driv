@@ -55,6 +55,8 @@ jobs:
       - name: Verify the deployed cockpit
         id: smoke
         run: node tests/cockpit-browser.mjs
+        env:
+          EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Prepare isolated Stripe test-mode backend when configured
         id: billing
         continue-on-error: true

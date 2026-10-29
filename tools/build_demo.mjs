@@ -39,10 +39,11 @@ fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, 
 // pull-request preview (--preview) runs as a guest with the whole course open; production copies the
 // committed account configuration. The production sign-in key is bound to the production domain and
 // would leave either of the others stuck at the sign-in gate, and nothing they do reaches an account.
-if (process.argv.includes('--pages-preview') || (preview&&!billingPreview)) {
+if (process.argv.includes('--pages-preview')) {
   fs.cpSync(path.join(SRC, 'examples/cambridge-pilot'), path.join(OUT, 'examples/cambridge-pilot'), { recursive: true });
-  fs.writeFileSync(path.join(OUT, 'auth-config.js'),preview?'window.LEARNER_CONFIG={\"PREVIEW\":true,\"BROWSER_AUTHORING\":true};':'window.LEARNER_CONFIG={BROWSER_AUTHORING:true};');
+  fs.writeFileSync(path.join(OUT, 'auth-config.js'),'window.LEARNER_CONFIG={BROWSER_AUTHORING:true};');
 } else if(billingPreview)fs.writeFileSync(path.join(OUT,'auth-config.js'),'window.LEARNER_CONFIG='+JSON.stringify(billingConfig)+';\n');
+else if(preview)fs.writeFileSync(path.join(OUT,'auth-config.js'),'window.LEARNER_CONFIG={"PREVIEW":true};\n');
 else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
 
 fs.copyFileSync(path.join(SRC,'js/vendor/THIRD-PARTY-LICENSES.txt'),path.join(OUT,'THIRD-PARTY-LICENSES.txt'));

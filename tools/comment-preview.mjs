@@ -5,7 +5,7 @@ const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const body=`<!-- learner-drive-preview -->
 **Driving preview:** ${env.PREVIEW_URL}
 
-Commit \`${sha}\`. Guest preview: lessons and browser-local JSON imports are available; no production account or payment access.
+Commit \`${sha}\`. Learner preview: lessons and built-in mock tests are open for review; no production account or payment access. JSON authoring stays on the separate testing page.
 
 ${billing.status==='ready'?`**Stripe sandbox:** ${billing.frontend} — test accounts and test cards only.`:`**Stripe sandbox:** ${billing.status||'not run'}. ${billing.missing?'Missing configuration: '+billing.missing.join(', '):'See workflow evidence.'}`}
 

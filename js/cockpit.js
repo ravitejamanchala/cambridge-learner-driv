@@ -8,6 +8,8 @@ export function createCockpit(T, {camera, mirrors, seat, car}) {
  const material = (colour, shininess=12) => {const m=new T.MeshPhongMaterial({color:colour,shininess,specular:0x262b30});materials.push(m);return m;};
  const dashM=material(0x202930,9), leather=material(0x784b38,7), dark=material(0x11191e,6), metal=material(0x8b979c,65), wood=material(0x443b33,18), wheelM=material(0x171d22,12);
  const bonnetMaterial=material(0x1d6a46,38), span=[];
+ const css=getComputedStyle(document.documentElement),mapColour=name=>css.getPropertyValue(name).trim();
+ const mapPalette={ground:mapColour('--map-bg'),pavement:mapColour('--map-pave'),road:mapColour('--map-road'),route:mapColour('--accent'),player:mapColour('--bad')};
  const mesh=(g,m,x,y,z,parent=group)=>{geometries.push(g);const o=new T.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;};
  const box=(w,h,d,m,x,y,z,parent=group)=>mesh(new T.BoxGeometry(w,h,d),m,x,y,z,parent);
  function rounded(w,h,d,r,m,x,y,z,parent=group){
@@ -106,15 +108,15 @@ export function createCockpit(T, {camera, mirrors, seat, car}) {
   text(g,s.parkingBrake?'PARKING BRAKE':s.engine?'READY':'ENGINE OFF',30,h-17,20,s.parkingBrake?'#f4af7b':'#91d7bd');text(g,s.beltWarning?'FASTEN BELT':s.headlights?'DIPPED LIGHTS':'',w-30,h-17,18,s.beltWarning?'#f4af7b':'#91d7bd','right');
  }
  function routeMap(p,t,net,s){
-  const {g,canvas:c}=navigation,w=c.width,h=c.height;g.fillStyle='#d9e0d3';g.fillRect(0,0,w,h);
+  const {g,canvas:c}=navigation,w=c.width,h=c.height;g.fillStyle=mapPalette.ground;g.fillRect(0,0,w,h);
   g.save();g.beginPath();g.rect(0,70,w,h-118);g.clip();const k=2.1;g.translate(w/2,h*.65);g.rotate(p.th);g.scale(k,k);g.translate(-p.x,-p.z);
   const range=240,C=net.chunkSize,edges=new Set();
   for(let x=Math.floor((p.x-range)/C);x<=Math.floor((p.x+range)/C);x++)for(let z=Math.floor((p.z-range)/C);z<=Math.floor((p.z+range)/C);z++)for(const e of net.chunks.get(net.ck(x,z))||[])edges.add(e);
   g.lineCap='round';g.lineJoin='round';
-  for(const [colour,extra] of [['#b4c0ba',4],['#f8faf4',0]]){g.strokeStyle=colour;for(const e of edges){g.lineWidth=Math.max(2,e.way.w+extra);g.beginPath();for(let i=0;i<e.n;i++)i?g.lineTo(e.px[i],e.pz[i]):g.moveTo(e.px[i],e.pz[i]);g.stroke();}}
-  const r=t.route;if(r?.xs?.length){g.strokeStyle='#258a71';g.lineWidth=4;g.beginPath();let drawing=false;for(let i=0;i<r.xs.length;i++){const near=Math.abs(r.xs[i]-p.x)<range&&Math.abs(r.zs[i]-p.z)<range;if(near||drawing){if(drawing)g.lineTo(r.xs[i],r.zs[i]);else if(i){g.moveTo(r.xs[i-1],r.zs[i-1]);g.lineTo(r.xs[i],r.zs[i]);}else g.moveTo(r.xs[i],r.zs[i]);}drawing=near;}g.stroke();}
-  g.restore();g.fillStyle='#165643';g.strokeStyle='#fff';g.lineWidth=3;g.beginPath();g.moveTo(w/2,h*.65-13);g.lineTo(w/2+10,h*.65+11);g.lineTo(w/2,h*.65+6);g.lineTo(w/2-10,h*.65+11);g.closePath();g.fill();g.stroke();
-  g.fillStyle='#143b35';g.fillRect(0,0,w,70);text(g,s.turn.slice(0,32),24,43,25,'#edf7ef');text(g,s.distanceText,w-20,43,24,'#b8e5cc','right');g.fillStyle='#14282e';g.fillRect(0,h-48,w,48);text(g,s.road.slice(0,40),20,h-17,23);text(g,s.remainingText,w-18,h-17,20,'#a8c5c7','right');
+  for(const [colour,extra] of [[mapPalette.pavement,5],[mapPalette.road,0]]){g.strokeStyle=colour;for(const e of edges){g.lineWidth=Math.max(2,e.way.w+extra);g.beginPath();for(let i=0;i<e.n;i++)i?g.lineTo(e.px[i],e.pz[i]):g.moveTo(e.px[i],e.pz[i]);g.stroke();}}
+  const r=t.route;if(r?.xs?.length){g.strokeStyle=mapPalette.route;g.lineWidth=4;g.beginPath();let drawing=false;for(let i=0;i<r.xs.length;i++){const near=Math.abs(r.xs[i]-p.x)<range&&Math.abs(r.zs[i]-p.z)<range;if(near||drawing){if(drawing)g.lineTo(r.xs[i],r.zs[i]);else if(i){g.moveTo(r.xs[i-1],r.zs[i-1]);g.lineTo(r.xs[i],r.zs[i]);}else g.moveTo(r.xs[i],r.zs[i]);}drawing=near;}g.stroke();}
+  g.restore();g.fillStyle=mapPalette.player;g.strokeStyle='#fff';g.lineWidth=3;g.beginPath();g.moveTo(w/2,h*.65-13);g.lineTo(w/2+10,h*.65+11);g.lineTo(w/2,h*.65+6);g.lineTo(w/2-10,h*.65+11);g.closePath();g.fill();g.stroke();
+  g.fillStyle='#1c3948';g.fillRect(0,0,w,70);text(g,s.turn.slice(0,32),24,43,25,'#fff6ea');text(g,s.distanceText,w-20,43,24,'#91cfc6','right');g.fillStyle='#14282e';g.fillRect(0,h-48,w,48);text(g,s.road.slice(0,40),20,h-17,23);text(g,s.remainingText,w-18,h-17,20,'#a8c5c7','right');
  }
  function journeyDisplay(s){const {g,canvas:c}=journey;backdrop(g,c.width,c.height);const now=new Date();text(g,'YOUR DRIVE',28,47,21,'#94b5b5');text(g,now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),c.width/2,165,78,'#eff5f0','center');text(g,now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}),c.width/2,208,22,'#a9bebd','center');text(g,s.mode,c.width/2,290,21,'#91d7bd','center');text(g,'Focus on the road ahead',c.width/2,c.height-19,18,'#a9bebd','center');}
  function update(player,test,net,clock,{lowPower=false,force=false}={}){

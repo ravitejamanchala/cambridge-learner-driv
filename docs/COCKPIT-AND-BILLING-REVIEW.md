@@ -18,8 +18,10 @@ The production deployment workflow still triggers only from `main` or a manual r
 3. Choose **Driver view** in settings, or press **C** to cycle cameras.
 4. Drive with the arrow keys or WASD. **Q/E** signal, **B** checks the interior
    mirror, and holding **Z/X** checks mirrors then the blind spot.
-5. Test **Mock tests → Local tracks → Import editor track JSON** with an existing
-   admin export. Revisions in this browser preview are local to that browser.
+
+The learner preview has the normal course and built-in mock tests. JSON upload,
+local revision editing and experimental import samples belong to the dedicated
+testing build (`--pages-preview`) and local editor server, not this learner flow.
 
 The physical dashboard displays actual speed, selected automatic gear or driving
 direction, known speed limit, temporary motorway restrictions, turn instructions,
@@ -32,13 +34,17 @@ layouts retain the existing HUD. The rear and door mirrors render the real scene
 Static interior trim is combined by material; screens refresh at 10 Hz, or 4 Hz
 in low-power mode, and stop updating when hidden. Low-power mirrors use smaller
 render targets and fewer updates. Car selection still adjusts seat height,
-interior width and bonnet colour.
+interior width and bonnet colour. The dashboard map reads the same pink route and
+map colour palette as the chase-view map. The larger rear-view mirror faces the
+driver's eye and fits within narrow viewports. Both views render the same world,
+route and vehicle.
 
 ## Two separate previews
 
 | Build | Purpose | Accounts/payments |
 | --- | --- | --- |
-| `--preview` | Visual, lesson and JSON-import review | Guest, all content open; no production account sync |
+| `--preview` | Learner UI, cockpit, lessons and built-in mocks | Guest, all content open; no JSON authoring or production account sync |
+| `--pages-preview` | Dedicated JSON testing page | Browser-local imports/revisions; no account service |
 | `--billing-preview` | Clerk/Stripe integration review | Development Clerk + isolated Neon + Stripe test mode; no guest entitlement bypass |
 | Default production build | `app.slaydrive.com`, after merge/release approval | Existing production configuration and access policy |
 
