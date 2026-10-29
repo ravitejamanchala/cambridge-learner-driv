@@ -1,3 +1,8 @@
+import {createObstacleIndex} from './obstacle-index.js';
+import {fitRoadCorners} from './roadside-clearance.js';
+import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
+import { addEditorObjects } from './local-world.js';
+import { obstacleContact } from './editor-collisions.js';
 import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
 import { parkingPlan, ROADSIDE_PARKING } from './roadside-parking.js';
@@ -48,6 +53,7 @@ async function boot() {
   const assetURL = url => release ? url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(release) : url;
   const ix = await fetch(assetURL(AREAS_URL + 'index.json')); if (!ix.ok) throw new Error('Map index did not load (' + ix.status + ')');
   const index = await ix.json();
+  const localTracks = await loadLocalLibrary(index, ROUTES);
   const meta = (key) => index.plans[key] || { len: 0, n: 0, first: '' };
 
   let camInit = false, paused = false;
@@ -103,18 +109,25 @@ async function boot() {
       $('areaLoad').textContent = 'Loading map…';
       const info = index.areas.find(a => a.id === id); if (!info) throw new Error('Unknown map area ' + id);
       $('areaLoad').hidden = false;
-      const r = await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
-      const d = await r.json();
+      const r = localTracks.has(id) ? {ok:true} : await fetch(assetURL(AREAS_URL + info.file)); if (!r.ok) throw new Error('Map area did not load (' + r.status + ')');
+      const d = localTracks.get(id) || await r.json();
       await new Promise(res => setTimeout(res, 16));
       if (A.test) A.test.running = false;
-      const old = scene; scene = new T.Scene(); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
-      const net = buildNet(d);
+      const old = scene; scene = new T.Scene(); scene.matrixAutoUpdate=!Array.isArray(d.objects); scene.add(camera, player.mesh, guide.group, headBeam, headBeam.target); carI = bikeI = pedI = 0;
+      const net = buildNet(d.network || d);
+      if(d.network)fitRoadCorners(net,d.objects||[]);
       const traffic = createTraffic(net, scene, makeCar, makeBk,makePedestrian);
-      const world = buildWorld(scene, net, traffic); world.setShadows(shadowsOn && !lowPower);
+      // Local navigation inserts waypoint nodes; the original graph keeps road
+      // paint continuous through those artificial cuts. Signals share cluster/group
+      // identifiers with traffic, so both graphs display the same live phase.
+      const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      if(d.network) addEditorObjects(T,scene,d,visualNet);
+      world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
-      Object.assign(A, { id, net, traffic, world, test, trafficInit: false });
+      Object.assign(A, { id, net, traffic, world, test, obstacleIndex: d.objects?createObstacleIndex(d.objects):null, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
     }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; throw err; });
@@ -201,15 +214,18 @@ async function boot() {
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
     const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
-    nodes = wps.map(w => snapWaypoint(A.net, w));
+    nodes = pl.kind==='mock' && ROUTES[pl.index].localNodes ? [...ROUTES[pl.index].localNodes] : wps.map(w => snapWaypoint(A.net, w));
     route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
+    test.experimental = localTracks.get(A.id)?.practiceMode === 'experimental';
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
     A.traffic.setDensity(pl.scenarioDefinition?.conditions.trafficDensity || 'normal');
     const s0 = startPos(startS(pl), pl.lesson?.startLane || 0);
+    const authored = localTracks.get(A.id);
+    if(authored) player.place(authored.spawn.x, authored.spawn.z, authored.spawn.heading);
     if (pl.kind === 'free') { player.v = 22.4; player.steer = 0; test.parked = false; } // 50 mph in lane 1, nothing to move off from
     if (pl.lesson?.startMph) { player.v = pl.lesson.startMph * 0.44704; player.steer = 0; test.parked = false; } // a motorway lesson starts at speed, in its lane
     const parkingLayout = pl.lesson?.manoeuvre ? (pl.lesson.parkingLayout || ROADSIDE_PARKING) : null;
@@ -229,12 +245,14 @@ async function boot() {
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
     ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free' ? 0 : (pl.lesson.maxD ?? 2));
-    $('testState').textContent = pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
+    $('backBtn').textContent = test.experimental ? 'Reset to spawn' : 'Back to last instruction';
+    $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
     document.body.classList.toggle('free-drive', pl.kind === 'free'); $('quitBtn').textContent = pl.kind === 'free' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    notifyLocalRoute(pl);
     if(start&&!canAccessPlan(pl)){hub.requestAccess();return false;}
     if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
     if (pl.kind === 'lesson' && !pl.lesson.questions) pl = { ...pl, scenarioDefinition: resolveScenario(pl.lesson, pl.scenarioId) };
@@ -247,7 +265,8 @@ async function boot() {
     if (tok !== pickTok || !A.net || A.id !== areaOf(pl)) return false;
     loadPlan(pl); if (start) begin();
   }
-  const hub = createHub({ meta, onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  const hub = createHub({ meta, initialMockId: preferredLocalRoute(), onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
+  mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
     if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
@@ -425,6 +444,8 @@ async function boot() {
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
   window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+    get roadsidePlacements(){return A.world?.placements||[];},
+    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; }, steerFor };
@@ -462,7 +483,7 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
+    const test = A.test; if (test.experimental) return; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -509,14 +530,14 @@ async function boot() {
     loadPlan(plan);
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
+    scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
     stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = A.test.experimental ? 'Experimental practice · no grading or recorded results' : plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
@@ -530,6 +551,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('backBtn').addEventListener('click', () => {
     if (plan?.lesson?.manoeuvre) return;
+    if (A.test.experimental) { begin(); return; }
     const test = A.test, r = test.route, i = Math.max(0, test.step - 1), s = test.step > 0 ? r.instructions[i].s + 10 : 8;
     let best = 0; for (let k = 0; k < r.cum.length; k++) if (r.cum[k] <= s) best = k;
     const a = best, b = Math.min(r.xs.length - 1, best + 1), tx = r.xs[b] - r.xs[a], tz = r.zs[b] - r.zs[a], L = Math.hypot(tx, tz) || 1;
@@ -745,13 +767,16 @@ async function boot() {
   function sim(dt) {
     const { traffic, test, net } = A;
     traffic.update(dt, player);
-    if (test.running) test.elapsed = (test.elapsed || 0) + dt;
+    if (test.running && !test.experimental) test.elapsed = (test.elapsed || 0) + dt;
     if (test.running && scenario && !plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);
     if (test.running) {
       const nr = nearest(net, player.x, player.z);
+      const previous = {x:player.x,z:player.z};
       const verge = nr && /^motorway/.test(nr.way.cls) ? 0.6 : 2.6; // a motorway has a verge, not a footway
       player.update(dt, readInput(), nr && nr.d > paved(nr.way) + verge && !onPaved(net, player.x, player.z, verge) && !inFillet(net, player.x, player.z) ? 'off' : 'road');
       chaseMirrors(dt, traffic.clock);
+      const authored = localTracks.get(A.id);
+      if(authored && obstacleContact(player,A.obstacleIndex.near(previous,player),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
       if (plan?.kind === 'free') stepFreeDrive(dt);
@@ -780,7 +805,7 @@ async function boot() {
     $('sigL').classList.toggle('on', player.indicator === 'L' && Math.floor(traffic.clock * 3) % 2 === 0);
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
     sigT += dt; if (sigT > 0.15) { sigT = 0; world.updateSignals(traffic.clock); }
-    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1); }
+    chunkT += dt; if (chunkT > 0.25) { chunkT = 0; const o = cam === 2 && drive; world.updateChunks(player.x + (o ? ov.px : 0), player.z + (o ? ov.pz : 0), o ? 2 : 1, o ? WORLD.fogFar + 200 + ov.h : 0); }
     // lamps: the learner's tail lights at dusk, headlights when switched on, and the beam on the road
     setLamps(player.mesh, dusk, !!player.headlights);
     { const blink = Math.floor(traffic.clock * 3) % 2 === 0; for (const c of traffic.cars) if (c.mesh.visible) setIndicators(c.mesh, c.ind, blink); } // everyone's indicators, flashing with the learner's

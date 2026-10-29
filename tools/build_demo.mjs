@@ -14,6 +14,7 @@ const assetVersion = sourceCommit || String(Date.now());
 let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8').replace('<script type="module" src="js/main.js"></script>', '<script type="module" src="app.js?v=' + assetVersion + '"></script>');
 html = html.replace('<head>', '<head><meta name="app-release" content="' + assetVersion + '">');
 html = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+if(process.argv.includes('--pages-preview')) html=html.replace('src="auth-config.js"','src="auth-config.js?v='+assetVersion+'"');
 // A preview build is for reviewing a pull request on its own Cloudflare branch URL. It must never be
 // mistaken for production, so the lobby carries a small label saying what it is and which commit.
 const preview = process.argv.includes('--preview');
@@ -30,9 +31,14 @@ console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length }));
 
-// Production copies the committed account configuration. A preview has no account service: the
-// production sign-in key is bound to the production domain and would leave a preview stuck at the
-// sign-in gate. Instead it runs as a guest with the whole course open, so a reviewer can reach every
-// lesson. Nothing is synced, and nothing a preview does reaches a learner's account.
-if (preview) fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG = {"PREVIEW":true};\n');
+// The Pages JSON sandbox (--pages-preview) authors routes in the browser with no account service; a
+// pull-request preview (--preview) runs as a guest with the whole course open; production copies the
+// committed account configuration. The production sign-in key is bound to the production domain and
+// would leave either of the others stuck at the sign-in gate, and nothing they do reaches an account.
+if (process.argv.includes('--pages-preview')) {
+  fs.cpSync(path.join(SRC, 'examples/cambridge-pilot'), path.join(OUT, 'examples/cambridge-pilot'), { recursive: true });
+  fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG={BROWSER_AUTHORING:true};');
+} else if (preview) fs.writeFileSync(path.join(OUT, 'auth-config.js'), 'window.LEARNER_CONFIG = {"PREVIEW":true};\n');
 else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
+
+fs.copyFileSync(path.join(SRC,'js/vendor/THIRD-PARTY-LICENSES.txt'),path.join(OUT,'THIRD-PARTY-LICENSES.txt'));

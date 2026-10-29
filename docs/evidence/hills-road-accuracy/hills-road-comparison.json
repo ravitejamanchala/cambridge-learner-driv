@@ -1,0 +1,1726 @@
+{
+  "bounds": [
+    52.19339077957386,
+    0.1272607088947701,
+    52.199517520426134,
+    0.137664313267862
+  ],
+  "sharedRoadCoordinateSamples": 542,
+  "sharedOSMWays": 113,
+  "roadResidualMetres": {
+    "median": 0.024122897182264735,
+    "p95": 0.05305020611208976,
+    "max": 0.0676144799038565
+  },
+  "dimensionDifferences": [
+    {
+      "osmWayId": 4040778,
+      "name": "Union Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4040780,
+      "name": "George IV Street",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235420,
+      "name": "Felton Street",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235426,
+      "name": "Cambridge Place",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4276099,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 12,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 143954797,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 318853038,
+      "name": "St Paul's Place",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3128574,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3244947,
+      "name": "Bateman Street",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 7.25,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3244961,
+      "name": "Tenison Avenue",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 10.4,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4040801,
+      "name": "Bateman Mews",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4040899,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 8.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235424,
+      "name": "St Paul's Place",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235428,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235429,
+      "name": "Highsett",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235430,
+      "name": "Highsett",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235431,
+      "name": "Highsett",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235437,
+      "name": "George Pateman Court",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235438,
+      "name": "Ravensworth Gardens",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235450,
+      "name": "Glisson Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 5202442,
+      "name": "Vinter Terrace",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 5202443,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 27281044,
+      "name": "Vinter Terrace",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 42130564,
+      "name": "Warren Close",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 43666139,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 43868018,
+      "name": "Glisson Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 10.4,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 44367576,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 12,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 45675958,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134578407,
+      "name": "Station Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134578410,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 12,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134578415,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "1"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134696846,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134806810,
+      "name": "Claremont",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134808005,
+      "name": "Claremont",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134921533,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 141329846,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 141329865,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 143731105,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 147864202,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782963,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782964,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782966,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782967,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782968,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782969,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782970,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 169782971,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 190852457,
+      "name": "Mill Park",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 261096864,
+      "name": "Station Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 261096866,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 331111620,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 373696930,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 373696931,
+      "name": "Great Northern Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 436875351,
+      "name": "Station Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 486180366,
+      "name": "Eccleston Place",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 682154991,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 682154992,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 861395205,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 884938059,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 884938060,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 894616968,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 13.5,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 898067371,
+      "name": "Great Northern Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903232500,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903232501,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903232502,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903238227,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 7,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903238229,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 7,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903238230,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903238231,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 7,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 903246070,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 13.5,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 905426259,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1002837771,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 8.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1105794250,
+      "name": "Hills Road",
+      "ours": {
+        "width": 8.5,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 8.5,
+        "lanes": 4
+      },
+      "rawOSMTags": {
+        "width": "8.5",
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1159704444,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1171311809,
+      "name": "Warren Close",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1352896778,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1418025543,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1418025544,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1418025545,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1418025546,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1418025547,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1426085810,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 7.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "2"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1471101503,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1474783221,
+      "name": "Tenison Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1516951361,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1541012993,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1541012994,
+      "name": "Hills Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 7,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1541012995,
+      "name": "Station Road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 3,
+        "lanes": 1
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1541012996,
+      "name": "Station Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 1541012997,
+      "name": "Hills Road",
+      "ours": {
+        "width": 9.600000000000001,
+        "lanes": 3
+      },
+      "reference": {
+        "width": 12,
+        "lanes": 3
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": "3"
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3987074,
+      "name": "St Barnabas Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 134746679,
+      "name": "Tenison Court",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3217814,
+      "name": "Devonshire Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 8.2,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 43666137,
+      "name": "Devonshire Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 884938058,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 3987071,
+      "name": "St Barnabas Court",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 4235439,
+      "name": "Ravensworth Gardens",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 219151321,
+      "name": "Unnamed road",
+      "ours": {
+        "width": 3.2,
+        "lanes": 1
+      },
+      "reference": {
+        "width": 4.5,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    },
+    {
+      "osmWayId": 651572595,
+      "name": "Station Road",
+      "ours": {
+        "width": 6.4,
+        "lanes": 2
+      },
+      "reference": {
+        "width": 6,
+        "lanes": 2
+      },
+      "rawOSMTags": {
+        "width": null,
+        "lanes": null
+      },
+      "decision": "At least one dimension is inferred. Keep source tags and review; competitor defaults are not ground truth."
+    }
+  ],
+  "nativeSceneCounts": {
+    "building": 327,
+    "garden": 5,
+    "footway": 283,
+    "cycleway": 24,
+    "park": 3,
+    "steps": 12,
+    "hedge": 5,
+    "fence": 70,
+    "parking": 10,
+    "wall": 14,
+    "grass": 6,
+    "forest": 3,
+    "path": 12,
+    "plaza": 4,
+    "gate": 16,
+    "postBox": 2,
+    "busStop": 5,
+    "bollard": 6,
+    "bicycleParking": 24,
+    "bench": 11,
+    "tree": 57,
+    "bin": 1,
+    "waypoint": 21
+  },
+  "limitations": "Nearest-polyline comparison restricted to shared OSM way IDs inside this sample. Different data dates, simplification and estimates can differ. This does not verify city-wide lane markings or real-world dimensions."
+}

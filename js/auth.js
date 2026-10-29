@@ -1,7 +1,9 @@
+import { authoringEnabled } from './local-library.js';
 import { setAccess, hasFullAccess, setAuthConfigured, setSignedIn } from './access.js';
 import { Profiles } from './profile.js';
 import { CloudSync, cloudProfile, cloudSession } from './cloud-sync.js';
 export async function initAuth() {
+ if(authoringEnabled()){setAccess(true);return;}
  setAccess(false);
  const config = window.LEARNER_CONFIG;
  // Pull-request preview builds (tools/build_demo.mjs --preview) open the whole course to a guest so a

@@ -1,7 +1,7 @@
 name: Verify simulator and API
 on:
   push:
-    branches: ['recovery/**']
+    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery']
   pull_request:
 permissions:
   contents: read
@@ -27,3 +27,17 @@ jobs:
         env:
           WRANGLER_LOG_PATH: /tmp/wrangler-setup.log
           WRANGLER_SEND_METRICS: 'false'
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/local-tracks-browser.mjs
+      - run: node tests/experimental-practice-browser.mjs
+      - run: node tests/cambridge-pilot-browser.mjs
+      - run: npm run build:pages
+      - run: node tests/pages-browser.mjs
+      - run: node tests/three-imports-browser.mjs
+      - run: node tools/check-pages-preview.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-mock-browser
+          path: test-results/
+          if-no-files-found: ignore

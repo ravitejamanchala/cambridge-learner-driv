@@ -94,6 +94,9 @@ export function createUI(net) {
   let shown = 0, hitT = 0, allowD = 15;
   const mbEl = document.getElementById('markBoard'); if (mbEl) mbEl.addEventListener('click', () => { clearTimeout(hitT); mbEl.classList.toggle('open'); });
   function renderFaults(t, maxD) {
+    $('markBoard').hidden = !!t.experimental;
+    const heading = document.querySelector('#pauseSheet .detail h3'); if (heading) heading.textContent = t.experimental ? 'Practice mode' : 'Marking sheet';
+    if (t.experimental) { shown = 0; $('flist').innerHTML = '<li class="empty">Experimental practice — grading and saved results are disabled. Physical collisions remain enabled.</li>'; return; }
     if (maxD !== undefined) allowD = maxD;
     const ul = $('flist'); $('dCount').textContent = t.D; $('sCount').textContent = t.S;
     $('dMax').textContent = '/' + allowD; $('sCount').parentElement.classList.toggle('on', t.S > 0);
@@ -169,7 +172,7 @@ export function createUI(net) {
     }
     // Coaching, when the learner has asked for it: the scenario's own running line, under the
     // instruction box. Off by default, so a drive carries nothing the lesson card already said.
-    const coach = $('hudCoach'), coachTxt = running ? t.coach || '' : '';
+    const coach = $('hudCoach'), coachTxt = t.experimental ? 'Experimental practice · ungraded' : running ? t.coach || '' : '';
     coach.hidden = !coachTxt;
     if (coachTxt && coach.textContent !== coachTxt) coach.textContent = coachTxt;
     // An alert takes the HUD box over while it lasts: the state goes where the learner already looks,

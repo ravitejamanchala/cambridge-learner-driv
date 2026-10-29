@@ -1,0 +1,16 @@
+import {rectanglesOverlap,rectangleCorners,VEHICLE_ENVELOPE} from './parking-geometry.js';
+export function obstacleContact(player,obstacles,previous){const steps=Math.max(1,Math.ceil(Math.hypot(player.x-previous.x,player.z-previous.z)/.25));for(let i=1;i<=steps;i++){const pose={x:previous.x+(player.x-previous.x)*i/steps,z:previous.z+(player.z-previous.z)*i/steps,th:player.th,...VEHICLE_ENVELOPE};for(const o of obstacles)if(footprintContact(pose,o)){player.x=previous.x;player.z=previous.z;player.v=0;return true;}}return false;}
+// Generated city walls and tree trunks are instanced. Retain ground-level solid boxes,
+// not elevated roofs, flat markings, road ribbons or foliage. Rebuild only on new chunks.
+export function sceneryIndex(THREE){let seen=new Set(),grid=new Map();const matrix=new THREE.Matrix4(),box=new THREE.Box3();return {scan(scene){scene.updateMatrixWorld(true);scene.traverse(m=>{if(!m.isInstancedMesh||seen.has(m.uuid))return;seen.add(m.uuid);m.geometry.computeBoundingBox();for(let i=0;i<m.count;i++){m.getMatrixAt(i,matrix);matrix.premultiply(m.matrixWorld);box.copy(m.geometry.boundingBox).applyMatrix4(matrix);if(box.max.y<1||box.min.y>1.5||box.max.x-box.min.x>100||box.max.z-box.min.z>100)continue;const o={x:(box.min.x+box.max.x)/2,z:(box.min.z+box.max.z)/2,sx:box.max.x-box.min.x,sz:box.max.z-box.min.z,rotation:0};for(let x=Math.floor(box.min.x/20);x<=Math.floor(box.max.x/20);x++)for(let z=Math.floor(box.min.z/20);z<=Math.floor(box.max.z/20);z++){const key=x+':'+z;if(!grid.has(key))grid.set(key,[]);grid.get(key).push(o);}}});},near(x,z){const objects=new Set();for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(const o of grid.get((Math.floor(x/20)+a)+':'+(Math.floor(z/20)+b))||[])objects.add(o);return [...objects];}};}
+
+function inside(p,ring){let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;}return hit;}
+function intersects(a,b,c,d){const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);return cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;}
+export function footprintContact(pose,o){
+ if(o.properties?.mapFeature==='tree')return rectanglesOverlap(pose,{x:o.x,z:o.z,th:o.rotation||0,width:o.sx*.14,length:o.sz*.14});
+ const ring=o.properties?.footprint;if(!ring?.length)return rectanglesOverlap(pose,{x:o.x,z:o.z,th:o.rotation||0,width:o.sx,length:o.sz});
+ const xs=ring.map(p=>p.x),zs=ring.map(p=>p.z),cx=(Math.min(...xs)+Math.max(...xs))/2,cz=(Math.min(...zs)+Math.max(...zs))/2,w=Math.max(.01,Math.max(...xs)-Math.min(...xs)),d=Math.max(.01,Math.max(...zs)-Math.min(...zs)),angle=o.rotation||0,c=Math.cos(angle),s=Math.sin(angle);
+ const transform=p=>{const x=(p.x-cx)/w*o.sx,z=(p.z-cz)/d*o.sz;return {x:o.x+c*x+s*z,z:o.z-s*x+c*z};},outer=ring.map(transform),holes=(o.properties.holes||[]).map(h=>h.map(transform)),car=rectangleCorners(pose),solid=p=>inside(p,outer)&&!holes.some(h=>inside(p,h));
+ if(car.some(solid)||outer.some(p=>inside(p,car)))return true;
+ for(const boundary of [outer,...holes])for(let i=0;i<boundary.length;i++)for(let j=0;j<car.length;j++)if(intersects(boundary[i],boundary[(i+1)%boundary.length],car[j],car[(j+1)%car.length]))return true;return false;
+}

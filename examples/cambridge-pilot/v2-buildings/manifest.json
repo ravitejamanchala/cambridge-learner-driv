@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "engineVersion": "native-loops-v2",
+  "centre": {
+    "name": "Cambridge (Brookmount Court)",
+    "slug": "brookmount",
+    "locationVerified": false,
+    "startDescription": "Provisional road start near Kirkwood Road / Kings Hedges Road; not a verified centre entrance"
+  },
+  "requestedStart": [
+    0.13650354,
+    52.23335695
+  ],
+  "startSnapMetres": 0.00024796354223330787,
+  "source": {
+    "label": "OpenStreetMap contributors (ODbL), via Overpass Turbo export",
+    "dataTimestamp": null,
+    "file": "simulator/data/cambridge.json",
+    "review": "Cached OSM map; current access, barriers and turn restrictions unavailable",
+    "sha256": "18f8d47ed6fd8f88966e0295cde652d7de8663aaaf58a384d62871c14dacaa4a"
+  },
+  "restrictionValidation": "unavailable",
+  "warnings": [
+    "Experimental geometry only: this compact map does not retain access, barrier, conditional or turn-restriction data. Legal-route validation is unavailable.",
+    "OSM data can be incomplete or out of date. Centre access, spawn safety and road details require review before publication."
+  ],
+  "routes": [
+    {
+      "file": "brookmount-clockwise.json",
+      "title": "Cambridge (Brookmount Court) — clockwise EXPERIMENTAL",
+      "direction": "clockwise",
+      "distanceMetres": 6236,
+      "estimatedMinutes": 15,
+      "buildings": 330,
+      "roadNames": [
+        "Kings Hedges Road",
+        "Ramsden Square",
+        "Milton Road",
+        "Kendal Way",
+        "Green End Road",
+        "Scotland Road",
+        "Union Lane",
+        "Arbury Road",
+        "",
+        "Chariot Way",
+        "Circus Drive",
+        "Central Avenue",
+        "Stanley Avenue",
+        "Chieftain Way"
+      ],
+      "spawn": {
+        "x": 1020.7353347593523,
+        "z": -3524.454541734836,
+        "heading": -2.365766629227425
+      },
+      "sha256": "c54ab22208540b9d4b470776ebaada15400044c677679f11e7fdd4e250b1d0aa"
+    },
+    {
+      "file": "brookmount-anticlockwise.json",
+      "title": "Cambridge (Brookmount Court) — anticlockwise EXPERIMENTAL",
+      "direction": "anticlockwise",
+      "distanceMetres": 6127,
+      "estimatedMinutes": 15,
+      "buildings": 324,
+      "roadNames": [
+        "Kings Hedges Road",
+        "Chieftain Way",
+        "Stanley Avenue",
+        "Central Avenue",
+        "Circus Drive",
+        "Chariot Way",
+        "",
+        "Arbury Road",
+        "Milton Road",
+        "Kendal Way",
+        "Green End Road"
+      ],
+      "spawn": {
+        "x": 980.6133448419218,
+        "z": -3554.071986401751,
+        "heading": 0.9925115903107106
+      },
+      "sha256": "91f7e82468eaac12954964c6ac7eef5915b1cfdd024559670c30d8d6b993122a"
+    }
+  ]
+}
