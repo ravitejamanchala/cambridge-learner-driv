@@ -1,4 +1,6 @@
 import {styleUKBuilding,ukBuildingResources} from './uk-buildings.js';
+import {rectangularOutline} from './uk-buildings.js';
+import {compactMaterialGroups} from './material-groups.js';
 // Stylised city dressing for each 400 m chunk: houses with pitched roofs, shops with awnings,
 // taller blocks with rooftop gardens, street lamps and trees. Everything is instanced per chunk.
 import { posAt, nearest, paved } from './net.js';
@@ -61,7 +63,7 @@ let K = null;
 export function kitResources() {
   if (!K) return ukBuildingResources();
   const mats = Object.values(K.mats);
-  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean), ...ukBuildingResources()];
+  return [K.box, K.prism, K.unit, K.trunkG, K.crownG, K.poleG, K.headG, ...mats, ...mats.map(m => m.map).filter(Boolean), ...practiceMaterials.values(), ...ukBuildingResources()];
 }
 function kit() {
   if (K) return K;
@@ -226,3 +228,22 @@ export function buildChunkContent(net, edges, cx, cz, C, R) {
 // Authored footprints share the simulator's facade textures and palette, without
 // generating replacement boxes or moving the surveyed building outline.
 export function styleEditorBuilding(mesh, object, net) { const near=net&&nearest(net,object.x,object.z),p=near&&posAt(near.e,near.s);return styleUKBuilding(T,mesh,object,{front:p?{x:p.x-object.x,z:p.z-object.z}:null}); }
+
+// Personal maps use the default mock-world kit: the same low-cost facade
+// textures, colours and roof design, on the mapped building footprints.
+const practiceMaterials=new Map();
+export function styleSimulatorBuilding(mesh,o) {
+  const k=kit(),tags=o.properties?.tags||{},type=(tags.shop||/retail|commercial/.test(tags.building))?'shop':o.sy>12?'block':'house';
+  let seed=0;for(const c of String(o.properties?.osmId||o.id))seed=(Math.imul(seed,31)+c.charCodeAt(0))>>>0;
+  const tint=TYPES[type].tints[seed%TYPES[type].tints.length],key=type+':'+tint;
+  if(!practiceMaterials.has(key)){const m=k.mats[type].clone();m.color.setHex(tint);practiceMaterials.set(key,m);}
+  const roofKey='roof:'+(seed%ROOF_PITCH.length);if(!practiceMaterials.has(roofKey)){const m=k.mats.roof.clone();m.color.setHex(ROOF_PITCH[seed%ROOF_PITCH.length]);practiceMaterials.set(roofKey,m);}
+  const wall=practiceMaterials.get(key),roof=practiceMaterials.get(roofKey),outline=type==='house'?rectangularOutline(o):null,frac=outline?Math.min(.28,2/o.sy):0,top=.5-frac;
+  const g=mesh.geometry,p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
+  for(let i=0;i<p.count;i++){if(frac)p.setY(i,(p.getY(i)+.5)*(1-frac)-.5);if(Math.abs(n.getY(i))<.5){const width=type==='house'?7:type==='shop'?10:15;uv.setXY(i,(-n.getZ(i)*p.getX(i)*o.sx+n.getX(i)*p.getZ(i)*o.sz)/width+.5,(p.getY(i)+.5)/(1-frac));}else uv.setXY(i,.985,.985);}
+  wall.map.wrapS=T.RepeatWrapping;
+  for(const group of g.groups){const i=g.index?g.index.getX(group.start):group.start;group.materialIndex=Math.abs(n.getY(i))>.5?0:1;}
+  for(const m of new Set([].concat(mesh.material)))m.dispose();mesh.material=[roof,wall];compactMaterialGroups(g);p.needsUpdate=uv.needsUpdate=true;g.computeBoundingBox();g.computeBoundingSphere();
+  if(outline){const [a,b,c,d]=outline.map(([x,z])=>[x,top,z]),u=[(a[0]+d[0])/2,.5,(a[2]+d[2])/2],v=[(b[0]+c[0])/2,.5,(b[2]+c[2])/2],pts=[...a,...b,...v,...a,...v,...u,...d,...u,...v,...d,...v,...c,...a,...u,...d,...b,...c,...v],geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(pts,3));geometry.computeVertexNormals();const cap=new T.Mesh(geometry,roof);cap.castShadow=true;mesh.add(cap);}
+  mesh.userData.simulatorBuilding={type,footprintPreserved:true};
+}

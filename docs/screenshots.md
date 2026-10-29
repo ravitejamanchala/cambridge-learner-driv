@@ -449,3 +449,8 @@ Mock test 4: Mill Road and Cherry Hinton Road. Narrow 20 mph streets, two right 
 ![Mock test 5: Cherry Hinton and Coldham's Lane. Suburban roundabout, cycle lanes, longer drive](screenshots/mock-cherry.jpg)
 
 Mock test 5: Cherry Hinton and Coldham's Lane. Suburban roundabout, cycle lanes, longer drive
+
+
+## Personal routes and responsive panels
+
+Updated route creation and phone panel captures are in [personal routes evidence](evidence/personal-routes/README.md). The road-provider fixtures are explicitly labelled; live verification is reported separately by preview CI.

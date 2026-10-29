@@ -5,7 +5,7 @@
 // clips play at true speed however slowly the software renderer draws. Needs Chromium and ffmpeg.
 // Uses the offline sign-in fixture, so no account and no network are involved.
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -417,8 +417,10 @@ GROUPS.boxes = {
         await ffUntil(p, 'a => a.test.sRoute > a.test.route.len - 30', 400); await p.evaluate(() => { window.__mw.mph = -1; }); await ffUntil(p, 'a => a.test.done', 60); } },
   ],
 };
+GROUPS.personal={run:()=>execFileSync(process.execPath,['tools/record-personal-evidence.mjs'],{stdio:'inherit'})};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
+if(group.run){group.run();process.exit(0);}
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '--directory', '.'], { stdio: 'ignore' });
 let browser;
 try {

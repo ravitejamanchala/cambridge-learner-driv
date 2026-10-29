@@ -3,12 +3,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [feature/production-cockpit-billing]
+    branches: [feature/production-cockpit-billing, feature/personal-route-builder]
 permissions:
   contents: read
   pull-requests: write
 concurrency:
-  group: learner-preview-${{ github.event.pull_request.number || 'cockpit-review' }}
+  group: learner-preview-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: false
 env:
   PAGES_PROJECT: learner-drive-app
@@ -57,6 +57,12 @@ jobs:
         run: node tests/cockpit-browser.mjs
         env:
           EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify personal route interactions
+        run: node tests/personal-routes-browser.mjs
+      - name: Verify mobile panels
+        run: node tests/modal-layout-browser.mjs
+      - name: Verify live map providers separately
+        run: node tools/check-personal-providers.mjs
       - name: Prepare isolated Stripe test-mode backend when configured
         id: billing
         continue-on-error: true

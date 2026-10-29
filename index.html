@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="js/vendor/leaflet.css">
+<link rel="stylesheet" href="js/personal/routes.css">
 <style>
 /* Layout: one full-screen landscape stage. The 3D city is the background; a game-style lobby,
    a driving HUD and slide-up sheets sit on top. Blue showroom, cream round buttons, teal cards and pink actions. */
@@ -451,6 +453,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
  body[data-mode="drive"].driver-view .hud-next.stop{opacity:1}
 }
 </style>
+<link rel="stylesheet" href="js/responsive-panels.css">
 </head>
 <body>
 <div id="app">
@@ -481,6 +484,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
     <div class="col r">
       <button class="gbtn" data-open="puzzleSheet" aria-label="Puzzles"><span class="disc"><svg viewBox="0 0 40 40"><path d="M7 7h11v5a3.5 3.5 0 1 0 0 7v4H7z" fill="#b49cf5" stroke="#6a4fc4" stroke-width="2" stroke-linejoin="round"/><path d="M21 7h12v12h-5a3.5 3.5 0 1 0-7 0z" fill="#ffc23d" stroke="#c98a0e" stroke-width="2" stroke-linejoin="round"/><path d="M21 22h12v11H21v-4a3.5 3.5 0 1 0 0-7z" fill="#38cbb9" stroke="#14857a" stroke-width="2" stroke-linejoin="round"/><path d="M7 26h4a3.5 3.5 0 1 1 7 0v7H7z" fill="#ef4f97" stroke="#a52a63" stroke-width="2" stroke-linejoin="round"/></svg></span><span class="lb">Puzzles</span></button>
       <button class="gbtn" data-open="freeSheet" aria-label="Free drive"><span class="disc"><svg viewBox="0 0 40 40"><path d="M13 34 18 6h4l5 28z" fill="#fff" stroke="#8a6ae3" stroke-width="2" stroke-linejoin="round"/><path d="M20 10v4M20 19v4M20 28v4" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round"/><path d="M9 34 15 6M31 34 25 6" stroke="#b49cf5" stroke-width="2" stroke-linecap="round"/></svg></span><span class="lb">Free drive</span></button>
+      <button class="gbtn" id="myRoutesBtn" aria-label="My routes"><span class="disc"><svg viewBox="0 0 40 40"><path d="M8 30C28 30 12 12 31 12" fill="none" stroke="#ef4f97" stroke-width="4" stroke-linecap="round"/><circle cx="8" cy="30" r="5" fill="#fff" stroke="#087f83" stroke-width="3"/><path d="M31 7a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z" fill="#ffc23d" stroke="#b47a11" stroke-width="2"/></svg></span><span class="lb">My routes</span></button>
       <button class="gbtn" id="profBtn2" data-open="profileSheet" aria-label="Learners"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="15" r="6.5" fill="#ffc28c" stroke="#c9741f" stroke-width="2"/><path d="M8 33c1.5-7 6.5-10 12-10s10.5 3 12 10z" fill="#ef4f97" stroke="#a52a63" stroke-width="2" stroke-linejoin="round"/></svg></span><span class="lb">Learners</span></button>
       <button class="gbtn" data-open="controlsSheet" aria-label="Controls"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff" stroke="#3b2416" stroke-width="2.6"/><circle cx="20" cy="20" r="3.4" fill="#3b2416"/><path d="M8 18c4-1.5 8-2 12-2s8 .5 12 2M20 23.5V33" stroke="#3b2416" stroke-width="2.6" stroke-linecap="round"/></svg></span><span class="lb">Controls</span></button>
     </div>
@@ -490,6 +494,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       <span class="row"><span class="n" id="passUnit">1</span><span class="bar"><i id="passBar"></i></span></span>
     </button>
 
+    <p id="personalOpenStatus" role="status"></p>
     <div class="playzone">
       <button class="event" id="eventCard" aria-label="Selected drive details">
         <span class="th" id="eventIco"></span>
@@ -503,7 +508,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
   <!-- ================= DRIVING HUD ================= -->
   <div class="layer" id="hud">
     <div class="glass hud-map"><canvas id="mini" aria-label="Route map, heading up. Drag to pan, scroll or pinch to zoom."></canvas><button class="recentre" id="mapRecentre" hidden>Recentre</button></div>
-    <div class="glass hud-next" id="hudNextBox" role="status"><div class="ico"><span id="hudIco"></span><i class="exitn" id="hudExit" hidden></i></div><div class="tx"><strong id="hudNext">Ready</strong><span id="hudDist"></span><span class="checks" id="hudChecks" hidden></span></div><span class="lanes" id="hudLanes" hidden></span></div>
+    <div class="glass hud-next" id="hudNextBox" role="status"><div class="ico"><span id="hudIco"></span><i class="exitn" id="hudExit" hidden></i></div><div class="tx"><strong id="hudNext">Ready</strong><span id="hudDist"></span><span id="personalJourneyProgress" hidden></span><span class="checks" id="hudChecks" hidden></span></div><span class="lanes" id="hudLanes" hidden></span></div>
     <div class="hud-right">
       <div class="glass speedo"><div class="tl" id="hudLight" hidden role="img"><i></i><i></i><i></i></div><div class="spd-col"><div class="hud-spd"><span id="hudSpd">0</span><small>MPH</small></div><div class="target" id="hudTarget" hidden></div></div><div class="roundel" id="hudLimit">30</div></div>
       <button class="glass pausebtn lookbtn" id="lookBtn" aria-label="Interior mirror check (B)" title="Interior mirror check (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><kbd>B</kbd></button>
@@ -635,6 +640,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
       </div>
     </div></div></div>
 
+  <div class="sheet" id="personalLoadSheet" hidden><div class="card sm" role="dialog" aria-modal="true" aria-labelledby="personalLoadHeading"><header><h2 id="personalLoadHeading">Your route</h2></header><div class="body"><p id="personalLoadMessage" role="status" aria-live="polite"></p><div class="btns"><button id="retryPersonalSection" class="cbtn go" hidden>Retry section</button><button id="endPersonalLoad" class="cbtn">End drive</button></div></div></div></div>
   <div class="sheet" id="resultSheet" hidden><div class="card sm" role="dialog" aria-labelledby="verdict">
     <header><h2 id="endTag">Test complete</h2></header>
     <div class="body">

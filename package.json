@@ -24,11 +24,15 @@
     "test:motorway": "node tests/motorway-lessons-browser.mjs",
     "test:boxes": "node tests/boxes-browser.mjs",
     "test:control": "node tests/control-browser.mjs",
-    "evidence": "node tools/record_evidence.mjs"
+    "evidence": "node tools/record_evidence.mjs",
+    "dev:routes": "node --use-env-proxy tools/local-routes-server.mjs",
+    "test:routes": "node tests/personal-routes-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
+    "leaflet": "^1.9.4",
     "playwright": "1.56.1",
+    "polygon-clipping": "^0.15.7",
     "three": "0.128.0"
   }
 }

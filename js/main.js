@@ -1,4 +1,5 @@
 import {createCockpit} from './cockpit.js';
+import {locate as locatePersonal,project as projectPersonal,unproject as unprojectPersonal,SECTION_METRES} from './personal/geometry.js';
 import {createObstacleIndex} from './obstacle-index.js';
 import {fitRoadCorners} from './roadside-clearance.js';
 import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
@@ -94,7 +95,7 @@ async function boot() {
   const makeBk = (i) => { let m = bikePool[bikeI]; if (!m) bikePool.push(m = shadowed(makeBike(i))); bikeI++; scene.add(m); return m; };
   const A = { id: null, net: null, traffic: null, world: null, test: null, trafficInit: false };
   let areaChain = Promise.resolve(), shadowsOn = true;
-  const areaOf = (pl) => pl.scenarioDefinition?.location.areaId || meta(pl.key).area;
+  const areaOf = (pl) => pl.kind==='personal' ? pl.area : pl.scenarioDefinition?.location.areaId || meta(pl.key).area;
   function disposeScene(old) {
     const keep = new Set(kitResources());
     const mark = (o) => o.traverse(c => { if (c.geometry) keep.add(c.geometry); for (const m of [].concat(c.material || [])) { keep.add(m); if (m.map) keep.add(m.map); } });
@@ -140,7 +141,7 @@ async function boot() {
   const learnerScope = () => hub.Profiles.scope() + ":" + hub.Profiles.current()?.id;
   // lessons and puzzles start about 150 yards before the junction they are about; mock tests run the whole route
   const LEAD = 137;
-  const startS = (pl) => { if (pl.kind === 'free') return 0; if (pl.lesson?.startAt !== undefined) return pl.lesson.startAt; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
+  const startS = (pl) => { if (pl.kind === 'free'||pl.kind==='personal') return 0; if (pl.lesson?.startAt !== undefined) return pl.lesson.startAt; if (pl.lesson?.scenario && ['cockpit', 'engine', 'mirrors', 'controlled-stop', 'accel-decel', 'automatic-drive', 'automatic-reverse', 'steering'].includes(pl.lesson.scenario)) return 0; if (pl.kind === 'mock') return 0; const ins = route.instructions.find(i => !i.final); return ins ? Math.max(0, ins.s - LEAD) : 0; };
   const startPos = (s0 = 0, lane = 0) => {
     let k = 0; while (k < route.steps.length - 1 && route.stepS[k + 1] <= s0) k++;
     const st = route.steps[k], ts = Math.max(Math.min(8, st.e.len / 3), Math.min(st.e.len - 4, s0 - route.stepS[k]));
@@ -214,9 +215,9 @@ async function boot() {
   // load a plan (lesson, puzzle or mock route) in the current area without starting it: the car moves to the start
   function loadPlan(pl) {
     plan = pl; if (scenario) { scenario.stop(); scenario = null; }
-    const wps = pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
-    nodes = pl.kind==='mock' && ROUTES[pl.index].localNodes ? [...ROUTES[pl.index].localNodes] : wps.map(w => snapWaypoint(A.net, w));
-    route = buildRoute(A.net, nodes, { name: pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
+    const wps = pl.kind==='personal'?pl.waypoints:pl.kind === 'mock' ? ROUTES[pl.index].waypoints : pl.kind === 'free' ? pl.drive.waypoints : (pl.scenarioDefinition?.location.waypoints || pl.lesson.waypoints);
+    nodes = pl.kind==='personal'?[...pl.nodes]:pl.kind==='mock' && ROUTES[pl.index].localNodes ? [...ROUTES[pl.index].localNodes] : wps.map(w => snapWaypoint(A.net, w));
+    route = buildRoute(A.net, nodes, { name: pl.kind==='personal'?pl.title:pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
     test.experimental = localTracks.get(A.id)?.practiceMode === 'experimental';
@@ -233,26 +234,27 @@ async function boot() {
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
     test.ctx = nearest(A.net,player.x,player.z);
-    test.ungraded = pl.kind === 'free'; test.onLap = null; test.onOffRoute = null;
+    test.ungraded = pl.kind === 'free'||pl.kind==='personal'; test.onLap = null; test.onOffRoute = null;
     // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
     test.marking = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
     test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
     applyTimeOfDay(test.timeOfDay); setHeadlights(false);
-    if (test.ungraded) startFreeDrive(pl, test);
+    if (pl.kind==='free') startFreeDrive(pl, test);
     test.mode = pl.lesson?.manoeuvre ? 'manoeuvre' : 'road'; test.manoeuvreStatus = null; camInit = false; player.indicator = null;
     // clear any traffic sitting where the learner is placed; it comes back further away
     if (A.trafficInit) for (const c of A.traffic.cars.concat(A.traffic.bikes)) if (Math.hypot(c.x - player.x, c.z - player.z) < 35) { c.alive = false; c.pinned = 0; c.mesh.visible = false; c.x = c.z = 1e6; }
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
-    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free' ? 0 : (pl.lesson.maxD ?? 2));
+    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free'||pl.kind==='personal' ? 0 : (pl.lesson.maxD ?? 2));
     $('backBtn').textContent = test.experimental ? 'Reset to spawn' : 'Back to last instruction';
     $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
-    document.body.classList.toggle('free-drive', pl.kind === 'free'); $('quitBtn').textContent = pl.kind === 'free' ? 'End drive' : 'Quit to lobby';
+    document.body.classList.toggle('free-drive', pl.kind === 'free'||pl.kind==='personal');document.body.classList.toggle('personal-drive',pl.kind==='personal'); $('quitBtn').textContent = pl.kind === 'free'||pl.kind==='personal' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
   async function pickPlan(pl, start) {
+    if(pl.kind!=='personal')stopPersonal();
     notifyLocalRoute(pl);
     if(start&&!canAccessPlan(pl)){hub.requestAccess();return false;}
     if (start && pl.kind === 'lesson' && !botMode && !availability(pl.lesson, hub.Profiles.current()).available) { hub.openSheet('courseSheet'); return; }
@@ -268,9 +270,66 @@ async function boot() {
   }
   const hub = createHub({ meta, initialMockId: preferredLocalRoute(), onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
   mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
+  let personalUI=null,personal=null,personalToken=0;
+  const personalLoad=$('personalLoadSheet');
+  function stopPersonal(){personalToken++;personal?.journey.cancel();personal=null;for(const key of localTracks.keys())if(key.startsWith('personal:'))localTracks.delete(key);index.areas=index.areas.filter(a=>!a.id.startsWith('personal:')); personalLoad.hidden=true;$('personalJourneyProgress').hidden=true;document.body.classList.remove('personal-drive');}
+  async function openPersonal(){
+    hub.closeSheets();
+    try{if(!personalUI){const {createRoutesUI}=await import('./personal/ui.js');personalUI=createRoutesUI({onDrive:startPersonal,canDrive:()=>canAccessPlan({kind:'personal'}),requestLogin:()=>{personalUI.close();hub.requestAccess();},onClose:()=>$('myRoutesBtn').focus()});}personalUI.open();}
+    catch(e){$('personalOpenStatus').textContent='Route creator could not load. Check your connection and retry.';}
+  }
+  $('myRoutesBtn').onclick=openPersonal;
+  async function installPersonal(track,part){
+    const current=personal;if(!current)throw Error('Drive cancelled.');
+    const id=`personal:${current.journey.recipe.id}:${part}`,old=A.id;
+    localTracks.set(id,track);if(!index.areas.some(a=>a.id===id))index.areas.push({id,file:''});
+    await useArea(id);if(personal!==current||current.journey.cancelled)throw new DOMException('Drive cancelled.','AbortError');
+    const pl={kind:'personal',key:id,area:id,title:current.journey.recipe.title,waypoints:track.plan.waypoints,nodes:track.plan.nodes};loadPlan(pl);
+    if(old?.startsWith('personal:')&&old!==id){localTracks.delete(old);index.areas=index.areas.filter(a=>a.id!==old);}
+  }
+  async function startPersonal(journey,first){
+    if(!canAccessPlan({kind:'personal'})){hub.requestAccess();throw Error('Sign in to drive your route.');}
+    stopPersonal();personal={journey,part:0,progress:0,seconds:0,distance:0,loading:false,complete:false};
+    try{await installPersonal(first,0);}catch(e){if(personal?.journey===journey)stopPersonal();throw e;}begin();journey.prefetch(1);$('personalJourneyProgress').hidden=false;
+  }
+  async function nextPersonalSection(){
+    if(!personal||personal.loading)return;const current=personal,token=personalToken,next=current.part+1;
+    if(next>=Math.ceil(current.journey.route.length/SECTION_METRES))return;
+    current.loading=true;A.test.running=false;releaseControls();personalLoad.hidden=false;$('personalLoadMessage').textContent='Loading the next section of your route…';$('retryPersonalSection').hidden=true;
+    const position=unprojectPersonal(A.net,player),velocity=player.v,heading=player.th,steer=player.steer;
+    try{
+      const track=await current.journey.get(next);if(token!==personalToken)return;
+      await installPersonal(track,next);if(token!==personalToken)return;
+      const p=projectPersonal(A.net,position);player.place(p.x,p.z,heading);player.v=velocity;player.steer=steer;
+      // Navigation restarts inside the overlap; keep geographic position/speed.
+      let best=0,d=Infinity;for(let i=0;i<route.xs.length;i++){const dist=Math.hypot(route.xs[i]-p.x,route.zs[i]-p.z);if(dist<d){d=dist;best=i;}}
+      A.test.idx=Math.min(best,route.xs.length-2);A.test.sRoute=route.cum[best];A.test.wpIndex=Math.max(1,Math.floor((current.progress-track.section.start)/24));
+      A.test.parked=false;current.part=next;current.loading=false;personalLoad.hidden=true;
+      // Never resume behind a pause dialog or after sign-out/tab hiding.
+      A.test.running=!paused&&!document.hidden&&canAccessPlan(plan);if(!A.test.running){paused=true;$('pauseSheet').hidden=false;}
+      current.journey.prefetch(next+1);
+    }catch(error){if(token!==personalToken)return;current.loading=false;$('personalLoadMessage').textContent=error.message+' Your car is paused here.';$('retryPersonalSection').hidden=false;}
+  }
+  $('retryPersonalSection').onclick=nextPersonalSection;$('endPersonalLoad').onclick=()=>showPersonalSummary(false);
+  function stepPersonal(dt){
+    if(!personal||personal.loading||personal.complete)return;
+    const hit=locatePersonal(personal.journey.route,unprojectPersonal(A.net,player),personal.progress);
+    if(hit.d<25)personal.progress=Math.max(personal.progress,hit.s);
+    personal.seconds+=dt;personal.distance+=Math.abs(player.v)*dt;
+    const remaining=Math.max(0,personal.journey.route.length-personal.progress);$('personalJourneyProgress').textContent=(remaining/1609.344).toFixed(1)+' mi to finish';
+    if(remaining<12&&Math.abs(player.v)<.5&&hit.d<15){personal.complete=true;showPersonalSummary(true);return;}
+    if(personal.progress>=(personal.part+1)*SECTION_METRES)nextPersonalSection();
+  }
+  function showPersonalSummary(complete){
+    if(!personal)return;A.test.running=false;paused=false;$('pauseSheet').hidden=true;personalLoad.hidden=true;
+    $('endTag').textContent=complete?'Route complete':'Personal practice';$('verdict').textContent=(personal.distance/1609.344).toFixed(1)+' miles driven';$('verdict').className='verdict pass';
+    $('rD').textContent=$('rS').textContent='–';$('rNote').textContent=personal.journey.recipe.title+' · ungraded, nothing added to your record';$('rReasons').replaceChildren();
+    for(const text of [`${Math.round(personal.seconds/60)} minutes of practice.`,complete?'You reached your chosen finish.':'Your route is saved here for another drive.']){const li=document.createElement('li');li.textContent=text;$('rReasons').append(li);}
+    $('coachingReport').textContent='';$('runDetailList').replaceChildren();$('nextBtn').hidden=true;$('againBtn').textContent='Drive again';$('resultSheet').hidden=false;setMode('lobby');
+  }
   const setMode = (m) => { document.body.dataset.mode = m; document.body.classList.toggle('parking-drive',m === 'drive' && !!plan?.lesson?.manoeuvre); camInit = false; layoutSoon(); };
   window.addEventListener('learner-access-change',()=>{
-    if(!canAccessPlan(plan)){if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
+    if(!canAccessPlan(plan)){stopPersonal();if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
   });
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
@@ -444,7 +503,7 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+  window.cambridgeDrive = { get personalJourney(){return personal?{id:personal.journey.recipe.id,part:personal.part,progress:personal.progress,length:personal.journey.route.length,loading:personal.loading}:null;}, addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     get roadsidePlacements(){return A.world?.placements||[];},
     get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
@@ -520,6 +579,7 @@ async function boot() {
   function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
+    stopPersonal();
     document.body.classList.remove('free-drive'); applyTimeOfDay('day');
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
@@ -529,6 +589,7 @@ async function boot() {
     driveScope = learnerScope();
     paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);
+    if(plan.kind==='personal'&&personal){personal.progress=Math.max(0,personal.part*SECTION_METRES-150);personal.complete=false;personal.seconds=0;personal.distance=0;}
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
     scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
@@ -545,9 +606,10 @@ async function boot() {
   }
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume); $('resumeX').addEventListener('click', resume);
-  $('quitBtn').addEventListener('click', () => plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
+  $('quitBtn').addEventListener('click', () => plan?.kind==='personal'?showPersonalSummary(false):plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
   $('nextBtn').addEventListener('click', () => { const b = $('nextBtn'); pickPlan(hub.select(b.dataset.kind, b.dataset.id), true); });
-  $('againBtn').addEventListener('click', begin); $('restartBtn').addEventListener('click', begin);
+  async function restartDrive(){if(plan?.kind!=='personal')return begin();if(!personal)return openPersonal();const current=personal;A.test.running=false;try{await installPersonal(await current.journey.get(0),0);current.part=0;begin();}catch(e){personalLoad.hidden=false;$('personalLoadMessage').textContent=e.message;$('retryPersonalSection').hidden=true;}}
+  $('againBtn').addEventListener('click', restartDrive); $('restartBtn').addEventListener('click', restartDrive);
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('backBtn').addEventListener('click', () => {
@@ -721,6 +783,7 @@ async function boot() {
       if(authored && obstacleContact(player,A.obstacleIndex.near(previous,player),previous)) test.fault("S","Control – collision","Collided with authored scenery","authored-collision",4);
       test.update(dt);
       stats.distance += Math.abs(player.v) * dt; stats.topSpeed = Math.max(stats.topSpeed, Math.abs(player.v));
+      if(plan?.kind==='personal')stepPersonal(dt);
       if (plan?.kind === 'free') stepFreeDrive(dt);
       updateHeldLooks();
       if (test.running && plan?.lesson?.manoeuvre) scenario.update(dt, traffic.clock);

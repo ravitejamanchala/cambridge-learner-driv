@@ -51,6 +51,11 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
   const SHEET_KIND = { courseSheet: 'lesson', puzzleSheet: 'puzzle', mockSheet: 'mock', freeSheet: 'free' };
   let afterProfile = null;
   const protectedSheets = new Set(['mockSheet','puzzleSheet','freeSheet']);
+  for(const id of ['courseSheet','puzzleSheet','mockSheet','freeSheet']){
+    const card=$(id).querySelector('.card'),back=document.createElement('button');card.dataset.mobileView='list';back.className='sheet-back';back.type='button';back.textContent='‹ Back';back.setAttribute('aria-label','Back to '+({courseSheet:'lessons',puzzleSheet:'puzzles',mockSheet:'mock routes',freeSheet:'free drives'}[id]));
+    back.onclick=()=>{card.dataset.mobileView='list';const body=card.querySelector('.body');body.scrollTop=card._listScroll||0;card.querySelector('.list [aria-checked=true]')?.focus({preventScroll:true});};card.querySelector('header').prepend(back);
+  }
+  function mobileDetail(id){if(!matchMedia('(max-width:700px)').matches)return;const card=$(id).querySelector('.card'),body=card.querySelector('.body');card._listScroll=body.scrollTop;card.dataset.mobileView='detail';body.scrollTop=0;const title=card.querySelector('.detail h3');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}}
   const SIGN_IN_NOTICE='Sign in to start. Lessons, puzzles and mock tests need an account, and your progress is saved to it.';
   const SUBSCRIBE_NOTICE='Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course, mock tests and puzzles. Renews monthly until cancelled.';
   function requestAccess() {
@@ -66,7 +71,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
     const notice=$('accessNotice');if(notice){notice.hidden=allowed;notice.textContent=login?SIGN_IN_NOTICE:SUBSCRIBE_NOTICE;}
   }
   const modal = s => s.id === 'pauseSheet' || s.id === 'resultSheet';
-  function openSheet(id) { if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
+  function openSheet(id) { if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; const card=s.querySelector('.card');if(card?.dataset.mobileView)card.dataset.mobileView='list';s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
   function closeSheets() { document.querySelectorAll('.sheet').forEach(s => { if (!modal(s)) s.hidden = true; }); }
   const anyOpen = () => [...document.querySelectorAll('.sheet')].some(s => !s.hidden && !modal(s));
   document.addEventListener('click', e => {
@@ -111,7 +116,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
       ${qz ? '' : modePicker(false)}<div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
   }
-  $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
+  $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick();mobileDetail('courseSheet'); });
 
   $('lessonDetail').addEventListener('change', e => { if (e.target.id === 'scenarioChoice') { st.scenarioId = e.target.value; pick(); } });
 
@@ -132,7 +137,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · not giving way or going through a red fails it; ${t.maxD ? `otherwise up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''} allowed` : 'no other faults allowed'}. Stars by marking: Easy 1, Medium 2, Hard 3.</p>
       ${open ? modePicker(false) : ''}<div class="btns">${open ? '<button class="cbtn go" data-start>Start puzzle</button>' : `<p class="muted" style="margin:0">Locked. Solve any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} puzzle first.</p>`}</div>`;
   }
-  $('puzzleList').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b) return; st.kind = 'puzzle'; st.puzzle = b.dataset.z; pick(); });
+  $('puzzleList').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b) return; st.kind = 'puzzle'; st.puzzle = b.dataset.z; pick();mobileDetail('puzzleSheet'); });
 
   // ---------- mock ----------
   function renderMock() {
@@ -148,7 +153,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       ${!experimental && s ? `<p class="muted">Last try: ${s.last.pass ? 'pass' : 'fail'}, ${s.last.D} driving and ${s.last.S} serious faults.</p>` : ''}
       ${experimental ? '' : modePicker(true)}<div class="btns"><button class="cbtn go" data-start>${experimental ? 'Start practice' : 'Start mock test'}</button></div>`;
   }
-  $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick(); });
+  $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick();mobileDetail('mockSheet'); });
 
   // ---------- free drive ----------
   // Ungraded practice: the sheet says so plainly, so nobody expects a mark or a record from it.
@@ -160,7 +165,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       <p class="muted">Pause and choose End drive whenever you like.</p>
       <div class="btns"><button class="cbtn go" data-start>Start free drive</button></div>`;
   }
-  $('freePick').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.kind = 'free'; st.free = b.dataset.f; pick(); });
+  $('freePick').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.kind = 'free'; st.free = b.dataset.f; pick();mobileDetail('freeSheet'); });
 
   // ---------- Highway Code ----------
   const rules = []; { const seen = new Set(); for (const l of LESSONS.concat(PUZZLES)) if (!seen.has(l.rule.n + l.rule.t)) { seen.add(l.rule.n + l.rule.t); rules.push(l); } }

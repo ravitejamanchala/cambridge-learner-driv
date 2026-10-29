@@ -1,6 +1,6 @@
 import {execFileSync} from 'node:child_process';import {existsSync,readFileSync} from 'node:fs';
 const git=(args,input)=>execFileSync('git',args,{input,encoding:'utf8'}).trim(),env=process.env;
-const n=env.PR_NUMBER;if(n&&!/^\d+$/.test(n))throw Error('Invalid PR number');const alias=n?'pr-'+n:'cockpit-review',ref='refs/heads/deployment/'+alias+'-status';
+const n=env.PR_NUMBER;if(n&&!/^\d+$/.test(n))throw Error('Invalid PR number');const alias=n?'pr-'+n:env.GITHUB_REF_NAME==='feature/personal-route-builder'?'routes-review':'cockpit-review',ref='refs/heads/deployment/'+alias+'-status';
 const payload={revision:git(['rev-parse','HEAD']),result:env.PREVIEW_RESULT,visual:env.VISUAL_RESULT,smoke:env.SMOKE_RESULT,billing:existsSync('release-evidence/billing-preview.json')?JSON.parse(readFileSync('release-evidence/billing-preview.json','utf8')):{status:env.BILLING_RESULT||'not-run'},url:'https://'+alias+'.learner-drive-app.pages.dev/',run:`https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`,recordedAt:new Date().toISOString()};
 git(['config','user.name','github-actions[bot]']);git(['config','user.email','41898282+github-actions[bot]@users.noreply.github.com']);let parent;
 if(git(['ls-remote','--heads','origin',ref])){git(['fetch','--no-tags','origin',ref]);parent=git(['rev-parse','FETCH_HEAD']);}

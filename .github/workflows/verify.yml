@@ -1,7 +1,7 @@
 name: Verify simulator and API
 on:
   push:
-    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery', 'feature/production-cockpit-billing']
+    branches: ['recovery/**', 'development/local-mock-library', 'development/mapped-scenery', 'feature/production-cockpit-billing', 'feature/personal-route-builder']
   pull_request:
 permissions:
   contents: read
@@ -34,6 +34,10 @@ jobs:
         env:
           TEST_DPR: '.35'
           TEST_LOW_POWER: '1'
+      - run: node tests/personal-routes-browser.mjs
+        env:
+          TEST_SITE: dist
+      - run: node tests/modal-layout-browser.mjs
       - run: node tests/local-tracks-browser.mjs
       - run: node tests/experimental-practice-browser.mjs
       - run: node tests/cambridge-pilot-browser.mjs
