@@ -1,0 +1,59 @@
+{
+  "revision": "ca7d69d3b000f932b2af0c3e83583820d4953a37",
+  "result": "success",
+  "visual": "success",
+  "smoke": "success",
+  "billing": {
+    "status": "not-configured",
+    "missing": [
+      "PREVIEW_DATABASE_URL",
+      "PREVIEW_DATABASE_HOST",
+      "PREVIEW_CLERK_SECRET_KEY",
+      "PREVIEW_CLERK_PUBLISHABLE_KEY",
+      "PREVIEW_STRIPE_SECRET_KEY",
+      "PREVIEW_STRIPE_PRICE_ID"
+    ]
+  },
+  "url": "https://pr-23.learner-drive-app.pages.dev/",
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40973802667",
+  "recordedAt": "2026-10-29T23:34:20.401Z",
+  "mobilePanels": {
+    "passed": 52
+  },
+  "personalRoutes": {
+    "status": "passed",
+    "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
+    "searchRequests": 1,
+    "routeRequests": 1,
+    "osmRequests": 4,
+    "buildings": 26,
+    "performance": {
+      "chunks": 9,
+      "geometries": 103,
+      "textures": 12,
+      "calls": 117,
+      "triangles": 8218,
+      "programs": 14,
+      "heap": 73
+    },
+    "streamedSections": 2,
+    "failedSectionRetry": true
+  },
+  "mapProviders": {
+    "source": "live providers through the deployed Pages map proxy",
+    "at": "2026-10-29T23:33:55.348Z",
+    "checks": [
+      "Cambridge search",
+      "OSRM connected driving route",
+      "Bounded OSM import, native road matching and scenery generation"
+    ],
+    "roads": 97,
+    "buildings": 169,
+    "distance": 95.20389095195364,
+    "status": "passed",
+    "routingPolicy": {
+      "url": "https://routing.openstreetmap.de/about.html",
+      "status": 200
+    }
+  }
+}
