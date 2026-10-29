@@ -1,0 +1,20 @@
+{
+  "revision": "539f73857ec0663a32947505e22cd3594a4a83f5",
+  "result": "success",
+  "visual": "success",
+  "smoke": "success",
+  "billing": {
+    "status": "not-configured",
+    "missing": [
+      "PREVIEW_DATABASE_URL",
+      "PREVIEW_DATABASE_HOST",
+      "PREVIEW_CLERK_SECRET_KEY",
+      "PREVIEW_CLERK_PUBLISHABLE_KEY",
+      "PREVIEW_STRIPE_SECRET_KEY",
+      "PREVIEW_STRIPE_PRICE_ID"
+    ]
+  },
+  "url": "https://cockpit-review.learner-drive-app.pages.dev/",
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40897542783",
+  "recordedAt": "2026-10-29T15:04:56.261Z"
+}
