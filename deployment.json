@@ -1,5 +1,5 @@
 {
-  "revision": "611d7853a0e80c4d8a5c96b185b1a408829c0d4e",
+  "revision": "bc15eada70e0a0cb214bf8baa1c26448cb65c0f5",
   "result": "failure",
   "visual": "success",
   "smoke": "success",
@@ -7,6 +7,25 @@
     "status": "skipped"
   },
   "url": "https://routes-review.learner-drive-app.pages.dev/",
-  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40955978118",
-  "recordedAt": "2026-10-29T21:16:41.028Z"
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40956406752",
+  "recordedAt": "2026-10-29T21:19:45.027Z",
+  "personalRoutes": {
+    "status": "passed",
+    "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
+    "searchRequests": 1,
+    "routeRequests": 1,
+    "osmRequests": 4,
+    "buildings": 26,
+    "performance": {
+      "chunks": 9,
+      "geometries": 103,
+      "textures": 12,
+      "calls": 117,
+      "triangles": 8218,
+      "programs": 14,
+      "heap": 69
+    },
+    "streamedSections": 2
+  },
+  "mapProviders": null
 }
