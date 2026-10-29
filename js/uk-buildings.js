@@ -1,3 +1,4 @@
+import {addShopSign} from './shop-signs.js';
 import {compactMaterialGroups} from './material-groups.js';
 import {addUKFrontage} from './uk-architecture.js';
 // Original procedural UK facades. Source footprints, transforms and total heights
@@ -9,8 +10,8 @@ export const ukBuildingResources=()=>[...textures.values()];
 function seedOf(o){let s=0;for(const c of String(o.properties?.osmId??o.properties?.overtureId??o.id))s=(Math.imul(s,31)+c.charCodeAt(0))>>>0;return s;}
 export function ukProfile(o){
  const p=o.properties||{},t=p.tags||{},kind=t.building||p.class||'',material=t['building:material']||t.material||'';
- let style=p.ukStyle;if(!Object.hasOwn(UK_STYLES,style))style=/industrial|warehouse|shed|garage/.test(kind)?'industrial':t.shop||/retail|commercial/.test(kind)?'shop':/apartments|office/.test(kind)?'apartment':/church|cathedral|university|school|civic/.test(kind)||/stone/.test(material)?'stone':/plaster|render/.test(material)?'render':/terrace/.test(kind)?'terrace':o.sy>18?'apartment':seedOf(o)%3===0?'terrace':'buff-brick';
- const levels=Number(t['building:levels']);const floors=Math.max(1,Math.min(50,Number.isFinite(levels)&&levels>0?Math.round(levels):Math.round(o.sy/3)));
+ let style=p.ukStyle;if(!Object.hasOwn(UK_STYLES,style))style=/industrial|warehouse|shed|garage/.test(kind)?'industrial':(t.shop||p.storefront)||/retail|commercial/.test(kind)?'shop':/apartments|office/.test(kind)?'apartment':/church|cathedral|university|school|civic/.test(kind)||/stone/.test(material)?'stone':/plaster|render/.test(material)?'render':/terrace/.test(kind)?'terrace':o.sy>18?'apartment':seedOf(o)%3===0?'terrace':'buff-brick';
+ const levels=Number(t['building:levels']??p.renderLevels);const floors=Math.max(1,Math.min(50,Number.isFinite(levels)&&levels>0?Math.round(levels):Math.round(o.sy/3)));
  const roofShape=t['roof:shape']||(style==='render'?'hipped':'gabled');
  const flat=!['gabled','hipped','pitched'].includes(roofShape)||(!t['roof:shape']&&['stone','shop','apartment','industrial'].includes(style));
  return {style,floors,seed:seedOf(o),roofShape:roofShape==='hipped'?'hipped':'gabled',pitched:!flat&&o.sy>=3&&o.sy<=16,roofHeight:Math.min(o.sy*.3,Number(t['roof:height'])>0?Number(t['roof:height']):Math.min(2.2,o.sy*.25))};
@@ -101,6 +102,7 @@ export function styleUKBuilding(T,mesh,o,context={}){
   const gable=new T.MeshLambertMaterial({map:facade(T,profile.style,0),side:T.DoubleSide});compactMaterialGroups(g);const cap=new T.Mesh(g,[roof.clone(),gable]);cap.userData.ukRoof=true;cap.userData.id=o.id;cap.userData.editorObjectId=o.id;cap.castShadow=true;cap.receiveShadow=true;mesh.add(cap);
  }
  addUKFrontage(T,mesh,o,profile,{outline:rectangularOutline(o),front:context.front,brick:facade(T,profile.style,0),roofFraction:fraction});
+ addShopSign(T,mesh,o,context.front);
  compactMaterialGroups(mesh.geometry);
  mesh.userData.ukBuilding={style:profile.style,floors:profile.floors,roof:outline?profile.roofShape:'flat',estimatedStyle:!o.properties?.ukStyle};mesh.castShadow=true;mesh.receiveShadow=true;
 }

@@ -41,3 +41,9 @@ test('recreated modular frontage follows the road and retains rotated footprint 
 test('mapped numeric roof directions are accepted and orient the roof',()=>{
  const o=object();o.properties.tags['roof:direction']='90';const east=rectangularOutline(o);o.properties.tags['roof:direction']='0';const north=rectangularOutline(o);assert.notDeepEqual(east,north);
 });
+
+test('mapped shop sign faces outward, stays on its footprint and releases its texture',async()=>{
+ const {addShopSign}=await import('../js/shop-signs.js');const ctx=new Proxy({},{get:()=>()=>{}});globalThis.document={createElement:()=>({getContext:()=>ctx})};
+ try{const o=object();o.properties.storefront={name:'Cambridge Books',source:'OpenStreetMap'};const m=new T.Mesh();addShopSign(T,m,o,{x:0,z:1});assert.equal(m.userData.shopSign.label,'Cambridge Books');const sign=m.children[0].levels[0].object;assert.ok(sign.geometry.attributes.normal.getZ(0)>.99);const p=sign.geometry.attributes.position;for(let i=0;i<p.count;i++){assert.ok(Math.abs(p.getX(i))<=.5);assert.ok(Math.abs(p.getZ(i))<=.5);assert.ok(Math.abs(p.getY(i))<=.5);}let disposed=false;sign.material.map.addEventListener('dispose',()=>disposed=true);sign.material.dispose();assert.equal(disposed,true);
+ }finally{delete globalThis.document;}
+});
