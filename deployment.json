@@ -1,5 +1,5 @@
 {
-  "revision": "ca7d69d3b000f932b2af0c3e83583820d4953a37",
+  "revision": "40fd65b624a1666ff553140b530ca47f38ea9f9c",
   "result": "success",
   "visual": "success",
   "smoke": "success",
@@ -15,41 +15,78 @@
     ]
   },
   "url": "https://pr-23.learner-drive-app.pages.dev/",
-  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40973802667",
-  "recordedAt": "2026-10-29T23:34:20.401Z",
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40992784206",
+  "recordedAt": "2026-10-30T02:41:06.075Z",
   "mobilePanels": {
-    "passed": 52
+    "passed": 48
   },
   "personalRoutes": {
     "status": "passed",
     "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
     "searchRequests": 1,
     "routeRequests": 1,
-    "osmRequests": 4,
-    "buildings": 26,
+    "osmRequests": 7,
+    "buildings": 50,
     "performance": {
-      "chunks": 9,
-      "geometries": 103,
+      "chunks": 13,
+      "geometries": 105,
       "textures": 12,
-      "calls": 117,
-      "triangles": 8218,
+      "calls": 123,
+      "triangles": 7660,
       "programs": 14,
-      "heap": 73
+      "heap": 38
     },
-    "streamedSections": 2,
-    "failedSectionRetry": true
+    "preparedWholeRoute": true,
+    "boundaryWithoutReload": true,
+    "offlineWhileDriving": true,
+    "preflightFailureRecovery": true,
+    "gradedMockPassAndFail": true,
+    "courseRoadLessons": 9,
+    "voiceMute": true
   },
   "mapProviders": {
     "source": "live providers through the deployed Pages map proxy",
-    "at": "2026-10-29T23:33:55.348Z",
+    "at": "2026-10-30T02:40:41.497Z",
     "checks": [
       "Cambridge search",
       "OSRM connected driving route",
       "Bounded OSM import, native road matching and scenery generation"
     ],
-    "roads": 97,
-    "buildings": 169,
-    "distance": 95.20389095195364,
+    "pins": {
+      "start": [
+        0.13327,
+        52.2042
+      ],
+      "end": [
+        0.13089,
+        52.20197
+      ]
+    },
+    "snaps": [
+      {
+        "hint": "UH4IgLSBCIAYAAAAOwAAAAAAAAAAAAAA3lWOQeUvJUIAAAAAAAAAABgAAAA7AAAAAAAAAAAAAADLKQEA_QgCAD2THAOWCAIAqJIcAwAADwcAAAAA",
+        "location": [
+          0.133373,
+          52.204349
+        ],
+        "name": "Broad Street",
+        "distance": 18.01157359
+      },
+      {
+        "hint": "fIsDgEN-CIAOAAAABgAAACoAAABGAAAA9Eh7QaKRyEDc-TRCLM7-QQ4AAAAGAAAAKgAAAEYAAADLKQEAhP4BAD2KHANK_wEA8okcAwIAPw0AAAAA",
+        "location": [
+          0.130692,
+          52.202045
+        ],
+        "name": "Gonville Place",
+        "distance": 15.89670482
+      }
+    ],
+    "sourceSections": 1,
+    "renderTiles": 4,
+    "roads": 227,
+    "buildings": 281,
+    "distance": 329.15286365728286,
     "status": "passed",
     "routingPolicy": {
       "url": "https://routing.openstreetmap.de/about.html",
