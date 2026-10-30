@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-30T18:36:02.932Z",
+  "checks": [
+    {
+      "url": "https://www.google.com/maps/@?api=1&map_action=map&center=52.21829%2C0.14688&zoom=19&basemap=satellite",
+      "verified": false,
+      "error": "page.goto: net::ERR_TUNNEL_CONNECTION_FAILED at https://www.google.com/maps/@?api=1&map_action=map&center=52.21829%2C0.14688&zoom=19&basemap=satellite"
+    },
+    {
+      "url": "https://app.roadarium.com/?city=cambridge#52.21829,0.14688,-120,r3943608791,cfirst,b0_-3",
+      "verified": false,
+      "error": "page.goto: net::ERR_TUNNEL_CONNECTION_FAILED at https://app.roadarium.com/?city=cambridge#52.21829,0.14688,-120,r3943608791,cfirst,b0_-3"
+    }
+  ],
+  "satelliteImageryVisible": false,
+  "verdict": "CANNOT VERIFY",
+  "networkProbe": "Python proxy-aware HTTP requests to Overpass, Geofabrik, Google and Roadarium returned tunnel 403 Forbidden; native acquisition failed before boundary discovery."
+}

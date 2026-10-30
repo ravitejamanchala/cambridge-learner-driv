@@ -1,0 +1,31 @@
+name: Verify city data pipeline
+on:
+  push:
+    branches: [feature/roadarium-world-and-assets]
+  pull_request:
+    paths: ['js/world-data/**', 'tools/world/**', 'tests/world*', 'tests/fixtures/world/**', 'configs/world/**', 'schemas/world/**', 'world-inspector.html', '.github/workflows/world-data.yml']
+permissions:
+  contents: read
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:world
+      - run: npm run world:fixture
+      - run: git diff --exit-code -- tests/fixtures/world
+      - run: npm run world:inspector
+      - run: npx playwright install --with-deps chromium
+      - run: TEST_SITE=dist-world-inspector node tests/world-inspector-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: world-data-inspector
+          path: |
+            dist-world-inspector/
+            test-results/world/

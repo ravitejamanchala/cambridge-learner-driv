@@ -1,0 +1,49 @@
+{
+  "base": "e4449195fc27e38d010c335ba256b5969fcffed0",
+  "file": "data/cambridge.json",
+  "counts": {
+    "ways": 4665,
+    "edges": 6950,
+    "stops": 632,
+    "zebras": 166,
+    "giveways": 84,
+    "minis": 34,
+    "rbs": 42,
+    "nodes": 6146,
+    "lamps": 483
+  },
+  "areaFiles": 11,
+  "buildingsInBaselineData": 0,
+  "glbVehicles": 7,
+  "jsonVehicles": 1,
+  "humanGLBs": 4,
+  "sceneCounts": "Not measured for a full-city world; no city integration before data gate",
+  "uploadedSample": {
+    "file": "/workspace/exports/cambridge-detailed-sample.json",
+    "objects": 684,
+    "counts": {
+      "building": 114,
+      "cycleway": 8,
+      "footway": 215,
+      "pedestrian": 51,
+      "steps": 65,
+      "path": 12,
+      "plaza": 11,
+      "parking": 4,
+      "gate": 22,
+      "bollard": 1,
+      "water": 2,
+      "grass": 16,
+      "park": 1,
+      "busStop": 1,
+      "tree": 11,
+      "postBox": 4,
+      "bicycleParking": 29,
+      "bench": 8,
+      "bin": 3,
+      "fence": 69,
+      "wall": 37
+    },
+    "scope": "Earlier local sample; not full Cambridge and not redistributed"
+  }
+}

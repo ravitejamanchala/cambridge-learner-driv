@@ -1,0 +1,194 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #dce8ee;
+  background: #111b24;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid #334554;
+}
+h1 {
+  font-size: 19px;
+  margin: 0;
+}
+h2 {
+  font-size: 17px;
+}
+h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+a {
+  color: #80cafa;
+}
+button,
+input,
+select {
+  font: inherit;
+  padding: 9px;
+  border: 1px solid #52677c;
+  border-radius: 6px;
+  background: #203141;
+  color: inherit;
+  max-width: 100%;
+}
+button {
+  cursor: pointer;
+  background: #175a7d;
+  font-weight: 650;
+}
+button:hover {
+  background: #267da5;
+}
+:focus-visible {
+  outline: 3px solid #f48fb1;
+  outline-offset: 2px;
+}
+label {
+  display: block;
+  font-size: 13px;
+  margin: 8px 0;
+}
+#datasetForm {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 0 24px;
+}
+#datasetForm label {
+  flex: 1;
+}
+#datasetUrl {
+  display: block;
+  width: 100%;
+}
+#status {
+  padding: 10px 24px;
+  margin: 10px 0;
+  background: #243744;
+}
+main {
+  display: grid;
+  grid-template-columns: 250px minmax(250px, 1fr) 310px;
+  height: calc(100vh - 165px);
+  min-height: 480px;
+}
+aside {
+  overflow: auto;
+  padding: 12px 18px;
+}
+aside select {
+  width: 100%;
+}
+.map {
+  position: relative;
+  min-width: 0;
+  background: #e8eeee;
+}
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+#attribution,
+#scale {
+  position: absolute;
+  bottom: 0;
+  color: #142c3b;
+  background: #fffffff0;
+  padding: 5px;
+  font-size: 11px;
+  pointer-events: none;
+}
+#scale {
+  right: 0;
+}
+#gate {
+  color: #ffd194;
+}
+pre {
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#layers label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#metrics {
+  font-size: 12px;
+}
+#locationForm input {
+  width: 100%;
+}
+@media (max-width: 900px) {
+  header span {
+    display: none;
+  }
+  main {
+    grid-template-columns: 200px minmax(200px, 1fr);
+    height: auto;
+  }
+  .map {
+    height: 65vh;
+  }
+  main > aside:last-child {
+    grid-column: 1/-1;
+  }
+  #datasetForm {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 500px) {
+  main {
+    display: flex;
+    flex-direction: column;
+  }
+  .map {
+    order: -1;
+    height: 50vh;
+  }
+  header {
+    padding: 12px;
+  }
+  #datasetForm {
+    display: block;
+  }
+  aside {
+    overflow: visible;
+  }
+  #status {
+    padding: 10px;
+  }
+}
+
+@media (min-width: 901px) {
+  body {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  header,
+  #datasetForm,
+  #status {
+    flex-shrink: 0;
+  }
+  main {
+    height: auto;
+    min-height: 0;
+    flex: 1;
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "root": "dist-world-inspector",
+  "tests": [
+    "load synthetic dataset",
+    "provenance selection",
+    "drag pan",
+    "keyboard zoom",
+    "layer toggles",
+    "out of extent",
+    "stale response",
+    "failed tile and recovery",
+    "390px layout"
+  ],
+  "pageErrors": []
+}

@@ -91,3 +91,14 @@ This runs checks/build, pushes the built assets to `gh-pages`, and uses the exis
 The garage offers eight cars, including seven supplied models, and saves the selected car locally. Every vehicle in the simulator is one of them: the background traffic, the parked cars and the police car that arrives on blue lights all come from the same catalogue, and only the learner's car carries L plates. Street pedestrians use four supplied civilian models with idle/walk animations and a primitive fallback. Traffic spawning checks the actual spawn position and keeps respawns away from the forward view. Bot runs accept and export replay seeds. See [traffic and model validation](docs/development/traffic-and-models.md) for conversion and remaining simulation defects.
 
 The blue, teal and pink interface is shared by the home screen, course, mock tests, puzzles, quizzes, settings, pause and results. Choose a car directly from the home carousel; the showroom turns gently and stops animating when a menu is open, during driving, in a hidden tab, or when reduced motion is enabled. See [theme and showroom notes](docs/development/theme-and-showroom.md).
+
+## Cambridge city data inspection (development)
+
+The [city data pipeline](docs/world-data-pipeline.md) provides reproducible acquisition,
+normalization, versioned tile inventories and a north-up source inspector. Start with
+`npm run world:fixture`, `npm run world:inspector`, and the generated
+`dist-world-inspector/world-inspector.html` served over HTTP. The bundled fixture is
+synthetic and is not a map of Cambridge. [Data acceptance status](docs/cambridge-data-validation.md)
+and [validation evidence](docs/world-validation.md) distinguish this checkpoint from the
+pending full-city renderer. Isolated PR preview builds include `world-inspector.html`;
+ordinary production builds do not.

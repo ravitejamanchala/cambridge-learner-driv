@@ -26,7 +26,13 @@
     "test:control": "node tests/control-browser.mjs",
     "evidence": "node tools/record_evidence.mjs",
     "dev:routes": "node --use-env-proxy tools/local-routes-server.mjs",
-    "test:routes": "node tests/personal-routes-browser.mjs"
+    "test:routes": "node tests/personal-routes-browser.mjs",
+    "world:acquire": "node --use-env-proxy tools/world/cli.mjs acquire",
+    "world:build": "node tools/world/cli.mjs build",
+    "world:fixture": "node tools/world/fixture.mjs",
+    "world:inspector": "node tools/world/build-inspector.mjs",
+    "test:world": "node --test tests/world-data.test.mjs",
+    "test:world:browser": "node tests/world-inspector-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",

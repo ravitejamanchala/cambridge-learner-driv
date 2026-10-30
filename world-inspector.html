@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SlayDrive · World data inspector</title>
+    <link rel="stylesheet" href="js/world-data/inspector.css" />
+  </head>
+  <body>
+    <header>
+      <a href="index.html">SlayDrive</a>
+      <h1>World data inspector</h1>
+      <span>Data stage · north up · X east / Z south</span>
+    </header>
+    <form id="datasetForm">
+      <label
+        >City index URL
+        <input
+          id="datasetUrl"
+          value="tests/fixtures/world/dataset/index.json"
+          required /></label
+      ><button>Open dataset</button>
+    </form>
+    <p id="status" role="status">
+      Choose a versioned dataset. The bundled example is synthetic test
+      geometry.
+    </p>
+    <main>
+      <aside>
+        <h2 id="cityTitle">Dataset</h2>
+        <p id="gate"></p>
+        <label
+          >Tile
+          <select id="tileSelect" aria-label="Tile"></select></label
+        ><button id="fit">Fit selected tile</button
+        ><label
+          ><input type="checkbox" id="boundaries" checked /> Tile
+          boundaries</label
+        ><label
+          ><input type="checkbox" id="sourceBounds" checked /> City
+          boundary</label
+        >
+        <h3>Layers</h3>
+        <div id="layers"></div>
+        <h3>Location</h3>
+        <form id="locationForm">
+          <label
+            >Latitude
+            <input
+              id="latitude"
+              type="number"
+              step="any"
+              value="52.21829" /></label
+          ><label
+            >Longitude
+            <input
+              id="longitude"
+              type="number"
+              step="any"
+              value="0.14688" /></label
+          ><button>Inspect location</button>
+        </form>
+        <a id="google" target="_blank" rel="noreferrer"
+          >Compare in Google satellite</a
+        >
+        <p>
+          Drag to pan · wheel to zoom · click to inspect. Arrow keys pan; +/−
+          zoom.
+        </p>
+        <p id="metrics"></p>
+      </aside>
+      <section class="map">
+        <canvas
+          id="map"
+          tabindex="0"
+          aria-label="North-up source geometry; select features using the adjacent feature list"
+        ></canvas>
+        <p id="attribution"></p>
+        <span id="scale"></span>
+      </section>
+      <aside>
+        <h2>Source features</h2>
+        <label
+          >Feature
+          <select id="featureSelect" aria-label="Feature">
+            <option value="">Choose a feature</option>
+          </select></label
+        >
+        <pre id="detail">
+Select a source feature to inspect provenance, dimensions and estimates.</pre
+        >
+        <h3>Validation</h3>
+        <pre id="validation"></pre>
+      </aside>
+    </main>
+    <script type="module" src="js/world-data/inspector.js"></script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-30T18:47:41.666773+00:00",
+  "base": "e4449195fc27e38d010c335ba256b5969fcffed0",
+  "branch": "feature/roadarium-world-and-assets",
+  "unit": {
+    "passed": 261,
+    "failed": 0,
+    "command": "npm test"
+  },
+  "pipeline": {
+    "passed": 16,
+    "failed": 0,
+    "command": "npm run test:world"
+  },
+  "builds": [
+    "npm run build",
+    "node tools/build_demo.mjs . dist-review --preview",
+    "npm run world:inspector"
+  ],
+  "browser": {
+    "passed": true,
+    "root": "dist-world-inspector",
+    "tests": [
+      "load synthetic dataset",
+      "provenance selection",
+      "drag pan",
+      "keyboard zoom",
+      "layer toggles",
+      "out of extent",
+      "stale response",
+      "failed tile and recovery",
+      "390px layout"
+    ],
+    "pageErrors": []
+  },
+  "existingPersonalRoutes": {
+    "passed": true,
+    "command": "TEST_SITE=dist NODE_OPTIONS=--import=/workspace/shared/browser-cloud.mjs node tests/personal-routes-browser.mjs",
+    "providerMode": "deterministic fixtures; not live provider verification"
+  },
+  "fixtureVersion": "b4c2d95764ba1aab35ec3c161f4a470c3d1929beb61102d27e5fa8d79264a153",
+  "realCityAcquired": false,
+  "dataAccepted": false,
+  "cityDriveTested": false,
+  "performanceMeasured": false,
+  "productionDeployed": false
+}

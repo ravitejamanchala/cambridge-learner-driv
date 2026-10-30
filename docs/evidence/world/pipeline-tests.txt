@@ -1,0 +1,37 @@
+
+> test:world
+> node --test tests/world-data.test.mjs
+
+✔ Cambridge axes, known location, round trips, tile seams and headings (1.63343ms)
+✔ relation assembly retains a courtyard hole and rejects broken members (18.346119ms)
+✔ polygon validation rejects self intersections, exterior holes and intersecting holes (1.337275ms)
+✔ grade separation remains disconnected, turn relation and unknown attributes survive (3.26755ms)
+✔ source conflicts and provider truncation are explicit (3.20853ms)
+✔ buffer inventory covers negative tiles and conservative 1 km margin (23.900888ms)
+✔ every feature has one owner; references resolve across tile seams; builds deterministic (28.088262ms)
+✔ failed acquisition and unresolved nodes prevent structural acceptance (19.088607ms)
+✔ provider retries 429 with backoff, rejects forbidden and incomplete responses (28.571071ms)
+✔ immutable disk build verifies source hashes and detects modified output (107.864763ms)
+✔ inspection reader deduplicates requests, bounds cache and detects corrupt files (19.401752ms)
+✔ acquisition records failure without inventing a boundary and can resume discovery (5.557956ms)
+✔ administrative labels are not polygon edges; truly unsupported members stay rejected (2.726109ms)
+✔ empty tile inventory and source metadata gaps stay explicit (20.774083ms)
+Acquiring parts/-1_-1.json (2/6)
+Acquiring parts/0_-1.json (3/6)
+Acquiring parts/-1_0.json (4/6)
+Acquiring parts/0_0.json (5/6)
+✔ successful acquisition resumes without network and detects tampered source cache (34.05677ms)
+✔ overlapping multipolygon exteriors are rejected, not silently unioned (1.728897ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 445.436104
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
