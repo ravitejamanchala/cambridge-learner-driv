@@ -295,6 +295,7 @@ canvas.onpointermove = (e) => {
   }
 };
 canvas.onpointerup = (e) => {
+  if(!index){drag=null;return;}
   if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) {
     const rect = canvas.getBoundingClientRect(),
       p = [
