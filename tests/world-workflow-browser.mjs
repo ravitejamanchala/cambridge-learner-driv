@@ -49,7 +49,7 @@ try {
       viewport: { width: 1440, height: 1000 },
     }),
     errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => {errors.push(e.message);console.error(e.stack);});
   page.setDefaultTimeout(90000);
 
   await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'text/javascript'}));
@@ -76,13 +76,13 @@ try {
   await page.locator('#worldSatellite').click();
   await page.waitForFunction(()=>document.querySelector('#satStatus').textContent.includes('unavailable'));
   assert.equal(await page.locator('#worldReviewed').isDisabled(),true);
-  await page.locator('#satClose').click();satelliteFail=false;
+  await page.locator('#satClose').click();await page.waitForTimeout(350);satelliteFail=false;
   await page.locator('#worldSatellite').click();
   await page.waitForFunction(()=>document.querySelector('#satStatus').textContent.includes('tiles loaded'));
   const shape=page.locator('#satMap path.leaflet-interactive').first();assert.ok(await shape.count());
   await page.locator('#satHide').click();assert.equal(await shape.getAttribute('stroke-opacity'),'0');
   await page.locator('#satHide').click();assert.equal(await shape.getAttribute('stroke-opacity'),'0.45');
-  await page.locator('#satClose').click();
+  await page.locator('#satClose').click();await page.waitForTimeout(350);
   await page.locator('[data-review=roads]').selectOption('mismatch');
   await page.locator('#worldNotes').fill('Adapter test only; no real imagery comparison. Junction width needs review.');
   await page.locator('#worldReviewed').check();await page.locator('#worldSave').click();
