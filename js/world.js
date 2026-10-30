@@ -417,7 +417,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
 
 // a word of road text, white on clear, drawn tall and narrow: laid flat and seen from a driver's eye it
 // foreshortens back to normal proportions
-function roadText(word) {
+export function roadText(word) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');
   g.fillStyle = '#f2f2ec'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.font = 'bold 150px Arial, sans-serif';
@@ -429,7 +429,7 @@ function roadText(word) {
 // a box junction's markings, `len` along its axis by `wid` across: a border and lines at 45 degrees both
 // ways about 2 m apart, in road-marking yellow on clear. The lines are 0.3 m wide, half as wide again as
 // real ones, so the box still reads from 30 m back, as signs and lamps are drawn larger than life
-function boxTexture(len, wid) {
+export function boxTexture(len, wid) {
   const ppm = 32, c = document.createElement('canvas'); c.width = Math.min(1024, Math.round(wid * ppm)); c.height = Math.min(1024, Math.round(len * ppm));
   const g = c.getContext('2d'), kx = c.width / wid, kz = c.height / len;
   g.strokeStyle = '#f0c419'; g.lineWidth = 0.3 * ppm; g.lineCap = 'butt';

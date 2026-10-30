@@ -152,7 +152,7 @@ function inPolygon(p, ring) {
   }
   return inside;
 }
-export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} }) {
+export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={}, preserveSourceGeometry=false }) {
   boundsCheck(b);
   if (!Array.isArray(data?.elements) || data.elements.length > (limits.elements||30000))
     throw Error(
@@ -496,5 +496,5 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
     heading: Math.atan2(-tx, -tz),
   };
   t.plan.waypoints = [{ x: t.spawn.x, z: t.spawn.z, road: "", label: "Imported start" }];
-  return clearRoadside(addOSMDetails(clearRoadBuildings(t),data,{limits}));
+  return preserveSourceGeometry?addOSMDetails(t,data,{limits}):clearRoadside(addOSMDetails(clearRoadBuildings(t),data,{limits}));
 }

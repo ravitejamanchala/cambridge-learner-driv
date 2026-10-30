@@ -14,7 +14,7 @@ function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.w
 const PAINT = '#f2f1ea';
 
 // ---- painted textures (top of texture = direction of travel) ----
-function arrowTex(kind) {
+export function arrowTex(kind) {
   return canvasTex(64, 192, (g, W, H) => {
     g.fillStyle = PAINT; g.strokeStyle = PAINT; g.lineWidth = 12; g.lineCap = 'butt'; g.lineJoin = 'round';
     const head = (x, y, ang) => { g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.moveTo(0, -26); g.lineTo(18, 6); g.lineTo(-18, 6); g.closePath(); g.fill(); g.restore(); };
@@ -237,3 +237,5 @@ export function motorwaySign(sg) {
   grp.userData.motorwaySign = sg;
   return grp;
 }
+
+export {speedSignTex,giveWaySignTex,noEntryTex};

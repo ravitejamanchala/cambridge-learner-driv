@@ -17,3 +17,5 @@
 .personal-routes .card{display:block}.personal-routes .route-note{margin-bottom:0}.personal-routes .personal-library{position:relative}
 .personal-drive #pauseSheet .detail>h3,.personal-drive #flist{display:none}.personal-drive #resultSheet .score{display:none}
 #personalOpenStatus:empty{display:none}
+/* Geometry preview uses the existing My routes layout, fonts and buttons. */
+#tileViewport{position:absolute;inset:0;background:var(--cream)}#tileViewport canvas{display:block;width:100%;height:100%}#tileControls [aria-pressed=true]{outline:2px solid #087f83;background:#e1f2ed}#tileControls .route-actions{flex-wrap:wrap}.personal-routes [hidden]{display:none!important}.route-mode{margin:0 0 16px}
