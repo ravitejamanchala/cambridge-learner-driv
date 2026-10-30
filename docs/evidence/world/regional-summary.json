@@ -1,0 +1,170 @@
+{
+  "version": "52fdf092cb5e518587df60f81ee649591e457ede6b761af903e7ecf17563bef9",
+  "boundary": {
+    "id": "relation/295355",
+    "version": 52,
+    "timestamp": "2026-07-31T19:40:54Z",
+    "areaSquareMetres": 40371165.754954435,
+    "bufferMetres": 1000,
+    "geographicBounds": [
+      0.053963008617271935,
+      52.14888707597925,
+      0.19922789138272806,
+      52.24628422402075
+    ]
+  },
+  "sources": [
+    {
+      "crs": "EPSG:4326",
+      "file": "regional.json",
+      "license": "ODbL-1.0",
+      "provider": "Geofabrik / OpenStreetMap",
+      "queryHash": "cf311734605a571400bbad82033bac0c3f99ecaa656d17f3484f576d529c15a0",
+      "sha256": "db828aa2a726590fb0dae821dd0870e68213ee6b039c40ea95def647360acea8",
+      "snapshot": "2026-10-29T21:21:26Z",
+      "sourceKind": "regional-pbf",
+      "upstream": {
+        "bytes": 34876467,
+        "sha256": "b9105d78198b24b0f318cc51f222e2854fa02fecdf79bfac781832d0711c4965",
+        "snapshot": "2026-10-29T21:21:26Z",
+        "url": "https://download.geofabrik.de/europe/united-kingdom/england/cambridgeshire-261029.osm.pbf"
+      }
+    }
+  ],
+  "counts": {
+    "sourceCounts": {
+      "node": 445855,
+      "relation": 383,
+      "way": 92595
+    },
+    "featureCounts": {
+      "barrier": 4,
+      "bench": 1534,
+      "berm": 1,
+      "bicycleParking": 1672,
+      "bin": 315,
+      "block": 10,
+      "bollard": 477,
+      "boundary": 51,
+      "bridleway": 13,
+      "building": 45160,
+      "busStop": 586,
+      "bus_trap": 1,
+      "car_trap": 10,
+      "cattle_grid": 43,
+      "chain": 1,
+      "crossing": 1504,
+      "cycle_barrier": 127,
+      "cycleway": 1536,
+      "ditch": 2,
+      "door": 6,
+      "entrance": 157,
+      "fence": 4759,
+      "fence;wall": 1,
+      "footway": 8548,
+      "full-height_turnstile": 3,
+      "gate": 1713,
+      "give_way": 96,
+      "ground": 7246,
+      "guard_rail": 20,
+      "handrail": 3,
+      "hedge": 989,
+      "height_restrictor": 23,
+      "kerb": 455,
+      "kissing_gate": 47,
+      "lamp": 398,
+      "lift_gate": 107,
+      "mini_roundabout": 43,
+      "one-way-plates": 2,
+      "one-way_plates": 1,
+      "parking": 1397,
+      "path": 382,
+      "pedestrian": 260,
+      "planter": 5,
+      "postBox": 205,
+      "pram_handles": 2,
+      "rail": 387,
+      "railing": 2,
+      "ramp": 1,
+      "retaining_wall": 30,
+      "rising_kerb": 12,
+      "road": 9987,
+      "rope": 1,
+      "shelter": 16,
+      "sign": 9,
+      "steps": 1119,
+      "stile": 7,
+      "stop": 2,
+      "street_lamp": 3,
+      "swing_gate": 31,
+      "traffic_signals": 327,
+      "tree": 4196,
+      "turnstile": 3,
+      "wall": 1011,
+      "water": 781,
+      "wedge": 2,
+      "wire_fence": 1,
+      "yes": 323
+    },
+    "ledgerCounts": {
+      "accepted": 98315,
+      "dependency": 405796,
+      "rejected": 7,
+      "unsupported": 34715
+    },
+    "acceptedFeatures": 98166,
+    "acceptedRestrictions": 149,
+    "expectedTiles": 102,
+    "emptyTiles": 0
+  },
+  "rejected": [
+    {
+      "id": "relation/10283897",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    },
+    {
+      "id": "relation/10402",
+      "kind": "building",
+      "reason": "Missing exterior"
+    },
+    {
+      "id": "relation/1116128",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    },
+    {
+      "id": "relation/12741856",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    },
+    {
+      "id": "relation/16075364",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    },
+    {
+      "id": "relation/18814223",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    },
+    {
+      "id": "relation/5546965",
+      "kind": "restriction",
+      "reason": "Incomplete turn restriction"
+    }
+  ],
+  "missingDependencies": 0,
+  "buildingOverlapCandidates": 1052,
+  "structuralPass": false,
+  "dataGate": {
+    "reasons": [
+      "Structural or acquisition errors unresolved",
+      "Google satellite review pending",
+      "Supporting-source and source-conflict review pending",
+      "Renderer and drivable city integration deferred until data gate passes",
+      "Building overlap candidates require source reconciliation"
+    ],
+    "status": "incomplete"
+  }
+}

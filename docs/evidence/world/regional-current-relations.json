@@ -1,0 +1,265 @@
+{
+  "source": "https://api.openstreetmap.org/api/0.6/relations.json?relations=10402,1116128,5546965,10283897,12741856,16075364,18814223,19384781,20460968",
+  "checked": "2026-10-30",
+  "license": "ODbL-1.0",
+  "attribution": "\u00a9 OpenStreetMap contributors",
+  "elements": [
+    {
+      "type": "relation",
+      "id": 10402,
+      "version": 7,
+      "timestamp": "2025-10-01T16:38:44Z",
+      "tags": {
+        "addr:city": "Cambridge",
+        "addr:country": "GB",
+        "addr:postcode": "CB3 0AP",
+        "building": "yes",
+        "name": "Shire Hall",
+        "operator": "Cambridgeshire County Council",
+        "ref:university_of_cambridge": "yes",
+        "type": "multipolygon",
+        "wikidata": "Q76436017",
+        "wikipedia": "en:Shire Hall, Cambridge"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 23783952,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1069890067,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1069890068,
+          "role": "inner"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 1116128,
+      "version": 4,
+      "timestamp": "2026-04-16T18:44:15Z",
+      "tags": {
+        "description": "No left turn onto Kings Hedges Rd, for northwest-bound guided busway traffic",
+        "restriction": "no_left_turn",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "node",
+          "ref": 251001906,
+          "role": "via"
+        },
+        {
+          "type": "way",
+          "ref": 71491949,
+          "role": "from"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 5546965,
+      "version": 2,
+      "timestamp": "2023-12-29T17:56:39Z",
+      "tags": {
+        "restriction": "only_left_turn",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "node",
+          "ref": 554296,
+          "role": "via"
+        },
+        {
+          "type": "way",
+          "ref": 54327173,
+          "role": "to"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 10283897,
+      "version": 2,
+      "timestamp": "2026-04-16T18:44:15Z",
+      "tags": {
+        "restriction": "only_left_turn",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 744211429,
+          "role": "from"
+        },
+        {
+          "type": "node",
+          "ref": 6965089834,
+          "role": "via"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 12741856,
+      "version": 2,
+      "timestamp": "2026-04-16T18:44:15Z",
+      "tags": {
+        "restriction": "only_straight_on",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 339003786,
+          "role": "from"
+        },
+        {
+          "type": "node",
+          "ref": 1291707399,
+          "role": "via"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 16075364,
+      "version": 1,
+      "timestamp": "2023-07-10T15:19:12Z",
+      "tags": {
+        "restriction": "only_left_turn",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 1185836274,
+          "role": "from"
+        },
+        {
+          "type": "way",
+          "ref": 1188674341,
+          "role": "to"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 18814223,
+      "version": 1,
+      "timestamp": "2025-03-12T15:16:39Z",
+      "tags": {
+        "restriction": "only_right_turn",
+        "type": "restriction"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 1183470715,
+          "role": "to"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 19384781,
+      "version": 1,
+      "timestamp": "2025-07-24T14:08:06Z",
+      "tags": {
+        "landuse": "grass",
+        "type": "multipolygon"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 1416978841,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 164830072,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1416978840,
+          "role": "outer"
+        }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 20460968,
+      "version": 2,
+      "timestamp": "2026-04-17T14:08:01Z",
+      "tags": {
+        "natural": "scrub",
+        "type": "multipolygon"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 1500246960,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1500246959,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1500246962,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1500246961,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 4293982,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 4299617,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1500246964,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1500246963,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1500246966,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1500246968,
+          "role": "inner"
+        },
+        {
+          "type": "way",
+          "ref": 1500246967,
+          "role": "inner"
+        }
+      ]
+    }
+  ]
+}

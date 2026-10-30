@@ -18,12 +18,12 @@ The older simulator and UI worktrees have unrelated edits and were not modified.
 
 No new driving city provider, 3D tile coordinator, terrain elevation, asset gallery, asset redesign or production entry point has been enabled. Existing physics, grading, accounts, payments and road rendering have no modifications. The personal-route conversion import is the only existing application logic touched.
 
-The complete Cambridge source dataset is **not acquired**, its boundary ID is **not resolved**, and Google imagery is **not verified**. `accepted:false` is mandatory for every dataset produced at this stage; a successful structural fixture test does not promote a dataset. The future review/acceptance operation must bind decisions to an immutable source version and refuse unresolved critical findings.
+The Cambridge regional source extract is acquired and its boundary is **relation/295355**. Actual Google satellite imagery is accessible again. Source acceptance is still incomplete: malformed upstream relations, source reconciliation, supporting data and the full geographic review remain unresolved. `accepted:false` is mandatory for every dataset produced at this stage; a successful structural fixture test does not promote a dataset. The future review/acceptance operation must bind decisions to an immutable source version and refuse unresolved critical findings.
 
-## Next stages after data access
+## Remaining stages after source acquisition
 
-1. Acquire the real administrative relation, all selected tiles and dependencies; resolve complex relation errors and reconcile overlapping footprints.
-2. Cross-check coverage against a regional extract. Overpass bbox selection is node based and can miss a feature crossing the entire selection without an interior node. A successful bounded download alone is not complete real-world coverage.
+1. Resolve the documented malformed source relations and reconcile overlapping footprints.
+2. Review the regional geometry-intersection coverage report. No dependency references are missing, but unsupported categories and underlying OSM omissions still require review.
 3. Evaluate elevation and additional footprint sources, including license, dates, coverage and horizontal/vertical datums. No supporting dataset is currently accepted.
 4. Perform the tracked imagery review, record critical fixes with evidence, and freeze a validated real dataset.
 5. Adapt existing `createAuthoredTiles` and `buildWorld` for stable city graph residency, bounded CPU/GPU residency, cancelled requests, driving-ground safety and actual terrain/bridge surfaces. Keep the car, examiner and traffic alive across tile boundaries.

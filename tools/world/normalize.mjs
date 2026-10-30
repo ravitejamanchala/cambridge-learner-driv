@@ -157,9 +157,12 @@ function geometry(e, elements, p, kind) {
   if (e.type === "relation") return relationGeometry(e, elements, p);
   const coords = (e.nodes || []).map((n) => nodePoint(n, elements, p));
   if (coords.length < 2) throw Error("Too few way nodes");
+  const linearLeisure =
+    ["track", "slipway"].includes(e.tags?.leisure) &&
+    (e.nodes[0] !== e.nodes.at(-1) || e.tags?.area === "no");
   const area =
     e.tags?.area === "yes" ||
-    ["building", "ground", "parking"].includes(kind) ||
+    (["building", "ground", "parking"].includes(kind) && !linearLeisure) ||
     (kind === "water" && !e.tags?.waterway) ||
     e.tags?.waterway === "riverbank";
   if (area) {
@@ -174,7 +177,53 @@ export const geometryPoints = (g) =>
     : g.type === "LineString"
       ? g.coordinates
       : g.coordinates.flat(2);
+function assembledRelation(e, assembly, elements, p) {
+  if (
+    !(e.members || []).some(
+      (m) => m.type === "way" && ["outer", ""].includes(m.role || ""),
+    )
+  )
+    throw Error("Missing exterior");
+  if (
+    assembly.sourceVersion !== e.version ||
+    assembly.geometry?.type !== "MultiPolygon"
+  )
+    throw Error("Source area version/type mismatch");
+  const points = new Set();
+  for (const member of e.members || [])
+    if (member.type === "way") {
+      const way = elements.get("way/" + member.ref);
+      if (!way) throw Error("Missing source area way");
+      for (const id of way.nodes) {
+        const node = elements.get("node/" + id);
+        if (!node) throw Error("Missing source area node");
+        points.add(node.lon.toFixed(7) + "," + node.lat.toFixed(7));
+      }
+    }
+  const polygons = assembly.geometry.coordinates.map((rings) =>
+    rings.map((ring, index) =>
+      orient(
+        ring.map((point) => {
+          if (
+            !points.has(
+              Number(point[0]).toFixed(7) + "," + Number(point[1]).toFixed(7),
+            )
+          )
+            throw Error("Assembled area introduces an unsourced vertex");
+          const projected = project(p, point);
+          return [projected.x, projected.z];
+        }),
+        index === 0,
+      ),
+    ),
+  );
+  return { type: "MultiPolygon", coordinates: polygons };
+}
 export function normalize(snapshots, p) {
+  const assemblies = Object.assign(
+    {},
+    ...snapshots.map((s) => s.relationAreas || {}),
+  );
   const { elements, conflicts } = mergeSnapshots(snapshots),
     features = [],
     ledger = [],
@@ -226,9 +275,14 @@ export function normalize(snapshots, p) {
           "Preserved separately; simulator enforcement not yet integrated";
         continue;
       }
-      const g = geometry(e, elements, p, kind);
+      const assembly = e.type === "relation" ? assemblies[id] : null;
+      const g = assembly
+        ? assembledRelation(e, assembly, elements, p)
+        : geometry(e, elements, p, kind);
       if (g.type === "MultiPolygon") {
-        const bad = polygonErrors(g.coordinates);
+        const bad = polygonErrors(g.coordinates, {
+          allowPointTouches: !!assembly,
+        });
         if (bad.length) throw Error(bad.join("; "));
         const union = clipping.union(g.coordinates);
         if (Math.abs(area(union) - area(g.coordinates)) > 0.01)
@@ -242,6 +296,16 @@ export function normalize(snapshots, p) {
         id,
         version: e.version ?? null,
         timestamp: e.timestamp ?? null,
+        ...(assembly
+          ? {
+              assembly: {
+                engine: assembly.engine,
+                sourceVersion: assembly.sourceVersion,
+                vertices:
+                  "checked against source member nodes at OSM precision",
+              },
+            }
+          : {}),
       };
       features.push({
         id,

@@ -68,12 +68,17 @@ export function ringErrors(ring) {
   }
   return [...new Set(errors)];
 }
-export function polygonErrors(polygons) {
+export function polygonErrors(polygons, { allowPointTouches = false } = {}) {
   const errors = [];
   for (const rings of polygons) {
     rings.forEach((r) => errors.push(...ringErrors(r)));
     for (let i = 1; i < rings.length; i++) {
-      if (!inside(rings[i][0], rings[0])) errors.push("hole outside exterior");
+      if (
+        !(allowPointTouches
+          ? rings[i].some((point) => inside(point, rings[0]))
+          : inside(rings[i][0], rings[0]))
+      )
+        errors.push("hole outside exterior");
       for (let j = 0; j < i; j++) {
         if (
           j > 0 &&
@@ -88,7 +93,14 @@ export function polygonErrors(polygons) {
                 rings[i][a],
                 rings[j][b - 1],
                 rings[j][b],
-              )
+              ) &&
+              (!allowPointTouches ||
+                crossesOrOverlaps(
+                  rings[i][a - 1],
+                  rings[i][a],
+                  rings[j][b - 1],
+                  rings[j][b],
+                ))
             )
               errors.push("intersecting rings");
       }
@@ -122,4 +134,25 @@ export function joinWays(parts) {
 }
 export function orient(ring, positive) {
   return signedArea(ring) > 0 === positive ? ring : ring.slice().reverse();
+}
+
+// OGC polygons may have isolated point contacts between rings. Crossing interiors
+// or a shared segment still invalidates an assembled area.
+function crossesOrOverlaps(a, b, c, d) {
+  const values = [
+    cross(a, b, c),
+    cross(a, b, d),
+    cross(c, d, a),
+    cross(c, d, b),
+  ];
+  if (values[0] * values[1] < 0 && values[2] * values[3] < 0) return true;
+  if (values.every((v) => Math.abs(v) < 1e-8)) {
+    const axis = Math.abs(a[0] - b[0]) > Math.abs(a[1] - b[1]) ? 0 : 1;
+    return (
+      Math.min(Math.max(a[axis], b[axis]), Math.max(c[axis], d[axis])) -
+        Math.max(Math.min(a[axis], b[axis]), Math.min(c[axis], d[axis])) >
+      1e-8
+    );
+  }
+  return false;
 }

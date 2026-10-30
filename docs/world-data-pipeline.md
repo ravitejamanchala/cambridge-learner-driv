@@ -54,3 +54,30 @@ To inspect a missing object, find its stable ID in `ledger.json`, then check rej
 ## Another city later
 
 Use a separate config, boundary selector/origin, sources directory and output root. Reuse the normalizer, projection, inventory and inspection reader. Supply a regional traffic/asset profile during later renderer integration. Do not reuse Cambridge's accepted review records for another city. This task acquires no other city.
+
+## Regional PBF adapter (30 October 2026)
+
+The active environment now permits provider requests. Overpass resolved boundary `relation/295355` but repeatedly returned HTTP 502 during tile acquisition. The dated Geofabrik Cambridgeshire extract is the reproducible alternative. Unlike a node-only bbox query, the adapter intersects complete way/area geometry with the boundary buffer and retains full downward dependencies. A containing polygon or crossing road is included even without an interior source node. Unrelated route/statistical relations are accounted for separately, without expanding national relation trees.
+
+```sh
+python3 -m venv /tmp/world-geo
+/tmp/world-geo/bin/pip install -r tools/world/requirements.txt
+# Download the dated source URL given below; the expanded index records its provenance.
+# Verify SHA-256 b9105d78198b24b0f318cc51f222e2854fa02fecdf79bfac781832d0711c4965.
+node --input-type=module -e "import {projection} from './js/world-data/projection.js'; console.log(JSON.stringify(projection([52.205,.119])))" > /tmp/cambridge-projection.json
+/tmp/world-geo/bin/python tools/world/extract-region.py \
+  .world-sources/regional/cambridgeshire-261029.osm.pbf \
+  configs/world/cambridge.json /tmp/cambridge-projection.json \
+  .world-sources/cambridge-regional --boundary 295355
+node tools/world/import-region.mjs
+node tools/world/cli.mjs build configs/world/cambridge.json .world-sources/cambridge-regional .world-datasets/cambridge
+node tools/world/archive.mjs .world-datasets/cambridge/<version> data/world/cambridge.json.gz
+```
+
+Dated URL: https://download.geofabrik.de/europe/united-kingdom/england/cambridgeshire-261029.osm.pbf . Source byte count: 34,876,467. OSM snapshot: `2026-10-29T21:21:26Z`. Download with a proxy-aware HTTPS client and normal certificate verification. No API secret is required.
+
+Libosmium assembles supported multipolygons and Shapely checks their validity. The normalizer verifies assembled vertices against member nodes at OSM coordinate precision and requires the same source version. It does not simplify, relocate or guess missing geometry. Failed geometry remains in the rejection report. Known linear leisure features (BMX tracks and slipways) remain lines rather than being forced into invalid polygons.
+
+Large ledgers are split into 10,000-record shards; `ledger.json` indexes them. The deterministic gzip bundle contains normalized JSON, not the upstream PBF. The preview builder verifies receipt, dataset version, paths, file checksums, inventory and size before expansion. Each deployed file must be below 24 MiB, with a 300 MiB total bound. Production builds do not include the bundle or inspector. To inspect the original small synthetic fixture, append `?index=tests/fixtures/world/dataset/index.json` to the inspector URL.
+
+This establishes reproducible source selection and accounting, not real-world completeness or accepted legal driving rules. See `cambridge-data-validation.md` for the remaining upstream defects and review gate.

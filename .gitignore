@@ -21,3 +21,6 @@ test-results/
 .world-datasets/
 
 dist-world-inspector/
+
+# Local PR preview output
+dist-preview/

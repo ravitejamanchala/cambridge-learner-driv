@@ -449,3 +449,168 @@ test("overlapping multipolygon exteriors are rejected, not silently unioned", ()
   const n = normalize([data], projection(config.origin));
   assert.ok(n.errors.some((e) => e.id === "relation/101"));
 });
+
+test("open BMX tracks and slipways remain linear while broken building areas are rejected", () => {
+  const { config, data } = fixture();
+  const road = data.elements.find(
+    (e) => e.type === "way" && e.tags?.highway === "residential",
+  );
+  assert.ok(road);
+  for (const leisure of ["track", "slipway"]) {
+    const copy = structuredClone(data),
+      w = copy.elements.find((e) => e.type === "way" && e.id === road.id);
+    w.tags = { leisure, sport: "bmx" };
+    const result = normalize([copy], projection(config.origin));
+    assert.equal(
+      result.features.find((f) => f.id === "way/" + road.id).geometry.type,
+      "LineString",
+    );
+    w.tags = { building: "yes" };
+    assert.match(
+      normalize([copy], projection(config.origin)).errors.find(
+        (e) => e.id === "way/" + road.id,
+      ).reason,
+      /Unclosed/,
+    );
+  }
+});
+test("native area assembly requires the same version and only original source vertices", () => {
+  const { config, data } = fixture(),
+    p = projection(config.origin);
+  const normal = normalize([data], p),
+    f = normal.features.find((f) => f.id === "relation/101");
+  const assembly = {
+    engine: "test source assembly",
+    sourceVersion: f.provenance.version,
+    geometry: {
+      type: "MultiPolygon",
+      coordinates: f.geometry.coordinates.map((rings) =>
+        rings.map((r) => r.map(([x, z]) => unproject(p, { x, z }))),
+      ),
+    },
+  };
+  data.relationAreas = { "relation/101": assembly };
+  let result = normalize([data], p);
+  assert.equal(result.errors.length, 0);
+  assert.equal(
+    result.features.find((row) => row.id === f.id).provenance.assembly.engine,
+    "test source assembly",
+  );
+  assembly.sourceVersion++;
+  assert.match(
+    normalize([data], p).errors.find((e) => e.id === f.id).reason,
+    /version/,
+  );
+  assembly.sourceVersion--;
+  assembly.geometry.coordinates[0][0][1][0] += 0.0001;
+  assert.match(
+    normalize([data], p).errors.find((e) => e.id === f.id).reason,
+    /unsourced vertex/,
+  );
+});
+test("large source ledgers shard without dropping accounting records", () => {
+  const { config, data, acquisition } = compiled();
+  for (let id = 100000; id < 110001; id++)
+    data.elements.push({ type: "node", id, lon: 0.119, lat: 52.205 });
+  const result = compile({
+    config,
+    acquisition,
+    snapshots: [data],
+    sources: [],
+  });
+  const ledger = JSON.parse(result.files.get("ledger.json"));
+  assert.equal(ledger.records, data.elements.length);
+  assert.equal(ledger.shards.length, 2);
+  assert.equal(
+    ledger.shards.flatMap((f) => JSON.parse(result.files.get(f))).length,
+    data.elements.length,
+  );
+});
+
+test("preview archive verifies complete content before installation and rejects corruption", async () => {
+  const { packDataset, installDataset } = await import(
+    "../tools/world/archive.mjs"
+  );
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "world-archive-"));
+  try {
+    const { result } = compiled();
+    for (const [name, text] of result.files) {
+      await fs.mkdir(path.dirname(path.join(temp, "source", name)), {
+        recursive: true,
+      });
+      await fs.writeFile(path.join(temp, "source", name), text);
+    }
+    const archive = path.join(temp, "sample.gz");
+    await packDataset(path.join(temp, "source"), archive);
+    const index = await installDataset(archive, path.join(temp, "out"));
+    assert.equal(index.version, result.manifest.version);
+    assert.equal(
+      await fs.readFile(path.join(temp, "out/navigation.json"), "utf8"),
+      result.files.get("navigation.json"),
+    );
+    await fs.writeFile(archive, "corrupt");
+    await assert.rejects(
+      installDataset(archive, path.join(temp, "bad")),
+      /checksum/,
+    );
+    await assert.rejects(fs.access(path.join(temp, "bad")));
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("assembled OGC polygons allow point-touching holes but reject shared edges", () => {
+  const outer = [
+    [0, 0],
+    [10, 0],
+    [10, 10],
+    [0, 10],
+    [0, 0],
+  ];
+  const pointHole = [
+    [0, 5],
+    [2, 4],
+    [2, 6],
+    [0, 5],
+  ];
+  assert.deepEqual(
+    polygonErrors([[outer, pointHole]], { allowPointTouches: true }),
+    [],
+  );
+  const edgeHole = [
+    [0, 4],
+    [2, 4],
+    [2, 6],
+    [0, 6],
+    [0, 4],
+  ];
+  assert.ok(
+    polygonErrors([[outer, edgeHole]], { allowPointTouches: true }).includes(
+      "intersecting rings",
+    ),
+  );
+});
+test("native area assembler cannot promote inner-only building members to exteriors", () => {
+  const { config, data } = fixture(),
+    p = projection(config.origin);
+  const n = normalize([data], p),
+    f = n.features.find((f) => f.id === "relation/101");
+  data.relationAreas = {
+    [f.id]: {
+      sourceVersion: f.provenance.version,
+      geometry: {
+        type: "MultiPolygon",
+        coordinates: f.geometry.coordinates.map((r) =>
+          r.map((ring) => ring.map(([x, z]) => unproject(p, { x, z }))),
+        ),
+      },
+    },
+  };
+  data.elements
+    .find((e) => e.type === "relation" && e.id === 101)
+    .members.forEach((m) => (m.role = "inner"));
+  assert.match(
+    normalize([data], p).errors.find((e) => e.id === f.id).reason,
+    /Missing exterior/,
+  );
+});

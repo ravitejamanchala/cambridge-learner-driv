@@ -54,7 +54,7 @@ export function validateIndex(index) {
   }
   for (const [name, file] of Object.entries(index.files))
     if (
-      !/^(tiles\/-?\d+_-?\d+|navigation|ledger|validation|review-grid)\.json$/.test(
+      !/^(tiles\/-?\d+_-?\d+|ledger\/\d+|navigation|ledger|validation|review-grid)\.json$/.test(
         name,
       ) ||
       !/^[a-f0-9]{64}$/.test(file.sha256) ||

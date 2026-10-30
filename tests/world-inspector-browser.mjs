@@ -39,7 +39,10 @@ try {
     viewport: { width: 1440, height: 960 },
   });
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(base + "/world-inspector.html");
+  await page.goto(
+    base +
+      "/world-inspector.html?index=tests/fixtures/world/dataset/index.json",
+  );
   await page.waitForFunction(() =>
     document
       .getElementById("status")

@@ -1,0 +1,462 @@
+[
+  {
+    "id": "node/533790944",
+    "kind": "busStop",
+    "tags": {
+      "bench": "no",
+      "bin": "yes",
+      "bus": "yes",
+      "highway": "bus_stop",
+      "lit": "yes",
+      "name": "Water Lane",
+      "naptan:AtcoCode": "0500CCITY090",
+      "naptan:Bearing": "SW",
+      "naptan:CommonName": "Water Lane",
+      "naptan:Indicator": "near",
+      "naptan:Landmark": "Water Lane",
+      "naptan:NaptanCode": "cmbdagtm",
+      "naptan:PlusbusZoneRef": "CAMBDGE",
+      "naptan:ShortCommonName": "Water Lane",
+      "naptan:Street": "High Street",
+      "naptan:verified": "no",
+      "public_transport": "platform",
+      "shelter": "yes",
+      "source": "naptan_import",
+      "tactile_paving": "yes"
+    },
+    "bounds": [
+      1849.3863363188564,
+      -1553.4430685998684,
+      1849.3863363188564,
+      -1553.4430685998684
+    ]
+  },
+  {
+    "id": "node/533791019",
+    "kind": "busStop",
+    "tags": {
+      "bench": "no",
+      "bin": "no",
+      "bus": "yes",
+      "highway": "bus_stop",
+      "lit": "no",
+      "name": "Water Lane",
+      "naptan:AtcoCode": "0500CCITY136",
+      "naptan:Bearing": "NE",
+      "naptan:CommonName": "Water Lane",
+      "naptan:Indicator": "opp",
+      "naptan:Landmark": "Water Lane",
+      "naptan:NaptanCode": "cmbdajta",
+      "naptan:PlusbusZoneRef": "CAMBDGE",
+      "naptan:ShortCommonName": "Water Lane",
+      "naptan:Street": "High Street",
+      "naptan:verified": "no",
+      "public_transport": "platform",
+      "shelter": "no",
+      "source": "naptan_import",
+      "tactile_paving": "no"
+    },
+    "bounds": [
+      1836.3833876085753,
+      -1552.8349115998324,
+      1836.3833876085753,
+      -1552.8349115998324
+    ]
+  },
+  {
+    "id": "way/1114698314",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Lane",
+      "sidewalk:left": "yes",
+      "sidewalk:right": "separate",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      1946.3149277541459,
+      -1504.6799346004182,
+      1957.3258192643207,
+      -1503.972261000005
+    ]
+  },
+  {
+    "id": "way/36812316",
+    "kind": "road",
+    "tags": {
+      "cycleway:both": "no",
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Lane",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      1865.6980101731476,
+      -1564.8432480003128,
+      1946.3149277541459,
+      -1504.0717776003821
+    ]
+  },
+  {
+    "id": "way/36812317",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Street",
+      "sidewalk:left": "yes",
+      "sidewalk:right": "separate",
+      "source:name": "local knowledge",
+      "surface": "asphalt",
+      "traffic_calming": "cushion"
+    },
+    "bounds": [
+      1957.3258192643207,
+      -1545.1389612002495,
+      2148.5564883607854,
+      -1504.6799346004182
+    ]
+  },
+  {
+    "id": "way/4008069",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Fallowfield",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      1957.3258192643207,
+      -1654.1096382001115,
+      2074.2227374965605,
+      -1504.6799346004182
+    ]
+  },
+  {
+    "id": "way/4008103",
+    "kind": "cycleway",
+    "tags": {
+      "bicycle": "yes",
+      "bicycle:advisory": "dismount",
+      "bridge": "yes",
+      "bridge:ref": "466598",
+      "designation": "public_footpath",
+      "foot": "designated",
+      "highway": "cycleway",
+      "layer": "2",
+      "lit": "no",
+      "motor_vehicle": "no",
+      "name": "Green Dragon Bridge",
+      "oneway": "no",
+      "prow_ref": "Cambridge FP 21",
+      "segregated": "no",
+      "sidewalk": "no",
+      "source:designation": "cambridgeshire_county_council_prow_gis_data",
+      "source:prow_ref": "cambridgeshire_county_council_prow_gis_data",
+      "surface": "asphalt",
+      "width": "2.3"
+    },
+    "bounds": [
+      1816.0330224444797,
+      -1410.5814605999342,
+      1851.4056819737577,
+      -1356.588176399861
+    ]
+  },
+  {
+    "id": "way/43666131",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Street",
+      "parking:both": "lane",
+      "parking:both:orientation": "parallel",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      1810.5753314852857,
+      -1497.1609026005456,
+      1944.4524907143202,
+      -1419.1951752000284
+    ]
+  },
+  {
+    "id": "way/760788787",
+    "kind": "road",
+    "tags": {
+      "cycleway:both": "no",
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Street",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      1776.0690803957802,
+      -1419.1951752000284,
+      1810.5753314852857,
+      -1402.6975344005116
+    ]
+  },
+  {
+    "id": "node/533791142",
+    "kind": "busStop",
+    "tags": {
+      "bench": "yes",
+      "bin": "no",
+      "bus": "yes",
+      "highway": "bus_stop",
+      "lit": "yes",
+      "mapillary": "930779737710077",
+      "name": "Fallowfield",
+      "naptan:AtcoCode": "0500CCITY212",
+      "naptan:Bearing": "W",
+      "naptan:CommonName": "Fallowfield",
+      "naptan:Indicator": "opp",
+      "naptan:Landmark": "Fallowfield",
+      "naptan:NaptanCode": "cmbdapdt",
+      "naptan:PlusbusZoneRef": "CAMBDGE",
+      "naptan:ShortCommonName": "Fallowfield",
+      "naptan:Street": "Water Street",
+      "naptan:verified": "no",
+      "pole": "yes",
+      "public_transport": "platform",
+      "shelter": "yes",
+      "source": "naptan_import",
+      "survey:date": "2019-03-08",
+      "tactile_paving": "no"
+    },
+    "bounds": [
+      2170.8102232469,
+      -1546.9413174000988,
+      2170.8102232469,
+      -1546.9413174000988
+    ]
+  },
+  {
+    "id": "node/533791411",
+    "kind": "busStop",
+    "tags": {
+      "bench": "no",
+      "bin": "no",
+      "bus": "yes",
+      "highway": "bus_stop",
+      "lit": "yes",
+      "mapillary": "498169898263044",
+      "name": "Fallowfield",
+      "naptan:AtcoCode": "0500CCITY374",
+      "naptan:Bearing": "E",
+      "naptan:CommonName": "Fallowfield",
+      "naptan:Indicator": "near",
+      "naptan:Landmark": "Fallowfield",
+      "naptan:NaptanCode": "cmbdgamt",
+      "naptan:PlusbusZoneRef": "CAMBDGE",
+      "naptan:ShortCommonName": "Fallowfield",
+      "naptan:Street": "Water Street",
+      "naptan:verified": "no",
+      "pole": "yes",
+      "public_transport": "platform",
+      "shelter": "no",
+      "source": "naptan_import",
+      "survey:date": "2019-02-28",
+      "tactile_paving": "no"
+    },
+    "bounds": [
+      2134.762174461423,
+      -1544.022163800555,
+      2134.762174461423,
+      -1544.022163800555
+    ]
+  },
+  {
+    "id": "way/4008089",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Fallowfield",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      2129.7069882104697,
+      -1640.4979788005364,
+      2163.824378819133,
+      -1551.0657276003708
+    ]
+  },
+  {
+    "id": "way/4008091",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "name": "Fallowfield",
+      "source:name": "local knowledge"
+    },
+    "bounds": [
+      2004.4052259010698,
+      -1754.1569934001893,
+      2041.9950723825195,
+      -1733.8224347998319
+    ]
+  },
+  {
+    "id": "way/4008097",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Fallowfield",
+      "sidewalk": "both",
+      "source": "Bing",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      2041.9950723825195,
+      -1863.404105400139,
+      2151.3262665225766,
+      -1639.657616400144
+    ]
+  },
+  {
+    "id": "way/4008107",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "name": "Fallowfield",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "paving_stones"
+    },
+    "bounds": [
+      2149.1704785936954,
+      -1664.4040776002048,
+      2173.6618667730795,
+      -1658.0129004001562
+    ]
+  },
+  {
+    "id": "way/42222559",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "maxspeed": "20 mph",
+      "maxspeed:type": "GB:zone20",
+      "name": "Water Street",
+      "sidewalk": "both",
+      "source:name": "local knowledge",
+      "surface": "asphalt",
+      "traffic_calming": "cushion"
+    },
+    "bounds": [
+      2148.5564883607854,
+      -1546.7201693998716,
+      2152.8544199911516,
+      -1545.1389612002495
+    ]
+  },
+  {
+    "id": "way/833963795",
+    "kind": "footway",
+    "tags": {
+      "bicycle": "yes",
+      "highway": "footway",
+      "lit": "yes",
+      "name": "Fallowfield",
+      "segregated": "no",
+      "source": "Bing",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      2092.8539300085095,
+      -1783.4922756004498,
+      2099.314471681456,
+      -1778.8260528001315
+    ]
+  },
+  {
+    "id": "way/876585838",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "name": "Fallowfield",
+      "source:name": "local knowledge"
+    },
+    "bounds": [
+      2007.8026385231674,
+      -1753.891615800231,
+      2012.8305363193258,
+      -1749.8998943999381
+    ]
+  },
+  {
+    "id": "way/876585840",
+    "kind": "road",
+    "tags": {
+      "highway": "residential",
+      "lit": "yes",
+      "name": "Fallowfield",
+      "source": "Bing",
+      "source:name": "local knowledge",
+      "surface": "asphalt"
+    },
+    "bounds": [
+      2099.314471681456,
+      -1787.6719727997965,
+      2105.3042875091714,
+      -1783.4922756004498
+    ]
+  },
+  {
+    "id": "way/144555404",
+    "kind": "water",
+    "tags": {
+      "boat": "yes",
+      "have_riverbank": "yes",
+      "maxspeed": "8",
+      "motorboat": "yes",
+      "name": "River Cam",
+      "waterway": "river",
+      "wikidata": "Q944772",
+      "wikipedia": "en:River Cam"
+    },
+    "bounds": [
+      166.45275214172543,
+      -3438.1768986002094,
+      3735.6393750670677,
+      -597.1880592004278
+    ]
+  }
+]

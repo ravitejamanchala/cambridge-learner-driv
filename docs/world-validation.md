@@ -1,6 +1,6 @@
 # Validation and delivery
 
-This branch is a **data-stage implementation checkpoint**, not the completed city renderer. The brief explicitly requires a validated real dataset before broad rendering work. That gate cannot pass while boundary/source acquisition and satellite imagery are unavailable.
+This branch is a **data-stage implementation checkpoint**, not the completed city renderer. The brief explicitly requires a validated real dataset before broad rendering work. Network access is restored. That gate remains incomplete because confirmed malformed source relations and the wider geographic/source review are unresolved.
 
 ## Verification
 
@@ -8,19 +8,19 @@ Environment: Node 24.19.0, Linux cloud execution, system Chromium through Playwr
 
 | Check | Result / scope |
 |---|---|
-| New pipeline unit tests | 16 passing: geometry, provenance, topology, restrictions, ownership, invalid imports, provider retries, successful resume, tamper checks, cache/integrity and empty inventory |
+| New pipeline unit tests | 22 passing: geometry, provenance, topology, restrictions, ownership, invalid imports, provider retries, successful resume, tamper checks, cache/integrity and empty inventory |
 | Existing and new frontend suite | See `evidence/world/checks.json` and `unit.txt` for final count and exact outcome |
 | Production build | Built successfully; diagnostic page excluded |
 | Preview build | Built successfully; diagnostic page included at `world-inspector.html` |
 | Source/standalone/preview inspector in Chromium | Passed selection/provenance, courtyard hole display, pan/zoom, layers, outside extent, stale tile response, failure/retry and 390px layout |
 | Existing personal-route browser suite against production build | Passed search/pin drag, save/reload, provider 429, native drive, continuous route geometry, ungraded practice, graded custom mock pass/fail, course road lessons, voice mute, mobile and deletion |
-| Real Cambridge acquisition | Blocked before boundary discovery by proxy access; no data claimed |
-| Google and Roadarium browser inspection | Tunnel failure; CANNOT VERIFY |
+| Real Cambridge acquisition | Dated regional PBF acquired; complete selected dependency closure; see Cambridge report |
+| Google satellite browser access | Actual Cambridge satellite imagery visible with TLS verification; full matched review not passed |
 | Full-city rendering/terrain/asset gallery/driving | Not implemented or tested; deferred by data gate |
 | Full-city desktop/mobile fps, GPU memory and backtracking budgets | Not measured; 60/30 fps are future targets, not results |
 | Live provider reliability/auth/backend/Stripe | Not tested by these changes; no backend modifications |
 
-Screenshots in `evidence/world/` show the synthetic diagnostic fixture, a tile failure state and the phone layout. No screenshot is presented as real Cambridge geography or a city driving recording. The prior personal-route regressions exercise the existing simulator with deterministic fixtures; they are not live map-provider verification.
+Screenshots in `evidence/world/` show the synthetic diagnostic fixture, a tile failure state and the phone layout. The later `regional-*` evidence records the actual normalized Cambridge source dataset; no city driving claim is made. The prior personal-route regressions exercise the existing simulator with deterministic fixtures; they are not live map-provider verification.
 
 ## Review
 
@@ -40,4 +40,12 @@ Open `world-inspector.html` on that server. For a real acquired dataset, serve i
 
 `world-data.yml` checks the pipeline, deterministic fixture output and browser inspector, and uploads the diagnostic build/evidence as an Actions artifact. It has read-only repository permissions and no deployment step. The existing Cloudflare production workflow deploys on `main` or explicit manual dispatch. This branch does not push to main or dispatch it. The existing PR preview workflow is separate; a successful local build/push is not evidence of a deployed PR URL.
 
-The full deliverable remains blocked at the real-data gate. Once network configuration is applied, resume acquisition, real-source structural checks, source reconciliation and the per-tile satellite review. Only then begin city streaming/elevation/renderer integration and the corresponding driving/performance evidence.
+The full deliverable remains at the real-data acceptance gate. Resolve the recorded source defects, source reconciliation and per-tile satellite review before city streaming/elevation/renderer integration. Network permissions are no longer the blocker. PR #25 and its preview are available without merging.
+
+## Regional-source update evidence
+
+The latest local suite passes **267 tests**. `regional-unit.txt` and `regional-extractor-test.txt` record the unit and synthetic PBF regression results. `regional-browser.json` and `regional-reference.png` exercise the actual packaged Cambridge dataset (102 inventory tiles, reference location, provenance and three tile transitions). Production and preview builds pass; production output excludes `world-data/` and `world-inspector.html`. Synthetic fixture browser interactions were repeated against the preview build. The existing personal-route/browser regression remains the earlier checkpoint result; it was not rerun for these isolated data tools.
+
+Live source access: Geofabrik PBF and current OSM relation API successfully retrieved. Google satellite imagery visible with trusted managed CA and normal TLS verification. Source defects, supporting datasets and geographic review remain unresolved; this is not a city-driving performance result.
+
+PR: https://github.com/ravitejamanchala/cambridge-learner-driv/pull/25 . Test link: https://pr-25.learner-drive-app.pages.dev/world-inspector.html . No merge is needed.

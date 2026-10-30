@@ -25,7 +25,7 @@ export class Dataset {
   async read(file) {
     if (!this.index) throw Error("Open the index first");
     if (
-      !/^(tiles\/-?\d+_-?\d+|navigation|ledger|validation|review-grid)\.json$/.test(
+      !/^(tiles\/-?\d+_-?\d+|ledger\/\d+|navigation|ledger|validation|review-grid)\.json$/.test(
         file,
       ) ||
       !this.index.files[file]
@@ -76,11 +76,12 @@ export class Dataset {
     )
       throw Error("Invalid tile payload");
     const features = new Map(tile.features.map((f) => [f.id, f]));
+    const featureIds = new Set(tile.featureIds);
     for (const owner of [...new Set(tile.references.map((r) => r.owner))]) {
       const shard =
         owner === id ? tile : await this.read(`tiles/${owner}.json`);
       for (const f of shard.features)
-        if (tile.featureIds.includes(f.id)) features.set(f.id, f);
+        if (featureIds.has(f.id)) features.set(f.id, f);
     }
     if (tile.featureIds.some((id) => !features.has(id)))
       throw Error("Missing owned feature");

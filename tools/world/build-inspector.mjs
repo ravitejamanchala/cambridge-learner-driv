@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { installDataset } from "./archive.mjs";
 export async function buildInspector(out, src = ".") {
   await fs.mkdir(out, { recursive: true });
   await build({
@@ -11,11 +12,33 @@ export async function buildInspector(out, src = ".") {
     target: "es2022",
     outfile: path.join(out, "world-inspector.js"),
   });
-  const html = (
-    await fs.readFile(path.join(src, "world-inspector.html"), "utf8")
-  )
+  let html = (await fs.readFile(path.join(src, "world-inspector.html"), "utf8"))
     .replace("js/world-data/inspector.js", "world-inspector.js")
     .replace("js/world-data/inspector.css", "world-inspector.css");
+  const archive = path.join(src, "data/world/cambridge.json.gz");
+  const available = await fs.access(archive).then(
+    () => true,
+    (error) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    },
+  );
+  if (available) {
+    const index = await installDataset(
+      archive,
+      path.join(out, "world-data/cambridge"),
+    );
+    html = html
+      .replace(
+        'value="tests/fixtures/world/dataset/index.json"',
+        'value="world-data/cambridge/index.json"',
+      )
+      .replace(
+        "The bundled example is synthetic test\n      geometry.",
+        "Cambridge source data is awaiting acceptance.",
+      );
+    console.log("Cambridge inspection dataset: " + index.version);
+  }
   await fs.writeFile(path.join(out, "world-inspector.html"), html);
   await fs.copyFile(
     path.join(src, "js/world-data/inspector.css"),

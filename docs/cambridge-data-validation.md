@@ -1,34 +1,40 @@
-# Cambridge data validation — gate incomplete
+# Cambridge source validation — acceptance incomplete
 
-Date: 30 October 2026. Base: `e4449195fc27e38d010c335ba256b5969fcffed0`.
+Checked 30 October 2026. Base: `main` at `e4449195fc27e38d010c335ba256b5969fcffed0`.
 
-## Coverage
+## Coverage and reproducibility
 
-The intended extent is the Cambridge city administrative boundary plus 1 km. **Actual boundary ID, polygon, area, snapshot date and real tile count remain unresolved.** The proxy rejected the boundary discovery request before any live source file was acquired. The discovery bounding box is not reported as the city extent. No substitute Roadarium/corridor dataset is labelled complete Cambridge.
+Network access is restored. The earlier access-failure evidence is historical, not the current blocker. Overpass resolved Cambridge administrative boundary **relation/295355**, approximately **40.37 km²**, before repeated HTTP 502 failures. A dated Geofabrik regional PBF supplies the reproducible full-region alternative; the snapshot is **2026-10-29T21:21:26Z**. The delivery extent is the administrative polygon plus a **1 km buffer**, divided into **102 one-kilometre inventory tiles**.
 
-`docs/evidence/world/provider-access.json` records the independent browser checks. Proxy-aware HTTP requests to Overpass and Geofabrik returned tunnel `403 Forbidden`; Chromium could not load Google Maps or Roadarium. The acquisition journal records `status:incomplete`, null boundary/snapshot and a failed discovery part. This is an environment access dependency, not missing user authorization.
+Immutable inspection version: `52fdf092cb5e518587df60f81ee649591e457ede6b761af903e7ecf17563bef9`.
+Bundle: `data/world/cambridge.json.gz`, with checksum receipt. Exact source URL, PBF hash, boundary metadata and counts: [regional-summary.json](evidence/world/regional-summary.json). Rebuild commands: [pipeline](world-data-pipeline.md).
 
-The environment configuration draft contains the requested host additions, but its saved state does not apply them to the active runtime. Review/save and publish it through environment settings, then rerun `npm run world:acquire`. Do not retry unchanged requests repeatedly or use an unrelated host to bypass the policy.
+The geometry-intersection selection accounts for 445,855 nodes, 92,595 ways and 383 relations, with **zero missing dependency references**, zero selection errors and no missing normalized provenance. It retains 98,166 normalized features and 149 structurally complete restriction relations. Source counts include dependencies extending outside the delivery extent; feature counts are not claims about the number of distinct real-world objects. Unsupported categories have ledger records, not fabricated geometry.
 
-## Local structural evidence
+Native area assembly fixes two previous importer rejections of valid complex grass/scrub polygons. Point-touching holes are permitted; overlapping segments and unsupported geometry remain rejected. Open BMX tracks and slipways remain lines. An assembler is not allowed to promote an inner-only building relation into an exterior.
 
-The committed synthetic fixture has 16 inventory tiles, original test geometry, a building courtyard, two source road components including a grade-separated crossing, a restriction relation and a shelter. Every source feature has one owning shard and resolvable tile references. Unknown dimensions stay unknown. The fixture build passes structural checks, while `accepted:false` and `synthetic:true` prohibit interpreting it as verified Cambridge geography.
+## Confirmed upstream defects
 
-`npm run test:world` exercises coordinates/heading/negative tile indices; ring/hole reconstruction and rejection; source conflicts; original node connectivity and restriction preservation; bounded provider retries and explicit denials; incomplete coverage; immutable output; cache deduplication/integrity; administrative relation labels; and empty tiles. Browser checks exercise the connected diagnostic UI with the generated files.
+The current OSM API was independently checked, and contains the same defects as the pinned snapshot. Evidence: [regional-current-relations.json](evidence/world/regional-current-relations.json). Public user names/IDs are omitted from this review copy.
 
-## Acceptance matrix
+| Source relation | Defect | Required resolution |
+|---|---|---|
+| 10402, Shire Hall | Building relation has inner members but no outer boundary | Authoritative footprint/member correction |
+| 1116128 | Turn restriction has no `to` member | Confirm the intended exit road and current legal restriction |
+| 5546965 | No `from` member | Confirm approach road |
+| 10283897 | No `to` member | Confirm exit road |
+| 12741856 | No `to` member | Confirm exit road |
+| 16075364 | No `via` member | Confirm junction node or via-way sequence |
+| 18814223 | Only `to`; no `from` or `via` | Confirm approach and junction |
 
-| Gate | Result |
-|---|---|
-| Confirmed repository baseline | Complete: owner chose current main |
-| Actual Cambridge boundary + source inventory | Blocked: discovery unavailable |
-| Full live acquisition and dependency accounting | Not run; no real dataset |
-| Structural algorithms | Tested on synthetic fixture; not city-validated |
-| Projection absolute geographic accuracy | Round trips/axis conventions tested; survey alignment unverified |
-| Source topology and legal restrictions across city | Not reviewed; graph preservation implemented only |
-| Supporting sources/elevation and source reconciliation | Pending; no accepted height dataset |
-| Google satellite overview per populated/drivable tile | Unavailable; 0 inspected |
-| Fixed validated real dataset version | Not produced |
-| Renderer refinement and city driving | Deferred until preceding gate passes |
+These seven records remain rejected. Inferring legal turn rules from nearby geometry would not be a verified correction. They prevent structural acceptance. No edits were submitted to OSM.
 
-Do not promote this checkpoint by setting `accepted:true` manually. Complete real-source structural checks and the evidence-backed review first. Generic geometric tests cannot establish legal driving rules, imagery age or real-world completeness.
+## Remaining acceptance work
+
+- 1,052 building-overlap candidates need reconciliation (including building-part/member hierarchies); overlap alone does not justify deletion.
+- Full populated/drivable tile imagery review remains uncompleted. Actual Google satellite imagery at 52.21829, 0.14688 is visible; image acquisition date is unknown. See the geographic audit for the limited reviewed scope.
+- Overture/supporting-source reconciliation, terrain/elevation and horizontal/vertical datum acceptance remain pending. OSM height gaps remain unknown.
+- Raw topology and legal tags are preserved; this graph is not yet an accepted city driving router.
+- Full-city rendering, continuous driving, asset replacement and performance testing remain deferred by the requested data gate.
+
+The preview is a source-data inspection tool with `accepted:false`. It is not the finished Cambridge driving world. Do not manually promote it to accepted or merge it as the completed city renderer. A full regional download and dependency closure establish source accounting, not ground-truth accuracy or complete real-world coverage.

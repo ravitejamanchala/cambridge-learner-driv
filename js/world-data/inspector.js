@@ -121,7 +121,7 @@ function select(id) {
     : "No feature selected";
   render();
 }
-async function loadTile(id) {
+async function loadTile(id, focus = null) {
   const token = ++epoch,
     reader = dataset;
   status("Loading tile " + id + "…");
@@ -132,7 +132,19 @@ async function loadTile(id) {
     const loaded = await reader.tile(id);
     if (token !== epoch || reader !== dataset) return;
     tile = loaded;
-    features = loaded.features;
+    const priority = (f) =>
+      f.geometry.type === "Point"
+        ? 5
+        : f.geometry.type === "LineString"
+          ? 4
+          : f.kind === "building"
+            ? 3
+            : f.kind === "water"
+              ? 2
+              : 1;
+    features = loaded.features
+      .slice()
+      .sort((a, b) => priority(a) - priority(b));
     const selectBox = $("featureSelect");
     selectBox.replaceChildren(new Option("Choose a feature", ""));
     features.forEach((f) =>
@@ -140,6 +152,11 @@ async function loadTile(id) {
     );
     $("tileSelect").value = id;
     fit();
+    if (focus) {
+      center = focus;
+      zoom = 3;
+      render();
+    }
     status(
       (index.synthetic ? "SYNTHETIC TEST DATA · " : "") +
         id +
@@ -242,7 +259,7 @@ $("locationForm").onsubmit = (e) => {
       key = tileKey(p.x, p.z, index.tileSize);
     if (!index.tiles.some((t) => t.id === key))
       throw Error("Location is outside this dataset");
-    loadTile(key);
+    loadTile(key, [p.x, p.z]);
   } catch (error) {
     status(error.message);
   }

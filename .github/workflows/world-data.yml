@@ -3,7 +3,7 @@ on:
   push:
     branches: [feature/roadarium-world-and-assets]
   pull_request:
-    paths: ['js/world-data/**', 'tools/world/**', 'tests/world*', 'tests/fixtures/world/**', 'configs/world/**', 'schemas/world/**', 'world-inspector.html', '.github/workflows/world-data.yml']
+    paths: ['js/world-data/**', 'tools/world/**', 'tests/world*', 'tests/fixtures/world/**', 'configs/world/**', 'data/world/**', 'schemas/world/**', 'world-inspector.html', '.github/workflows/world-data.yml']
 permissions:
   contents: read
 jobs:
@@ -15,6 +15,11 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tools/world/requirements.txt
+      - run: python3 tests/world-region-test.py
       - run: npm ci
       - run: npm run test:world
       - run: npm run world:fixture
@@ -22,6 +27,7 @@ jobs:
       - run: npm run world:inspector
       - run: npx playwright install --with-deps chromium
       - run: TEST_SITE=dist-world-inspector node tests/world-inspector-browser.mjs
+      - run: TEST_SITE=dist-world-inspector node tests/world-regional-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

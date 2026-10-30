@@ -1,0 +1,5 @@
+
+> build
+> node tools/build_demo.mjs . dist
+
+built 573928 bytes

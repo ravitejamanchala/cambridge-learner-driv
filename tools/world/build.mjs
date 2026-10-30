@@ -71,7 +71,8 @@ export function compile({ config, acquisition, snapshots, sources }) {
     );
   const checked = new Set();
   for (const tile of tiles) {
-    const local = buildings.filter((f) => tile.featureIds.includes(f.id));
+    const tileIds = new Set(tile.featureIds);
+    const local = buildings.filter((f) => tileIds.has(f.id));
     for (let i = 0; i < local.length; i++)
       for (let j = i + 1; j < local.length; j++) {
         const a = local[i],
@@ -107,6 +108,8 @@ export function compile({ config, acquisition, snapshots, sources }) {
     schemaVersion: 1,
     city: config.id,
     acquisitionStatus: acquisition.status,
+    sourceCoverage: acquisition.sourceCoverage || "bounded-overpass",
+    selection: acquisition.selection || null,
     synthetic: !!config.synthetic,
     sourceCounts: counts([...data.elements.values()].map((e) => e.type)),
     featureCounts: counts(data.features.map((f) => f.kind)),
@@ -177,7 +180,20 @@ export function compile({ config, acquisition, snapshots, sources }) {
       features: data.features.filter((f) => f.owner === tile.id),
     });
   put("navigation.json", graph);
-  put("ledger.json", data.ledger);
+  if (data.ledger.length <= 10000) put("ledger.json", data.ledger);
+  else {
+    const shards = [];
+    for (let start = 0; start < data.ledger.length; start += 10000) {
+      const file = `ledger/${shards.length}.json`;
+      put(file, data.ledger.slice(start, start + 10000));
+      shards.push(file);
+    }
+    put("ledger.json", {
+      schemaVersion: 1,
+      records: data.ledger.length,
+      shards,
+    });
+  }
   put("validation.json", report);
   put("review-grid.json", {
     schemaVersion: 1,
@@ -234,6 +250,17 @@ export function compile({ config, acquisition, snapshots, sources }) {
       ]),
     ),
   };
+  if (acquisition.sourceCoverage === "regional-geometry-intersection") {
+    report.dataGate.reasons = report.dataGate.reasons.filter(
+      (reason) => !reason.startsWith("Regional extract coverage check pending"),
+    );
+    put("validation.json", report);
+    const reportText = files.get("validation.json");
+    manifest.files["validation.json"] = {
+      sha256: hash(reportText),
+      bytes: Buffer.byteLength(reportText),
+    };
+  }
   const version = hash(canonical(manifest));
   manifest.version = version;
   validateIndex(manifest);
@@ -251,7 +278,7 @@ export async function build(config, sourceDir, outputRoot) {
   for (const record of acquisition.parts.filter(
     (p) => p.status === "complete" && p.file !== "discovery.json",
   )) {
-    if (!/^(boundary|parts\/-?\d+_-?\d+)\.json$/.test(record.file))
+    if (!/^(boundary|regional|parts\/-?\d+_-?\d+)\.json$/.test(record.file))
       throw Error("Invalid source path");
     const bytes = await fs.readFile(path.join(sourceDir, record.file));
     if (hash(bytes) !== record.sha256)
@@ -263,7 +290,9 @@ export async function build(config, sourceDir, outputRoot) {
       sha256: record.sha256,
       queryHash: record.queryHash,
       license: "ODbL-1.0",
-      provider: config.endpoint,
+      provider: record.provider || config.endpoint,
+      sourceKind: record.sourceKind || "overpass",
+      upstream: record.upstream || null,
       snapshot: acquisition.snapshot,
       crs: "EPSG:4326",
     });
