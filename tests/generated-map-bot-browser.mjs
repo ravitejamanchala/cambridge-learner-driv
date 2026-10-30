@@ -175,6 +175,31 @@ try {
   const completed=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('cld.bot.')).map(k=>JSON.parse(localStorage.getItem(k))).sort((a,b)=>a.at-b.at).at(-1));
   assert.equal(completed.end,'done',JSON.stringify(completed));
   assert.equal(completed.completed,true);assert.equal(completed.pass,null);
+  // Provider adapter fixture: verifies UI/coordinates, not live Google imagery access.
+  await page.evaluate(()=>{window.SLAYDRIVE_MAPS={googleMapsBrowserKey:''};});
+  await page.locator('#blGoogleOverlay').click();
+  await page.locator('#googleReview').waitFor({state:'visible'});
+  assert.equal(await page.locator('#gmConnect').isVisible(),true);
+  await page.evaluate(()=>{
+    window.overlayTest={shapes:[],maps:[]};
+    class Shape{constructor(options){this.options=options;overlayTest.shapes.push(this);}setMap(map){this.options.map=map;}addListener(){return {remove(){}};}}
+    class Map{constructor(node,options){this.options=options;node.textContent='Google API adapter fixture — no reference imagery';overlayTest.maps.push(this);}getBounds(){return {toJSON:()=>({south:52,north:53,west:0,east:1})};}fitBounds(){}addListener(){return {remove(){}};}}
+    window.google={maps:{Map,Polygon:Shape,Polyline:Shape,LatLngBounds:class{extend(){}},event:{clearInstanceListeners(){}}}};
+  });
+  await page.locator('#gmKey').fill('fixture-not-a-real-key');
+  await page.locator('#gmConnect button').click();
+  await page.waitForFunction(()=>window.overlayTest?.shapes.length>0);
+  assert.equal(await page.evaluate(()=>overlayTest.maps[0].options.mapTypeId),'satellite');
+  const proposal={type:'FeatureCollection',schemaVersion:1,accepted:false,source:{provider:'Synthetic test only',allowsDerivedData:true},georeference:{crs:'EPSG:4326'},features:[{geometry:{type:'Polygon',coordinates:[[[.146,52.218],[.1461,52.218],[.1461,52.2181],[.146,52.218]]]},properties:{kind:'parking_bay',status:'proposal',verified:false,scoreCalibrated:false,score:.7}}]};
+  await page.locator('#gmVision').setInputFiles({name:'fixture-proposals.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(proposal))});
+  await page.waitForFunction(()=>document.querySelector('#gmStatus').textContent.includes('1 unverified'));
+  await page.locator('#gmHide').click();
+  assert.equal(await page.evaluate(()=>overlayTest.shapes.filter(s=>s.options.map).length),0);
+  await page.locator('#gmHide').click();
+  assert.ok(await page.evaluate(()=>overlayTest.shapes.some(s=>s.options.map)));
+  await page.locator('#gmOpacity').fill('0');await page.locator('#gmOpacity').dispatchEvent('input');
+  assert.ok(await page.evaluate(()=>overlayTest.shapes.filter(s=>s.options.map).every(s=>s.options.strokeOpacity===0)));
+  await page.locator('#gmClose').click();assert.equal(await page.locator('#googleReview').count(),0);
   await page.goto(base+'street-assets.html');
   await page.waitForFunction(()=>document.body.dataset.ready==='true');
   assert.equal(await page.locator('.label').count(),10);
@@ -199,6 +224,7 @@ try {
           "no grading",
           "one-click example and short route completion",
           "ten original street assets rendered in WebGL",
+          "Google overlay setup, provider adapter, layer visibility and opacity (provider mocked)",
         ],
         scope:
           "Local real-data integration, one short route/seed completion, not a city accuracy certificate",

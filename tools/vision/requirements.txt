@@ -1,0 +1,5 @@
+# Install torch==2.5.1 from https://download.pytorch.org/whl/cpu first.
+transformers==4.46.3
+pillow==11.0.0
+opencv-python-headless==4.10.0.84
+numpy==2.1.3

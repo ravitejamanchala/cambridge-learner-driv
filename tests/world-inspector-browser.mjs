@@ -24,7 +24,7 @@ const errors = [];
 try {
   for (let i = 0; i < 50; i++) {
     try {
-      if ((await fetch(base + "/world-inspector.html")).ok) break;
+      const response=await fetch(base + "/world-inspector.html");await response.arrayBuffer();if(response.ok)break;
     } catch {}
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -112,6 +112,10 @@ try {
   await page.waitForFunction(() =>
     document.getElementById("status").textContent.includes("1_-2:"),
   );
+  await page.locator('#accuracyRun').click();
+  await page.waitForFunction(()=>!document.querySelector('#accuracyExport').disabled);
+  assert.match(await page.locator('#accuracySummary').textContent(),/independentlyVerifiedWidths/);
+  assert.match(await page.locator('#accuracySummary').textContent(),/"accepted": false/);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(
     await page.evaluate(

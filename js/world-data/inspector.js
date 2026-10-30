@@ -1,3 +1,4 @@
+import {auditCity} from './accuracy-audit.js';
 import { Dataset } from "./dataset.js";
 import { project, unproject, tileKey } from "./projection.js";
 import { inside } from "./geometry.js";
@@ -14,7 +15,7 @@ const colors = {
   cycleway: "#6ba49a",
   boundary: "#8a5ab2",
 };
-let dataset,
+let accuracyReport=null, dataset,
   tile,
   index,
   features = [],
@@ -188,6 +189,7 @@ async function loadTile(id, focus = null) {
   }
 }
 async function open() {
+  accuracyReport=null;$("accuracyExport").disabled=true;$("accuracySummary").textContent="Not run for this dataset.";
   const token = ++epoch;
   status("Loading city index…");
   index = null;
@@ -347,3 +349,6 @@ new ResizeObserver(render).observe(canvas);
 const requested = new URLSearchParams(location.search).get("index");
 if (requested) $("datasetUrl").value = requested;
 open();
+
+$('accuracyRun').onclick=async()=>{if(!dataset?.index)return;const current=dataset;$('accuracyRun').disabled=true;$('accuracyExport').disabled=true;accuracyReport=null;try{const report=await auditCity(current,(n,total)=>{$('accuracySummary').textContent=`Checking tile ${n}/${total}…`;});if(current!==dataset||index!==current.index)throw Error('Dataset changed; rerun the audit.');accuracyReport=report;$('accuracySummary').textContent=JSON.stringify({coverage:{checked:report.coverage.checkedTiles,expected:report.coverage.expectedTiles},stats:report.stats,mappedDetails:report.mappedDetails,accepted:report.accepted,missingEvidence:report.missingEvidence},null,2);$('accuracyExport').disabled=false;}catch(e){$('accuracySummary').textContent=e.message;}finally{$('accuracyRun').disabled=false;}};
+$('accuracyExport').onclick=()=>{if(!accuracyReport)return;const url=URL.createObjectURL(new Blob([JSON.stringify(accuracyReport,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cambridge-accuracy-audit.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};

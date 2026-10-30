@@ -838,6 +838,7 @@ async function boot() {
   // bot lab: open the sim with ?bots to run and watch the test driver on any lesson, puzzle or mock test
   if (/[?&]bots\b/.test(location.search)) createBotLab({
     openMyRoutes:openPersonal,
+    async openGoogleOverlay(){const track=localTracks.get(A.id);if(!track)throw Error('Load a generated My routes practice map first.');const {openGoogleOverlay}=await import('./map-review/google-overlay.js');const wasPaused=paused;paused=true;openGoogleOverlay(track,{onClose:()=>{paused=wasPaused;}});},
     previewExample:!!document.querySelector('meta[name=world-data-index]'),
     async loadExample(){
       const response=await fetch(new URL('data/world/water-street-route.json',document.baseURI));if(!response.ok)throw Error('Preview example could not load.');

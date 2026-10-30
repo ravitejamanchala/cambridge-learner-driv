@@ -449,7 +449,7 @@ export function createBotLab(api) {
 #botlab td.n{text-align:right;font-variant-numeric:tabular-nums}#botlab .bad{color:#ff7b7f}#botlab .ok{color:#6fe0a0}#botlab .min{width:30px;height:30px;padding:0}
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
-<div class="row"><button id="blMyRoutes">Open My routes</button><button id="blExample" hidden>Cambridge example</button><span>Load a practice drive, then watch the bot.</span><a id="blAssets" href="street-assets.html" target="_blank" rel="noopener" hidden>Street assets ↗</a></div>
+<div class="row"><button id="blMyRoutes">Open My routes</button><button id="blExample" hidden>Cambridge example</button><button id="blGoogleOverlay">Google overlay</button><span>Load a practice drive, then watch the bot.</span><a id="blAssets" href="street-assets.html" target="_blank" rel="noopener" hidden>Street assets ↗</a></div>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
 <div class="row"><label>Traffic <select id="blTraffic" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="lesson">The lesson's own</option><option value="random">Add random traffic</option></select></label></div>
 <div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
@@ -464,6 +464,7 @@ export function createBotLab(api) {
   $('blMin').onclick = () => el.classList.toggle('min');
   $('blExample').hidden=!api.previewExample;$('blAssets').hidden=!api.previewExample;
   $('blExample').onclick=async()=>{if(running)return;$('blExample').disabled=true;$('blLive').textContent='Preparing Cambridge example…';try{await api.loadExample();}catch(e){$('blLive').textContent=e.message;}finally{$('blExample').disabled=false;}};
+  $('blGoogleOverlay').onclick=async()=>{if(running&&!paused){$('blLive').textContent='Pause the bot before opening the overlay.';return;}try{await api.openGoogleOverlay();}catch(e){$('blLive').textContent=e.message;}};
   $('blMyRoutes').onclick=()=>{if(running)return;el.classList.add('min');api.openMyRoutes?.();};
   window.addEventListener('personal-route-ready',()=>{if(!running){$('blPick').value='personal:current';el.classList.remove('min');$('blLive').textContent='Generated map loaded. Start to watch a driving check; this does not certify map accuracy.';}});
   const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;

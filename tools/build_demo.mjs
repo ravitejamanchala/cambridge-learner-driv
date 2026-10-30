@@ -37,6 +37,7 @@ for (const f of fs.readdirSync(path.join(SRC, 'data/areas'))) {
 for (const f of fs.readdirSync(path.join(SRC, 'models'))) if(fs.statSync(path.join(SRC,'models',f)).isFile()) fs.copyFileSync(path.join(SRC, 'models', f), path.join(OUT, 'models', f));
 console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 
+fs.writeFileSync(path.join(OUT, 'maps-config.js'),process.env.GOOGLE_MAPS_BROWSER_KEY?'window.SLAYDRIVE_MAPS='+JSON.stringify({googleMapsBrowserKey:process.env.GOOGLE_MAPS_BROWSER_KEY})+';':fs.readFileSync(path.join(SRC,'maps-config.js'),'utf8'));
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length+PUZZLES.length }));
 

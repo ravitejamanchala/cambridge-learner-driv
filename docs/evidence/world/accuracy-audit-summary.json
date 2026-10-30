@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "datasetVersion": "52fdf092cb5e518587df60f81ee649591e457ede6b761af903e7ecf17563bef9",
+  "generatedAt": "2026-10-30T20:32:07.238Z",
+  "stats": {
+    "roads": 9987,
+    "taggedWidths": 240,
+    "estimatedOrUnknownWidths": 9747,
+    "independentlyVerifiedWidths": 0,
+    "taggedLaneCounts": 1114,
+    "paintPresent": 45,
+    "paintAbsent": 820,
+    "paintUnknown": 9122,
+    "parkingTagged": 234,
+    "parkingWidthTagged": 0
+  },
+  "mappedDetails": {
+    "roadMarkingFeatures": 0,
+    "parkingSpaceFeatures": 0
+  },
+  "accepted": false,
+  "independentImageryComparison": "not performed",
+  "missingEvidence": [
+    "Independent, dated road-edge measurements",
+    "Lane-paint, yellow-box and KEEP CLEAR coverage",
+    "Individual parking-bay geometry",
+    "Imagery registration and acquisition dates"
+  ],
+  "coverage": {
+    "expectedTiles": 102,
+    "checkedTiles": 102,
+    "uniqueFeatures": 98142
+  }
+}

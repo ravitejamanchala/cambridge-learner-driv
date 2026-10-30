@@ -1,0 +1,23 @@
+{
+  "model": {
+    "id": "CIDAS/clipseg-rd64-refined",
+    "license": "Apache-2.0",
+    "weightsSha256": "d00ca85d6b859f9d07b7cfb8ef26fe9771cb275b34c9368f2ecf603139307f55"
+  },
+  "imageSha256": "91c30a0d3fb3dd3d15dc6104e4a88c65c36f8d4da754330ca4d0631815d9ba1d",
+  "source": {
+    "provider": "Original synthetic test scene \u2014 NOT Cambridge",
+    "license": "CC0-1.0",
+    "attribution": "SlayDrive test scene",
+    "capturedAt": "2026-10-30",
+    "allowsDerivedData": true
+  },
+  "proposals": 17,
+  "accepted": false,
+  "knownFalsePositiveClasses": [
+    "keep_clear",
+    "yellow_box",
+    "arrow"
+  ],
+  "scope": "Synthetic software smoke test; not Cambridge imagery or detection-accuracy validation"
+}

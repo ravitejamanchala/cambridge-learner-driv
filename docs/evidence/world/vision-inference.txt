@@ -1,0 +1,1 @@
+{"output": "/tmp/slaydrive-vision-synthetic/proposals-run2.json", "proposals": 17, "accepted": false}
