@@ -63,6 +63,8 @@ jobs:
         run: node tests/personal-routes-browser.mjs
       - name: Verify generated Cambridge map in Bot lab
         run: TEST_SITE=dist node tests/generated-map-bot-browser.mjs
+      - name: Verify inspector to saved map driving and live satellite reference
+        run: TEST_SITE=dist LIVE_SATELLITE=1 node tests/world-workflow-browser.mjs
       - name: Verify mobile panels
         run: node tests/modal-layout-browser.mjs
       - name: Verify live map providers separately

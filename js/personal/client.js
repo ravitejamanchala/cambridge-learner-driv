@@ -24,7 +24,7 @@ export async function findRoute(start,end,options={}) {
 }
 function convert(osm,part,signal) {
   return new Promise((resolve,reject)=>{
-    const built=!!document.querySelector('meta[name=app-release]'),worker=new Worker(new URL(built?'personal-worker.js':'js/personal/generator-worker.js',document.baseURI),{type:'module'});
+    const built=!!document.querySelector('meta[name=app-release],meta[name=world-built]'),worker=new Worker(new URL(built?'personal-worker.js':'js/personal/generator-worker.js',document.baseURI),{type:'module'});
     const stop=()=>{worker.terminate();signal?.removeEventListener('abort',cancel);},cancel=()=>{stop();reject(new DOMException('Cancelled','AbortError'));};
     if(signal?.aborted)return cancel();signal?.addEventListener('abort',cancel,{once:true});
     worker.onmessage=({data})=>{stop();data.error?reject(Error(data.error)):resolve(data.track);};worker.onerror=()=>{stop();reject(Error('Map generation failed. Please retry.'));};worker.postMessage({osm,part,wholeRoute:true});
@@ -37,6 +37,7 @@ export function createJourney(recipe,{store=routeStore(),onStatus=()=>{},fetchSe
   async function prepare(){
     check();if(prepared)return prepared;if(pending)return pending;
     pending=(async()=>{
+      if(recipe.savedWorld){onStatus('Restoring your exact saved map…');const {restoreWorld}=await import('./saved-world.js');const saved=await restoreWorld(recipe);check();prepared=saved.track;return prepared;}
       const city=await citySource?.(route,{signal:controller.signal,onStatus});check();
       if(city){onStatus('Building roads and scenery from the Cambridge dataset…');prepared=await generate(city.data,city.part,controller.signal);check();return prepared;}
       const elements=new Map(),bounds=[Infinity,Infinity,-Infinity,-Infinity];let timestamp;

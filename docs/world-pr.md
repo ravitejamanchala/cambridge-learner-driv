@@ -1,3 +1,7 @@
+World inspector now owns the complete map workflow: choose pins or the Cambridge example, generate a native map, compare its geometry with satellite imagery, record a visual review, and save an immutable local revision. My routes restores that exact map without regenerating it. Esri World Imagery is available as a reference without a user key; Google remains optional. Unknowns and mismatches are retained; this does not implement automatic satellite correction or certify geographic accuracy.
+
+Test instructions and evidence: [World inspector → My routes](docs/world-inspector-to-drive.md). New browser coverage verifies generation, satellite failure/review states, local persistence, exact restored geometry and actual car movement; provider loading is tested separately from fixture-based integration checks.
+
 # Connect My routes source data, Bot lab and geographic review overlays
 
 My routes previously used a separate simplified OSM conversion path, so improvements visible in the city inspector did not reach the simulator. This PR connects the source normalizer and versioned Cambridge tiles to the existing My routes generator, preserving search, pins, saved routes, the car/physics and the app’s building assets.

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>SlayDrive · World data inspector</title>
     <link rel="stylesheet" href="js/world-data/inspector.css" />
+    <link rel="stylesheet" href="js/vendor/leaflet.css" />
   </head>
   <body>
     <header>
@@ -27,6 +28,7 @@
     </p>
     <main>
       <aside>
+        <section id="mapWorkflow"></section>
         <h2 id="cityTitle">Dataset</h2>
         <p id="gate"></p>
         <label
@@ -89,10 +91,11 @@
         <pre id="detail">
 Select a source feature to inspect provenance, dimensions and estimates.</pre
         >
-        <h3>City accuracy coverage</h3><button id="accuracyRun">Audit every city tile</button><button id="accuracyExport" disabled>Export audit</button><pre id="accuracySummary">Not run. Source completeness is not independent accuracy verification.</pre><h3>Validation</h3>
+        <h3>Source coverage checks</h3><button id="accuracyRun">Check every city tile</button><button id="accuracyExport" disabled>Export audit</button><pre id="accuracySummary">Not run. Source completeness is not independent accuracy verification.</pre><h3>Validation</h3>
         <pre id="validation"></pre>
       </aside>
     </main>
+    <script src="maps-config.js"></script>
     <script type="module" src="js/world-data/inspector.js"></script>
   </body>
 </html>

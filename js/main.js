@@ -878,6 +878,7 @@ async function boot() {
   });
   await areaChain; await new Promise(r => setTimeout(r, 0));
   $('loadOv').hidden = true;
+  if(new URLSearchParams(location.search).has('routes'))await openPersonal();
 }
 
 boot().catch(err => { console.error(err); setLoad(err.message || 'Something went wrong while loading.'); const b = $('loadErr'); if (b) b.hidden = false; });

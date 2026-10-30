@@ -5,6 +5,8 @@ import { build } from "esbuild";
 import { installDataset } from "./archive.mjs";
 export async function buildInspector(out, src = ".") {
   await fs.mkdir(out, { recursive: true });
+  await fs.mkdir(path.join(out,"js/vendor"),{recursive:true});
+  await fs.copyFile(path.join(src,"js/vendor/leaflet.css"),path.join(out,"js/vendor/leaflet.css"));
   await build({
     entryPoints: [path.join(src, "js/world-data/inspector.js")],
     bundle: true,
@@ -12,8 +14,11 @@ export async function buildInspector(out, src = ".") {
     target: "es2022",
     outfile: path.join(out, "world-inspector.js"),
   });
+  await build({entryPoints:[path.join(src,'js/personal/generator-worker.js')],bundle:true,format:'esm',target:'es2022',outfile:path.join(out,'personal-worker.js')});
+  // Standalone inspector and full preview both use the same browser-key config.
+  await fs.writeFile(path.join(out,'maps-config.js'),process.env.GOOGLE_MAPS_BROWSER_KEY?'window.SLAYDRIVE_MAPS='+JSON.stringify({googleMapsBrowserKey:process.env.GOOGLE_MAPS_BROWSER_KEY})+';':await fs.readFile(path.join(src,'maps-config.js'),'utf8'));
   let html = (await fs.readFile(path.join(src, "world-inspector.html"), "utf8"))
-    .replace("js/world-data/inspector.js", "world-inspector.js")
+    .replace("<head>", '<head><meta name="world-built" content="1">').replace("js/world-data/inspector.js", "world-inspector.js")
     .replace("js/world-data/inspector.css", "world-inspector.css");
   await build({entryPoints:[path.join(src,'js/world-data/assets-preview.js')],bundle:true,format:'esm',target:'es2022',outfile:path.join(out,'street-assets.js')});
   await fs.writeFile(path.join(out,'street-assets.html'),(await fs.readFile(path.join(src,'street-assets.html'),'utf8')).replace('js/world-data/assets-preview.js','street-assets.js'));

@@ -8,7 +8,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-labelledby="personalRoutesHeading">
     <header><div><span class="route-eyebrow">YOUR PLACES. YOUR PRACTICE.</span><h2 id="personalRoutesHeading">My routes <small>Experimental</small></h2></div><button class="x" type="button" aria-label="Close my routes">×</button></header>
     <div class="personal-layout"><div class="personal-tools">
-      <ol class="route-steps"><li>Find a place</li><li>Pick two pins</li><li>Drive</li></ol>
+      <p id="worldInspectorLink" hidden><a class="cbtn" href="world-inspector.html">Create &amp; review a map in World inspector →</a></p><ol class="route-steps"><li>Find a place</li><li>Pick two pins</li><li>Drive</li></ol>
       <form id="placeSearch"><label for="routePlace">Search for a place</label><div class="route-search"><input id="routePlace" type="search" placeholder="Cambridge, UK" maxlength="200" autocomplete="off" required><button class="cbtn" type="submit">Search</button></div></form>
       <div id="placeResults" aria-label="Place search results"></div>
       <div class="route-pin-controls"><button class="cbtn" id="chooseStart" aria-pressed="true"><b>A</b> Set start</button><button class="cbtn" id="chooseEnd" aria-pressed="false"><b>B</b> Set finish</button><button class="cbtn" id="swapPins" aria-label="Swap start and finish" disabled>⇄</button></div>
@@ -23,6 +23,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
     <footer class="route-credits">Map data and tiles © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL</a> · Routing <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>. Searches and pins are sent to map providers to generate your route.</footer>
   </div>`;
   document.body.append(sheet);const $=id=>sheet.querySelector('#'+id),status=$('personalRouteStatus'),store=routeStore();
+  $('worldInspectorLink').hidden=!!document.querySelector('meta[name=app-release]')&&!document.querySelector('meta[name=world-data-index]');
   const map=L.map($('personalRouteMap'),{zoomControl:true}).setView([52.2053,.1218],13);
   const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
   tiles.on('tileerror',()=>{$('mapTileStatus').hidden=false;});tiles.on('tileload',()=>{$('mapTileStatus').hidden=true;});
@@ -73,9 +74,10 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   function renderSaved(){
     const list=$('personalSavedRoutes');list.replaceChildren();let rows;try{rows=store.list();}catch(e){say(e.message);return;}
     if(!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Your first route starts with a place. Search above to begin.';list.append(empty);}
-    for(const recipe of rows){const card=document.createElement('article');card.className='personal-route-card';const info=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('span');title.textContent=recipe.title;detail.textContent=distance(recipe.distance);info.append(title,detail);card.append(info);
+    for(const recipe of rows){const card=document.createElement('article');card.className='personal-route-card';const info=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('span');title.textContent=recipe.title;detail.textContent=distance(recipe.distance)+(recipe.savedWorld?' · Saved map · '+({'pending':'satellite review pending','visual-review':'visual review recorded','needs-correction':'corrections needed'}[recipe.savedWorld.reviewStatus]||'unverified'):'');info.append(title,detail);card.append(info);
       const button=(text,fn)=>{const b=document.createElement('button');b.className='cbtn';b.textContent=text;b.onclick=fn;card.append(b);return b;};
-      button('View',()=>{invalidate();pins=[recipe.start,recipe.end];refreshPins();drawRecipe(recipe);say('Saved route loaded.');sheet.querySelector('.card').scrollTo({top:0,behavior:'smooth'});});
+      button('View',()=>{invalidate();pins=[recipe.start,recipe.end];refreshPins();drawRecipe(recipe);say(recipe.savedWorld?'Exact saved map selected. Drive restores this revision without generating another world.':'Saved route loaded.');sheet.querySelector('.card').scrollTo({top:0,behavior:'smooth'});});
+      if(recipe.savedWorld&&!$('worldInspectorLink').hidden)button('Review map',()=>{location.href='world-inspector.html?route='+encodeURIComponent(recipe.id);});
       button('Drive',()=>{if(!busy)drive(recipe);});if(eligibleForMock(recipe))button('Mock test',()=>{if(!busy)drive(recipe,true);});
       if(recipe.lastMock){const result=document.createElement('span');result.className='muted';result.textContent=recipe.lastMock.completed?`Last mock: ${recipe.lastMock.pass?'Passed':'Failed'} · ${recipe.lastMock.D} driving / ${recipe.lastMock.S} serious`:'Last mock: incomplete';info.append(result);}
       const del=button('Delete',()=>{if(!confirm(`Delete “${recipe.title}” from this browser?`))return;try{cancel();store.remove(recipe.id);if(draft?.id===recipe.id)invalidate();renderSaved();say('Route deleted from this device.');}catch(e){say(e.message);}});del.setAttribute('aria-label','Delete '+recipe.title);list.append(card);
@@ -88,5 +90,5 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   window.addEventListener('learner-access-change',()=>{if(!canDrive()&&busy){cancel();say('Sign in again to drive your saved route.');}});
   const fit=()=>{map.invalidateSize({pan:false});if(line)map.fitBounds(line.getBounds(),{padding:[32,32],maxZoom:16});};
   new ResizeObserver(()=>{if(!sheet.hidden)fit();}).observe($('personalRouteMap'));
-  return {open(){sheet.hidden=false;renderSaved();say(draft?'Saved route ready.':'Search for a place, then choose start and finish.');setTimeout(()=>{fit();$('routePlace').focus();},0);},close,map};
+  return {open(){sheet.hidden=false;renderSaved();say(draft?'Saved route ready.':'Search for a place, or drive a map saved from World inspector below.');const requested=new URLSearchParams(location.search).get('route');if(requested){const r=store.list().find(r=>r.id===requested);if(r){pins=[r.start,r.end];refreshPins();drawRecipe(r);say('Your World inspector map is ready. Choose Save & drive to test this exact revision.');}}setTimeout(()=>{fit();$('routePlace').focus();},0);},close,map};
 }

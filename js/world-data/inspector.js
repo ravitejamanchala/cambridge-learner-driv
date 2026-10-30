@@ -1,3 +1,7 @@
+import {mountMapWorkflow} from './map-workflow.js';
+import {overlayGeometry} from '../map-review/geometry.js';
+import {buildNet} from '../net.js';
+import {applyMappedRoadTags} from '../mapped-road-tags.js';
 import {auditCity} from './accuracy-audit.js';
 import { Dataset } from "./dataset.js";
 import { project, unproject, tileKey } from "./projection.js";
@@ -15,6 +19,7 @@ const colors = {
   cycleway: "#6ba49a",
   boundary: "#8a5ab2",
 };
+let workflow,generatedGeometry=null;
 let accuracyReport=null, dataset,
   tile,
   index,
@@ -101,6 +106,14 @@ function render() {
     ctx.lineWidth = 4;
     drawGeometry(selected.geometry, true);
   }
+  if(generatedGeometry){
+    for(const f of generatedGeometry.features.filter(f=>['roads','paint','boxes','parking'].includes(f.layer))){
+      ctx.strokeStyle=ctx.fillStyle=({roads:'#3d454a',paint:'#ffffff',boxes:'#edc952',parking:'#61b287'})[f.layer];ctx.lineWidth=1;
+      const rings=f.paths.map(r=>r.map(p=>{const q=project(index.projection,[p.lng,p.lat]);return[q.x,q.z];}));
+      drawGeometry(f.polygon?{type:'MultiPolygon',coordinates:[rings]}:{type:'LineString',coordinates:rings[0]},f.polygon);
+    }
+  }
+  workflow?.pins().forEach((p,i)=>{if(!p)return;const q=project(index.projection,p),[x,y]=screen([q.x,q.z]);ctx.fillStyle=i?'#e22572':'#175a7d';ctx.beginPath();ctx.arc(x,y,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='white';ctx.font='bold 14px system-ui';ctx.fillText(i?'B':'A',x-5,y+5);});
   $("scale").textContent =
     "100 m = " + (100 * zoom).toFixed(0) + " px · north ↑";
 }
@@ -189,9 +202,11 @@ async function loadTile(id, focus = null) {
   }
 }
 async function open() {
+  workflow?.resetDataset();
   accuracyReport=null;$("accuracyExport").disabled=true;$("accuracySummary").textContent="Not run for this dataset.";
   const token = ++epoch;
   status("Loading city index…");
+  dataset = null;
   index = null;
   tile = null;
   features = [];
@@ -299,6 +314,7 @@ canvas.onpointerup = (e) => {
           );
         return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dz);
       };
+    if(workflow?.pick(unproject(index.projection,{x:p[0],z:p[1]}))){drag=null;return;}
     const f = [...features]
       .reverse()
       .find(
@@ -345,10 +361,11 @@ canvas.onkeydown = (e) => {
   e.preventDefault();
   render();
 };
+workflow=mountMapWorkflow({getDataset:()=>dataset,onPins:()=>render(),onDraft:track=>{generatedGeometry=null;if(track){const net=buildNet(track.renderNetwork||track.network);applyMappedRoadTags(net,track.osm?.ways);generatedGeometry=overlayGeometry(track,net);}render();},focus:p=>{if(!index)return;const q=project(index.projection,p),key=tileKey(q.x,q.z,index.tileSize);if(!index.tiles.some(t=>t.id===key)){status('Place is outside this dataset. Open a dataset covering it.');return;}loadTile(key,[q.x,q.z]);}});
 new ResizeObserver(render).observe(canvas);
 const requested = new URLSearchParams(location.search).get("index");
 if (requested) $("datasetUrl").value = requested;
-open();
+open().then(()=>{const saved=new URLSearchParams(location.search).get('route');if(saved)workflow.loadSaved(saved);});
 
 $('accuracyRun').onclick=async()=>{if(!dataset?.index)return;const current=dataset;$('accuracyRun').disabled=true;$('accuracyExport').disabled=true;accuracyReport=null;try{const report=await auditCity(current,(n,total)=>{$('accuracySummary').textContent=`Checking tile ${n}/${total}…`;});if(current!==dataset||index!==current.index)throw Error('Dataset changed; rerun the audit.');accuracyReport=report;$('accuracySummary').textContent=JSON.stringify({coverage:{checked:report.coverage.checkedTiles,expected:report.coverage.expectedTiles},stats:report.stats,mappedDetails:report.mappedDetails,accepted:report.accepted,missingEvidence:report.missingEvidence},null,2);$('accuracyExport').disabled=false;}catch(e){$('accuracySummary').textContent=e.message;}finally{$('accuracyRun').disabled=false;}};
 $('accuracyExport').onclick=()=>{if(!accuracyReport)return;const url=URL.createObjectURL(new Blob([JSON.stringify(accuracyReport,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cambridge-accuracy-audit.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};

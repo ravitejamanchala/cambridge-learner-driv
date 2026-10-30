@@ -32,7 +32,8 @@
     "world:fixture": "node tools/world/fixture.mjs",
     "world:inspector": "node tools/world/build-inspector.mjs",
     "test:world": "node --test tests/world-data.test.mjs",
-    "test:world:browser": "node tests/world-inspector-browser.mjs"
+    "test:world:browser": "node tests/world-inspector-browser.mjs",
+    "test:world:flow": "node tests/world-workflow-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
