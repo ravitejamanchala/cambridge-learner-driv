@@ -16,3 +16,8 @@ test-results/
 
 /dist-review/
 /dist-billing/
+
+.world-sources/
+.world-datasets/
+
+dist-world-inspector/

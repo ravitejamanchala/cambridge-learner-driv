@@ -1,3 +1,5 @@
+import {project, unproject} from '../world-data/projection.js';
+export {project, unproject};
 // Recipes stay in lon/lat. Bounded provider requests are combined into one
 // X-east / Z-south world with a stable origin before the drive starts.
 export const SECTION_METRES = 600, OVERLAP_METRES = 150;
@@ -41,8 +43,6 @@ export function section(route,index) {
   const bounds=boundsCheck([Math.min(...ys)-dy,Math.min(...xs)-dx,Math.max(...ys)+dy,Math.max(...xs)+dx]);
   return {index,count,start,end,coordinates,bounds,advance:Math.min(route.length,(index+1)*SECTION_METRES)};
 }
-export const project=(n,p)=>({x:(p[0]-n.origin[1])*n.kx,z:-(p[1]-n.origin[0])*n.kz});
-export const unproject=(n,p)=>[n.origin[1]+p.x/n.kx,n.origin[0]-p.z/n.kz];
 function lowerBound(cum,s){let a=0,b=cum.length;while(a<b){const m=(a+b)>>1;if(cum[m]<s)a=m+1;else b=m;}return a;}
 // Search near the last measured progress, so a loop cannot jump to a later lap.
 export function locate(route,p,previous=0) {

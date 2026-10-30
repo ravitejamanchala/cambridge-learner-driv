@@ -1,0 +1,13 @@
+{
+  "id": "cambridge",
+  "name": "Cambridge city",
+  "origin": [52.205, 0.119],
+  "boundary": {"name": "Cambridge", "adminLevel": "8", "discoveryBounds": [52.10, -0.10, 52.35, 0.30]},
+  "bufferMetres": 1000,
+  "tileSize": 1000,
+  "acquisitionTileMetres": 1500,
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "attribution": "© OpenStreetMap contributors, ODbL 1.0",
+  "reference": {"latitude": 52.21829, "longitude": 0.14688},
+  "note": "Discovery bounds locate the administrative relation; they do not define the city extent. Boundary geometry must be acquired before coverage is known."
+}

@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SlayDrive city data index v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "city",
+    "version",
+    "accepted",
+    "projection",
+    "tileSize",
+    "tiles",
+    "files",
+    "boundary",
+    "sources",
+    "attribution"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "city": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "accepted": {
+      "type": "boolean"
+    },
+    "projection": {
+      "type": "object",
+      "required": [
+        "kind",
+        "origin",
+        "kx",
+        "kz",
+        "units",
+        "axes",
+        "geographicCRS"
+      ],
+      "properties": {
+        "kind": {
+          "const": "local-equirectangular"
+        },
+        "origin": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "kx": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "kz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "units": {
+          "const": "metres"
+        },
+        "geographicCRS": {
+          "const": "EPSG:4326"
+        }
+      }
+    },
+    "tileSize": {
+      "type": "number",
+      "minimum": 100,
+      "maximum": 5000
+    },
+    "tiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "bounds",
+          "status",
+          "path"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^-?[0-9]+_-?[0-9]+$"
+          },
+          "bounds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "status": {
+            "enum": [
+              "populated",
+              "empty",
+              "missing",
+              "failed"
+            ]
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "sha256",
+          "bytes"
+        ],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150000000
+          }
+        }
+      }
+    }
+  }
+}
