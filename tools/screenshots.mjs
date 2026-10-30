@@ -58,7 +58,7 @@ try {
   if (want('lobby')) { await settle(page); await capture(page, 'lobby', 'The lobby: learner, level and the selected drive.'); }
   if (want('course')) {
     await page.locator('[data-open=courseSheet]').first().click(); await page.waitForTimeout(250);
-    await capture(page, 'course-menu', 'The course: seven units of lessons, with what you have passed.');
+    await capture(page, 'course-menu', 'Courses: practical and theory units followed by road challenge lessons; existing progress is retained.');
     await page.locator('#courseSheet [data-close]').click();
   }
   if (want('garage')) {

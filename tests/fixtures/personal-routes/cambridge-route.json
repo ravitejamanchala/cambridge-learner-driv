@@ -1,0 +1,71 @@
+{
+  "start": [
+    0.1216173,
+    52.2030808
+  ],
+  "end": [
+    0.1206964,
+    52.2036931
+  ],
+  "routes": [
+    {
+      "id": "route-0",
+      "distance": 95,
+      "duration": 11,
+      "coordinates": [
+        [
+          0.1216173,
+          52.2030808
+        ],
+        [
+          0.1216225,
+          52.2031301
+        ],
+        [
+          0.1215909,
+          52.2031787
+        ],
+        [
+          0.1215258,
+          52.203216
+        ],
+        [
+          0.1210145,
+          52.2034789
+        ],
+        [
+          0.1209874,
+          52.2034928
+        ],
+        [
+          0.1208295,
+          52.2035854
+        ],
+        [
+          0.1206964,
+          52.2036931
+        ]
+      ]
+    }
+  ],
+  "waypoints": [
+    {
+      "location": [
+        0.1216173,
+        52.2030808
+      ],
+      "distance": 0
+    },
+    {
+      "location": [
+        0.1206964,
+        52.2036931
+      ],
+      "distance": 0
+    }
+  ],
+  "attribution": "© OpenStreetMap contributors",
+  "provider": "SlayDrive OSM road-graph router",
+  "dataTimestamp": "2026-10-21T21:36:58Z",
+  "warning": "OSM access and turn data can be incomplete. Review the route before use. Conditional access roads are excluded; conditional turn restrictions apply conservatively. Travel times are estimates without traffic."
+}

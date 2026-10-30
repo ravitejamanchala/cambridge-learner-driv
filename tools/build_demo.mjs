@@ -2,13 +2,18 @@ import {billingPreviewConfig} from './preview-config.mjs';
 // Demo build: one minified script with no comments, cleaned data headers. Source stays readable in the project.
 import { execFileSync } from 'node:child_process';
 import { VISIBLE_LESSONS as LESSONS } from '../js/course-menu.js';
+import {PUZZLES} from '../js/puzzles.js';
 import fs from 'fs'; import path from 'path'; import { build } from 'esbuild';
 const SRC = process.argv[2], OUT = process.argv[3];
 const billingPreview=process.argv.includes('--billing-preview');
 if(['--preview','--billing-preview','--pages-preview'].filter(f=>process.argv.includes(f)).length>1)throw Error('Choose one preview mode');
 const billingConfig=billingPreview?billingPreviewConfig(process.env):null;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(path.join(OUT, 'data/areas'), { recursive: true }); fs.mkdirSync(path.join(OUT, 'models'), { recursive: true });
-await build({ entryPoints: [path.join(SRC, 'js/main.js')], bundle: true, minify: true, format: 'esm', legalComments: 'none', target: 'es2019', outfile: path.join(OUT, 'app.js') });
+await build({ entryPoints: {app:path.join(SRC, 'js/main.js')}, bundle: true, minify: true, format: 'esm', legalComments: 'none', target: 'es2019', splitting:true, entryNames:'[name]', chunkNames:'chunks/[name]-[hash]', outdir:OUT });
+await build({entryPoints:[path.join(SRC,'js/personal/generator-worker.js')],bundle:true,minify:true,format:'esm',target:'es2022',outfile:path.join(OUT,'personal-worker.js')});
+await build({entryPoints:[path.join(SRC,'server/map/pages-worker.js')],bundle:true,minify:true,format:'esm',target:'es2022',outfile:path.join(OUT,'_worker.js')});
+fs.writeFileSync(path.join(OUT,'_routes.json'),JSON.stringify({version:1,include:['/map-api/*'],exclude:[]}));
+for(const file of ['js/vendor/leaflet.css','js/personal/routes.css','js/responsive-panels.css']){fs.mkdirSync(path.dirname(path.join(OUT,file)),{recursive:true});fs.copyFileSync(path.join(SRC,file),path.join(OUT,file));}
 let sourceCommit = null, sourceDirty = null;
 try {
   sourceCommit = execFileSync('git', ['-C', SRC, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -33,7 +38,7 @@ for (const f of fs.readdirSync(path.join(SRC, 'models'))) if(fs.statSync(path.jo
 console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
-fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length }));
+fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length+PUZZLES.length }));
 
 // The Pages JSON sandbox (--pages-preview) authors routes in the browser with no account service; a
 // pull-request preview (--preview) runs as a guest with the whole course open; production copies the

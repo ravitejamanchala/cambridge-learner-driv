@@ -1,4 +1,4 @@
-// Game-style lobby: learner chip with level/XP, course (icon tiles), puzzles (tiers and stars), mock tests,
+// Game-style lobby: learner chip with level/XP, course (including road challenge lessons), mock tests,
 // Highway Code and learner sheets, the course "pass" card, the selected-drive card and START.
 import { LESSONS } from './course.js';
 import { VISIBLE_LESSONS, VISIBLE_UNITS as UNITS } from './course-menu.js';
@@ -14,6 +14,7 @@ import { ICONS, LESSON_ICON, STAR } from './icons.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const COURSE_TOTAL=VISIBLE_LESSONS.length+PUZZLES.length;
 const miles = m => (m / 1609.34).toFixed(1);
 // how the next drive will be marked, chosen where it starts: Easy, Medium or Hard, one to three stars
 const modePicker = (mock) => { const cur = getMode(), m = MODES[cur];
@@ -23,10 +24,11 @@ const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${[1, 2, 
 // XP: 40 per lesson passed, 15 per puzzle star, 100 per mock pass, 10 per mock attempt. 100 XP per level.
 function progress(p) {
   if (!p) return { done: 0, mockPass: 0, stars: 0, xp: 0, lv: 1, frac: 0 };
-  const done = VISIBLE_LESSONS.filter(l => (p.lessons[l.id] || {}).passed).length;
+  const baseDone=VISIBLE_LESSONS.filter(l=>(p.lessons[l.id]||{}).passed).length;
+  const done=baseDone+PUZZLES.filter(l=>(p.lessons[l.id]||{}).passed).length;
   const st = PUZZLES.reduce((a, z) => a + starsFor(p.lessons[z.id]), 0);
   const mockPass = p.mocks.filter(m => m.pass).length;
-  const xp = done * 40 + st * 15 + mockPass * 100 + p.mocks.length * 10;
+  const xp = baseDone * 40 + st * 15 + mockPass * 100 + p.mocks.length * 10;
   return { done, mockPass, stars: st, xp, lv: 1 + Math.floor(xp / 100), frac: (xp % 100) / 100 };
 }
 
@@ -48,11 +50,16 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
   const pick = () => { render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); };
 
   // ---------- sheets ----------
-  const SHEET_KIND = { courseSheet: 'lesson', puzzleSheet: 'puzzle', mockSheet: 'mock', freeSheet: 'free' };
+  const SHEET_KIND = { courseSheet: 'lesson', mockSheet: 'mock', freeSheet: 'free' };
   let afterProfile = null;
-  const protectedSheets = new Set(['mockSheet','puzzleSheet','freeSheet']);
-  const SIGN_IN_NOTICE='Sign in to start. Lessons, puzzles and mock tests need an account, and your progress is saved to it.';
-  const SUBSCRIBE_NOTICE='Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course, mock tests and puzzles. Renews monthly until cancelled.';
+  const protectedSheets = new Set(['mockSheet','freeSheet']);
+  for(const id of ['courseSheet','mockSheet','freeSheet']){
+    const card=$(id).querySelector('.card'),back=document.createElement('button');card.dataset.mobileView='list';back.className='sheet-back';back.type='button';back.textContent='‹ Back';back.setAttribute('aria-label','Back to '+({courseSheet:'lessons',mockSheet:'mock routes',freeSheet:'free drives'}[id]));
+    back.onclick=()=>{card.dataset.mobileView='list';const body=card.querySelector('.body');body.scrollTop=card._listScroll||0;card.querySelector('.list [aria-checked=true]')?.focus({preventScroll:true});};card.querySelector('header').prepend(back);
+  }
+  function mobileDetail(id){if(!matchMedia('(max-width:700px)').matches)return;const card=$(id).querySelector('.card'),body=card.querySelector('.body');card._listScroll=body.scrollTop;card.dataset.mobileView='detail';body.scrollTop=0;const title=card.querySelector('.detail h3');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}}
+  const SIGN_IN_NOTICE='Sign in to start. Lessons and mock tests need an account, and your progress is saved to it.';
+  const SUBSCRIBE_NOTICE='Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course and mock tests. Renews monthly until cancelled.';
   function requestAccess() {
     const notice=$('accessNotice'); if(notice){notice.hidden=false;notice.textContent=needsLogin()?SIGN_IN_NOTICE:SUBSCRIBE_NOTICE;}
     openSheet('profileSheet');
@@ -61,12 +68,12 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
   function renderAccess() {
     const login=needsLogin(), allowed=!login&&hasFullAccess();
     const why=login?'Sign in to start':'Subscribe for £4.99/month to unlock';
-    document.querySelectorAll('[data-open=mockSheet],[data-open=puzzleSheet],[data-open=freeSheet]').forEach(b=>{b.setAttribute('aria-disabled',String(!allowed));b.classList.toggle('access-locked',!allowed);b.title=allowed?'':login?why:'Sign in with an account that has full access';});
+    document.querySelectorAll('[data-open=mockSheet],[data-open=freeSheet]').forEach(b=>{b.setAttribute('aria-disabled',String(!allowed));b.classList.toggle('access-locked',!allowed);b.title=allowed?'':login?why:'Sign in with an account that has full access';});
     for(const id of ['eventCard','playBtn']){const b=$(id),ok=canAccessPlan(plan());b.setAttribute('aria-disabled',String(!ok));b.classList.toggle('access-locked',!ok);b.title=ok?'':why;}
     const notice=$('accessNotice');if(notice){notice.hidden=allowed;notice.textContent=login?SIGN_IN_NOTICE:SUBSCRIBE_NOTICE;}
   }
   const modal = s => s.id === 'pauseSheet' || s.id === 'resultSheet';
-  function openSheet(id) { if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
+  function openSheet(id) { if(id==='puzzleSheet')id='courseSheet'; if(protectedSheets.has(id)&&!hasFullAccess()){requestAccess();return;} closeSheets(); const s = $(id); if (!s) return; const card=s.querySelector('.card');if(card?.dataset.mobileView)card.dataset.mobileView='list';s.hidden = false; render(); const f = s.querySelector('[aria-checked="true"]') || (matchMedia('(pointer:coarse)').matches ? null : s.querySelector('input[type=text]')) || s.querySelector('.x'); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} }
   function closeSheets() { document.querySelectorAll('.sheet').forEach(s => { if (!modal(s)) s.hidden = true; }); }
   const anyOpen = () => [...document.querySelectorAll('.sheet')].some(s => !s.hidden && !modal(s));
   document.addEventListener('click', e => {
@@ -75,11 +82,11 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
     const c = e.target.closest('[data-close]'); if (c) { const s = c.closest('.sheet'); if (s) s.hidden = true; return; }
     if (e.target.classList && e.target.classList.contains('sheet') && !modal(e.target)) e.target.hidden = true; // tap the dim backdrop
     // a Start button starts what its own sheet shows, whatever was chosen before the sheet opened
-    const go = e.target.closest('[data-start]'); if (go) { const k = SHEET_KIND[go.closest('.sheet')?.id]; if (k && k !== st.kind) { st.kind = k; st.scenarioId = null; } play(); }
+    const go = e.target.closest('[data-start]'); if (go) { const k = go.dataset.planKind||SHEET_KIND[go.closest('.sheet')?.id]; if (k && k !== st.kind) { st.kind = k; st.scenarioId = null; } play(); }
   });
   $('whoBtn').addEventListener('click', () => openSheet('profileSheet'));
   $('setBtn').addEventListener('click', () => openSheet('settingsSheet'));
-  $('eventCard').addEventListener('click', () => openSheet({ lesson: 'courseSheet', puzzle: 'puzzleSheet', mock: 'mockSheet' }[st.kind]));
+  $('eventCard').addEventListener('click', () => openSheet({ lesson: 'courseSheet', puzzle: 'courseSheet', mock: 'mockSheet' }[st.kind]));
 
   // ---------- learners ----------
   function renderProfiles() {
@@ -87,13 +94,14 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
     const list = Profiles.list(), cur = Profiles.current();
     $('profList').innerHTML = list.length ? list.map(p => {
       const g = progress(p), me = !!cur && cur.id === p.id;
-      return `<button class="item" role="radio" aria-checked="${me}" data-id="${p.id}"><span class="no">${esc(p.name[0].toUpperCase())}</span><span><span class="nm">${esc(p.name)}</span><span class="sub">Level ${g.lv} · ${g.done}/${VISIBLE_LESSONS.length} lessons · ${g.stars} stars</span></span><span class="tag ${me ? 'ok' : 'new'}">${me ? 'Playing' : 'Switch'}</span></button>`;
+      return `<button class="item" role="radio" aria-checked="${me}" data-id="${p.id}"><span class="no">${esc(p.name[0].toUpperCase())}</span><span><span class="nm">${esc(p.name)}</span><span class="sub">Level ${g.lv} · ${g.done}/${COURSE_TOTAL} lessons · ${g.stars} stars</span></span><span class="tag ${me ? 'ok' : 'new'}">${me ? 'Playing' : 'Switch'}</span></button>`;
     }).join('') : '<p class="muted" style="margin:0">No learners yet. Add your name to start.</p>';
   }
   const chosen = () => { st.scenarioId = null; st.kind = 'lesson'; st.lesson = firstOpen(); pick(); $('profileSheet').hidden = true; if (afterProfile) { const f = afterProfile; afterProfile = null; f(); } };
   $('profList').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (!b) return; Profiles.select(b.dataset.id); chosen(); });
   $('profForm').addEventListener('submit', e => { e.preventDefault(); const p = Profiles.create($('profName').value); if (!p) { $('profName').focus(); return; } $('profName').value = ''; chosen(); });
 
+  function addReadButton(){const b=document.createElement('button');b.className='cbtn alt';b.dataset.readLesson='';b.textContent='Read lesson aloud';b.disabled=!('speechSynthesis' in window);$('lessonDetail').append(b);}
   // ---------- course: icon tiles grouped by unit ----------
   function renderCourse() {
     let n = 0;
@@ -104,35 +112,41 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       return `<button class="tile ${cls}" role="radio" aria-checked="${st.kind === 'lesson' && st.lesson === l.id}" data-l="${l.id}" aria-label="${n}. ${esc(l.title)}, ${txt}">
         <span class="ic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><span class="no">${n}</span>${cls === 'ok' ? `<span class="tick">${stars(starsOf(Profiles.lesson(l.id)))}</span>` : ''}<span class="tt">${esc(l.title)}${needsLogin()?'':isFreeLesson(l.id)?' · Free':!hasFullAccess()?' · Plus':''}</span></button>`;
     }).join('') + '</div>').join('');
+    $('lessonList').insertAdjacentHTML('beforeend',roadLessonTiles());
+    if(st.kind==='puzzle'){$('lessonDetail').innerHTML=roadLessonDetail();addReadButton();return;}
     const l = LESSONS.find(x => x.id === st.lesson), m = meta('lesson:' + l.id), L = Profiles.lesson(l.id), [txt, cls] = status(l.id), qz = !!l.questions;
     $('lessonDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[LESSON_ICON[l.id]] || ICONS.car}</span><div><h3>${esc(l.title)}</h3><span class="tag ${cls}">${txt}</span></div></div><p>${esc(l.goal)}</p><p class="muted">${esc(l.difficulty)}${l.prerequisites.length ? ' · Prerequisites: ' + l.prerequisites.map(id => esc(LESSONS.find(x => x.id === id).title)).join(', ') : ''}</p><ul>${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(l.rule.n)}</b><span>${esc(l.rule.t)}</span></div>
       <p class="muted">${qz ? `${l.questions.length} questions · pass mark ${Math.round(l.pass * 100)}%${L && L.passed ? ` · best ${l.questions.length - L.bestD}/${l.questions.length}` : ''}. Unofficial practice, not the DVSA theory test.`
         : `${esc(l.road)} · ${miles(m.len)} mi${L && L.passed && L.bestD !== null ? ` · best ${L.bestD} faults` : ''}`}</p>
-      ${qz ? '' : modePicker(false)}<div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;
+      ${qz ? '' : modePicker(false)}<div class="btns">${qz || scenariosFor(l).length < 2 ? '' : `<label class="scenario-field">Practice scenario <select id="scenarioChoice">${scenariosFor(l).map(v => `<option value="${v.id}" ${st.scenarioId === v.id ? 'selected' : ''}>${esc(v.title)}</option>`).join('')}</select></label>`}<button class="cbtn go" data-start ${availability(l, Profiles.current()).available ? '' : 'disabled'}>${needsLogin()?'Sign in to start':!hasFullAccess()&&!isFreeLesson(l.id)?'Subscribe · £4.99/month':qz ? 'Start quiz' : 'Start lesson'}</button></div>`;addReadButton();
   }
-  $('lessonList').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick(); });
+  $('lessonList').addEventListener('click', e => { const z=e.target.closest('[data-z]');if(z){st.kind='puzzle';st.puzzle=z.dataset.z;st.scenarioId=null;pick();mobileDetail('courseSheet');return;} const b = e.target.closest('[data-l]'); if (!b) return; st.kind = 'lesson'; st.lesson = b.dataset.l; st.scenarioId = null; pick();mobileDetail('courseSheet'); });
 
+  const readLesson=()=>{const l=st.kind==='puzzle'?PUZZLES.find(z=>z.id===st.puzzle):LESSONS.find(l=>l.id===st.lesson);if(l)document.dispatchEvent(new CustomEvent('learner-read-lesson',{detail:l.title+'. '+l.goal+'. '+l.steps.join('. ')}));};
+  $('lessonList').addEventListener('click',e=>{if(e.target.closest('[data-l],[data-z]'))readLesson();});
+  $('lessonDetail').addEventListener('click',e=>{if(e.target.closest('[data-read-lesson]'))readLesson();});
   $('lessonDetail').addEventListener('change', e => { if (e.target.id === 'scenarioChoice') { st.scenarioId = e.target.value; pick(); } });
 
-  // ---------- puzzles: tiers, stars, unlocking ----------
-  function renderPuzzles() {
-    $('puzzleList').innerHTML = TIERS.map((t, ti) => {
+  // Existing puzzle IDs/assessment stay stable; their UI is part of Courses.
+  function roadLessonTiles() {
+    return TIERS.map((t, ti) => {
       const open = tierOpen(ti), list = PUZZLES.filter(z => z.tier === t.id);
-      return `<div class="unit-h tier"><i style="background:${t.colour}"></i>${esc(t.title)}${open ? '' : ` <span class="lk">· pass a ${esc(TIERS[ti - 1].title)} puzzle to unlock</span>`}</div><div class="tiles">` + list.map(z => {
+      return `<div class="unit-h tier"><i style="background:${t.colour}"></i>Unit ${UNITS.length+ti+1} · ${esc(t.title)}${open ? '' : ` <span class="lk">· pass a ${esc(TIERS[ti - 1].title)} lesson to unlock</span>`}</div><div class="tiles">` + list.map(z => {
         const s = starsFor(Profiles.lesson(z.id));
         return `<button class="tile pz ${open ? '' : 'locked'}" role="radio" aria-checked="${st.kind === 'puzzle' && st.puzzle === z.id}" data-z="${z.id}" style="--tier:${t.colour}" aria-label="${esc(z.title)}, ${t.title}${open ? `, ${s} stars` : ', locked'}">
           <span class="ic">${open ? ICONS[z.icon] : ICONS.lock}</span><span class="tt">${esc(z.title)}</span>${open ? stars(s) : ''}</button>`;
       }).join('') + '</div>';
     }).join('');
+  }
+  function roadLessonDetail() {
     const z = PUZZLES.find(x => x.id === st.puzzle), t = TIERS.find(x => x.id === z.tier), m = meta('puzzle:' + z.id), open = puzzleOpen(z), L = Profiles.lesson(z.id);
-    $('puzzleDetail').innerHTML = `<div class="dh"><span class="dic">${ICONS[z.icon]}</span><div><h3>${esc(z.title)}</h3><span class="tag" style="background:${t.colour};color:#fff">${esc(t.title)}</span> ${stars(starsFor(L))}</div></div>
+    return `<div class="dh"><span class="dic">${ICONS[z.icon]}</span><div><h3>${esc(z.title)}</h3><span class="tag" style="background:${t.colour};color:#fff">${esc(t.title)}</span> ${stars(starsFor(L))}</div></div>
       <p>${esc(z.goal)}</p><ul>${z.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <div class="rule"><b>${esc(z.rule.n)}</b><span>${esc(z.rule.t)}</span></div>
       <p class="muted">${esc(z.road)} · ${miles(m.len)} mi · not giving way or going through a red fails it; ${t.maxD ? `otherwise up to ${t.maxD} driving fault${t.maxD > 1 ? 's' : ''} allowed` : 'no other faults allowed'}. Stars by marking: Easy 1, Medium 2, Hard 3.</p>
-      ${open ? modePicker(false) : ''}<div class="btns">${open ? '<button class="cbtn go" data-start>Start puzzle</button>' : `<p class="muted" style="margin:0">Locked. Solve any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} puzzle first.</p>`}</div>`;
+      ${open ? modePicker(false) : ''}<div class="btns">${open ? '<button class="cbtn go" data-start data-plan-kind="puzzle">'+(needsLogin()?'Sign in to start':!hasFullAccess()?'Subscribe · £4.99/month':'Start lesson')+'</button>' : `<p class="muted" style="margin:0">Locked. Pass any ${esc(TIERS[TIERS.indexOf(t) - 1].title)} lesson first.</p>`}</div>`;
   }
-  $('puzzleList').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (!b) return; st.kind = 'puzzle'; st.puzzle = b.dataset.z; pick(); });
 
   // ---------- mock ----------
   function renderMock() {
@@ -148,7 +162,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       ${!experimental && s ? `<p class="muted">Last try: ${s.last.pass ? 'pass' : 'fail'}, ${s.last.D} driving and ${s.last.S} serious faults.</p>` : ''}
       ${experimental ? '' : modePicker(true)}<div class="btns"><button class="cbtn go" data-start>${experimental ? 'Start practice' : 'Start mock test'}</button></div>`;
   }
-  $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick(); });
+  $('routePick').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.kind = 'mock'; st.route = +b.dataset.i; pick();mobileDetail('mockSheet'); });
 
   // ---------- free drive ----------
   // Ungraded practice: the sheet says so plainly, so nobody expects a mark or a record from it.
@@ -160,7 +174,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       <p class="muted">Pause and choose End drive whenever you like.</p>
       <div class="btns"><button class="cbtn go" data-start>Start free drive</button></div>`;
   }
-  $('freePick').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.kind = 'free'; st.free = b.dataset.f; pick(); });
+  $('freePick').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.kind = 'free'; st.free = b.dataset.f; pick();mobileDetail('freeSheet'); });
 
   // ---------- Highway Code ----------
   const rules = []; { const seen = new Set(); for (const l of LESSONS.concat(PUZZLES)) if (!seen.has(l.rule.n + l.rule.t)) { seen.add(l.rule.n + l.rule.t); rules.push(l); } }
@@ -173,20 +187,21 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
     $('whoName').textContent = p ? p.name : 'Tap to add learner';
     $('whoAv').textContent = p ? p.name[0].toUpperCase() : '?';
     $('whoLv').textContent = g.lv; $('whoXp').style.width = (g.frac * 100) + '%';
-    $('statLessons').textContent = `${g.done}/${VISIBLE_LESSONS.length}`; $('statStars').textContent = `${g.stars}/${PUZZLES.length * 3}`; $('statMocks').textContent = g.mockPass;
-    const nl = LESSONS.find(l => l.id === firstOpen()), ui = UNITS.findIndex(u => u.id === nl.unit);
-    $('passTitle').textContent = g.done === VISIBLE_LESSONS.length ? 'Course complete' : UNITS[ui].title;
+    $('statLessons').textContent = `${g.done}/${COURSE_TOTAL}`; $('statStars').textContent = `${g.stars}/${PUZZLES.length * 3}`; $('statMocks').textContent = g.mockPass;
+    const roadNext=hasFullAccess()&&VISIBLE_LESSONS.every(l=>Profiles.lesson(l.id)?.passed)?PUZZLES.find(z=>puzzleOpen(z)&&!Profiles.lesson(z.id)?.passed):null;
+    const nl = LESSONS.find(l => l.id === firstOpen()), ui = roadNext?UNITS.length+TIERS.findIndex(t=>t.id===roadNext.tier):UNITS.findIndex(u => u.id === nl.unit);
+    $('passTitle').textContent = g.done === COURSE_TOTAL ? 'Course complete' : roadNext?TIERS[ui-UNITS.length].title:UNITS[ui].title;
     const summary = Profiles.summary();
     $('practiceSummary').textContent = `${Math.round(summary.practiceSeconds / 60)} min practice · ${summary.attempts} recorded attempts`;
-    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc(LESSONS.find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious</li>`).join('') || '<li>No recent reports yet.</li>';
-    $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / VISIBLE_LESSONS.length * 100) + '%';
+    $('recentHistory').innerHTML = summary.history.slice(0, 5).map(r => `<li>${esc([...LESSONS,...PUZZLES].find(l => l.id === r.lessonId)?.title || r.lessonId || r.routeId)}: ${r.pass ? 'Passed' : 'Retry'} · ${esc(r.D)} driving / ${esc(r.S)} serious</li>`).join('') || '<li>No recent reports yet.</li>';
+    $('passUnit').textContent = ui + 1; $('passBar').style.width = (g.done / COURSE_TOTAL * 100) + '%';
     const pl = plan();
     if (pl.kind === 'lesson') {
       const l = pl.lesson, [txt] = status(l.id);
       $('eventKind').textContent = (l.questions ? 'Quiz · ' : 'Lesson · ') + txt; $('eventTitle').textContent = l.title; $('eventSub').textContent = l.road; $('eventIco').innerHTML = ICONS[LESSON_ICON[l.id]] || ICONS.car;
     } else if (pl.kind === 'puzzle') {
       const z = pl.lesson, t = TIERS.find(x => x.id === z.tier);
-      $('eventKind').innerHTML = `Puzzle · ${esc(t.title)} ${stars(starsFor(Profiles.lesson(z.id)))}`; $('eventTitle').textContent = z.title; $('eventSub').textContent = z.road; $('eventIco').innerHTML = ICONS[z.icon];
+      $('eventKind').innerHTML = `Lesson · ${esc(t.title)} ${stars(starsFor(Profiles.lesson(z.id)))}`; $('eventTitle').textContent = z.title; $('eventSub').textContent = z.road; $('eventIco').innerHTML = ICONS[z.icon];
     } else if (pl.kind === 'free') {
       const d = pl.drive;
       $('eventKind').textContent = 'Free drive · ungraded'; $('eventTitle').textContent = d.title; $('eventSub').textContent = d.road;
@@ -197,7 +212,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       $('eventIco').innerHTML = '<svg viewBox="0 0 40 40"><rect x="8" y="7" width="24" height="28" rx="4" fill="#fff" stroke="#8a6ae3" stroke-width="2"/><rect x="14" y="4" width="12" height="7" rx="2.5" fill="#b49cf5" stroke="#8a6ae3" stroke-width="2"/><path d="M13 19l3 3 6-6M13 28h14" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     }
   }
-  function render() { renderAccess(); renderLobby(); renderProfiles(); renderCourse(); renderPuzzles(); renderMock(); renderFree(); }
+  function render() { renderAccess(); renderLobby(); renderProfiles(); renderCourse(); renderMock(); renderFree(); }
 
   function play() {
     if(!canAccessPlan(plan())){requestAccess();return;}
@@ -221,7 +236,7 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
       $('quizBody').innerHTML = `<h3 class="verdict ${pass ? 'pass' : 'fail'}">${pass ? 'Passed' : 'Not yet'}</h3>
         <div class="score"><div><b>${qz.right}/${n}</b><span>Correct</span></div><div><b>${Math.ceil(q.pass * n)}</b><span>Needed to pass</span></div></div>
         <p class="muted" style="margin:0">Unofficial practice questions written from The Highway Code and DVSA guidance. Not the DVSA theory test.</p>
-        <div class="btns">${nx ? `<button class="cbtn go" data-qnext="${nx.id}">Next: ${esc(nx.title)}</button>` : ''}<button class="cbtn alt" data-qagain>Try again</button><button class="cbtn lav" data-close>Back to lobby</button></div>`;
+        <div class="btns">${nx ? `<button class="cbtn go" data-qnext="${nx.id}" data-qkind="${nx.kind}">Next: ${esc(nx.title)}</button>` : ''}<button class="cbtn alt" data-qagain>Try again</button><button class="cbtn lav" data-close>Back to lobby</button></div>`;
       render(); return;
     }
     const it = q.questions[qz.i];
@@ -240,13 +255,13 @@ export function createHub({ meta, onPick, onStart, initialMockId = null }) {
     }
     if (e.target.closest('#qnextBtn')) { qz.i++; drawQuiz(); return; }
     if (e.target.closest('[data-qagain]')) { startQuiz(qz.quiz); return; }
-    const nb = e.target.closest('[data-qnext]'); if (nb) { st.kind = 'lesson'; st.lesson = nb.dataset.qnext; const pl = plan(); render(); if (isQuiz(pl)) startQuiz(pl.lesson); else { $('quizSheet').hidden = true; onStart(pl); } }
+    const nb = e.target.closest('[data-qnext]'); if (nb) { st.kind=nb.dataset.qkind||'lesson';if(st.kind==='puzzle')st.puzzle=nb.dataset.qnext;else st.lesson=nb.dataset.qnext;const pl=plan(); render(); if (isQuiz(pl)) startQuiz(pl.lesson); else { $('quizSheet').hidden = true; onStart(pl); } }
   });
 
   function open() { closeSheets(); render(); const pl = plan(); if (!isQuiz(pl)) onPick(pl); if (!Profiles.current()) openSheet('profileSheet'); }
   // what comes after this lesson or puzzle (null if none, or the next puzzle is still locked)
   function next(pl) {
-    if (pl.kind === 'lesson') { const l = recommendedLesson(VISIBLE_LESSONS, Profiles.current(), pl.lesson.id); return l ? { kind: 'lesson', id: l.id, title: l.title } : null; }
+    if (pl.kind === 'lesson') { const l = recommendedLesson(VISIBLE_LESSONS, Profiles.current(), pl.lesson.id); const z=hasFullAccess()?PUZZLES.find(z=>puzzleOpen(z)&&!Profiles.lesson(z.id)?.passed):null;return l ? { kind: 'lesson', id: l.id, title: l.title } : z?{kind:'puzzle',id:z.id,title:z.title}:null; }
     if (pl.kind === 'puzzle') { const i = PUZZLES.findIndex(z => z.id === pl.lesson.id), z = PUZZLES[i + 1]; return z && puzzleOpen(z) ? { kind: 'puzzle', id: z.id, title: z.title } : null; }
     return null;
   }

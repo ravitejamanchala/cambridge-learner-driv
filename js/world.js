@@ -31,7 +31,7 @@ function flatMat(c, order) { const m = new T.MeshLambertMaterial({ color: c, sid
 export function buildWorld(scene, net, traffic, options = {}) {
   const W = WORLD;
   if(options.authored)applyMappedRoadTags(net,options.osmWays);
-  const joined=!!options.authored&&!net.edges.some(e=>e.way.cls==='motorway');
+  const joined=!!options.authored;
   if(joined)fitRoadCorners(net,options.objects||[]);
   const blocked=objectBlocker(options.objects||[]),placements=[];
   scene.background = new T.Color(W.sky); scene.fog = new T.Fog(W.sky, W.fogNear, W.fogFar);
@@ -76,7 +76,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
         studLine(studs.red, e, w / 2 + 0.15, dec, e.len - acc);
         if (dec) studLine(studs.green, e, w / 2 + 0.15, 0, dec);
         if (acc) studLine(studs.green, e, w / 2 + 0.15, e.len - acc, e.len); }
-      ribbon(A.road, e, -(w / 2 + MW.hardStrip), w / 2 + (wy.hs || 0), 0.04);
+      if(!joined)ribbon(A.road, e, -(w / 2 + MW.hardStrip), w / 2 + (wy.hs || 0), 0.04);
       line(A.white, e, -w / 2, 0, e.len); // offside edge, by the central reservation
       const L = laneInfo(e, 1);
       for (let k = 1; k < L.n; k++) broken(A.white, e, L.outer - L.laneW * k, 4, e.len - 2, 2, 7, 0.075);
@@ -89,7 +89,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     }
     // slip road: one lane between solid edge lines, except where it runs alongside the carriageway
     const exit = slipOut(e.a), entry = slipIn(e.b);
-    ribbon(A.road, e, -(w / 2 + 0.6), w / 2 + 0.6, 0.041);
+    if(!joined)ribbon(A.road, e, -(w / 2 + 0.6), w / 2 + 0.6, 0.041);
     line(A.white, e, w / 2, exit ? MW.taper : 0, entry ? e.len - MW.taper : e.len);
     line(A.white, e, -w / 2, exit ? J.decel : 0, entry ? e.len - J.accel : e.len);
   }
@@ -198,8 +198,9 @@ export function buildWorld(scene, net, traffic, options = {}) {
   const updateStuds = (px, pz) => { studAt = { x: px, z: pz }; for (const m of studMeshes) m.visible = studsOn && Math.hypot(m.userData.x - px, m.userData.z - pz) < STUD_R; };
   if(joined){
     pm.color.setHex(0xa7a398);rm.color.setHex(0x343a3e);const kerbMat=flatMat(0x969792),paveMat=pm.clone();paveMat.depthWrite=true;kerbMat.depthWrite=true;rm.depthWrite=true;
-    for(const tile of joinedRoadSurfaces(net))for(const [kind,mat,y,order] of [['pave',paveMat,0,1],['kerb',kerbMat,0,1.5],['road',rm,.04,2]]){
-      if(!tile[kind].length)continue;const m=new T.Mesh(kind==='road'?surfaceGeometry(T,tile[kind]):raisedSurfaceGeometry(T,tile[kind],{bounds:tile.bounds,top:PAVEMENT_HEIGHT}),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;accFor(tile.x,tile.z).meshes.push(m);scene.add(m);
+    for(const tile of options.surfaceTiles||joinedRoadSurfaces(net,options.objects))for(const [kind,mat,y,order] of [['pave',paveMat,0,1],['kerb',kerbMat,0,1.5],['road',rm,.04,2]]){
+      if(!tile[kind].length)continue;
+      const A=accFor(tile.x,tile.z);(A.surfaces||=[]).push({tile,kind,mat,y,order});
     }
   }
   for (const [key, A] of roadChunks) {
@@ -208,6 +209,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     }
     A.bounds = new T.Box3();
     for(const m of A.meshes){m.geometry.computeBoundingBox();A.bounds.union(m.geometry.boundingBox);}
+    for(const {tile}of A.surfaces||[])for(const [x,z]of [[tile.bounds[0],tile.bounds[1]],[tile.bounds[2],tile.bounds[3]]])A.bounds.expandByPoint(new T.Vector3(x,0,z));
     A.cx = Math.floor(key / 8192) - 4000; A.cz = (key % 8192) - 4000; A.pave = A.road = A.cyc = A.white = null;
   }
   // bike symbols painted in cycle lanes
@@ -386,6 +388,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     }
     for (const A of roadChunks.values()) {
       const radius=Math.max(WORLD.hideRadius+200,viewRadius),vis = roadBoundsVisible(A.bounds, px, pz, radius), far = !roadBoundsVisible(A.bounds, px, pz, Math.max(WORLD.freeRadius,radius+200));
+      if(vis&&A.surfaces){for(const {tile,kind,mat,y,order}of A.surfaces){const m=new T.Mesh(kind==='road'?surfaceGeometry(T,tile[kind]):raisedSurfaceGeometry(T,tile[kind],{bounds:tile.bounds}),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;A.meshes.push(m);scene.add(m);m.updateMatrixWorld(true);m.matrixAutoUpdate=false;}A.surfaces=null;}
       for (const m of A.meshes) m.visible = vis;
       // The road itself is built once for the whole map, but a hidden mesh keeps its GPU buffers from
       // the last time it was drawn, so a lap of the motorway left every section it had passed on the
@@ -409,7 +412,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   function setShadows(on) { sun.castShadow = !!on; }
   // roadside parallel parking draws its markings, parked cars and guide over the ordinary world
   const roadside = createRoadsideParkingView(scene);
-  return { placements, updateChunks, updateSignals, updateSun, setShadows, setTimeOfDay, lighting, studs: studMeshes, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
+  return { joinedPavements:joined, placements, updateChunks, updateSignals, updateSun, setShadows, setTimeOfDay, lighting, studs: studMeshes, chunkCount: () => chunks.size, pending: () => queue.length, ...roadside };
 }
 
 // a word of road text, white on clear, drawn tall and narrow: laid flat and seen from a driver's eye it

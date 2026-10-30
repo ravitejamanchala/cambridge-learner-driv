@@ -6,7 +6,7 @@ export async function installAuthFixture(page, { full = true, host = 'clerk.fixt
   // The suites check the standard every drive was marked on before marking modes existed: Hard. A suite
   // that wants another mode chooses it in the interface, as a learner would.
   await page.addInitScript(() => { try { if (!localStorage.getItem('cambridge-learner-drive.mode')) localStorage.setItem('cambridge-learner-drive.mode', 'hard'); } catch (_) {} });
-  await page.route('**/auth-config.js', r => r.fulfill({ contentType: 'text/javascript',
+  await page.route('**/auth-config.js*', r => r.fulfill({ contentType: 'text/javascript',
     body: `window.LEARNER_CONFIG={CLERK_PUBLISHABLE_KEY:'pk_test_'+btoa('${host}$'),API_BASE_URL:'${api}'};` }));
   await page.route(`https://${host}/**`, r => r.fulfill({ contentType: 'text/javascript',
     body: `window.Clerk={user:{id:'fixture',firstName:'Test'},session:{getToken:async()=>'fixture'},load:async()=>{},addListener(){},mountUserButton(){},unmountUserButton(){},openSignIn(){},signOut(){}};` }));

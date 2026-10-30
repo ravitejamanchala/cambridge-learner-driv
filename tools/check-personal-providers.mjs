@@ -1,0 +1,14 @@
+import fs from 'node:fs';import {generateRoute} from '../js/personal/section.js';import {measure,section} from '../js/personal/geometry.js';
+const base=process.env.PREVIEW_URL;if(!base)throw Error('Set PREVIEW_URL to the isolated preview.');
+const result={source:'live providers through the deployed Pages map proxy',at:new Date().toISOString(),checks:[]};
+async function request(path,body){for(let i=0;i<3;i++){const r=await fetch(new URL('map-api/'+path,base),{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(45000)});if(r.status===429&&i<2){await new Promise(resolve=>setTimeout(resolve,Math.min(30000,Math.max(1000,(Number(r.headers.get('Retry-After'))||6)*1000))));continue;}const data=await r.json();if(!r.ok)throw Error(path+': HTTP '+r.status+' '+data.message);return data;}}
+try{
+ const places=await request('search?q=Cambridge%2C%20UK');if(!Array.isArray(places)||!places.some(p=>String(p.display_name).includes('Cambridge')))throw Error('Cambridge search failed');result.checks.push('Cambridge search');
+ const routed=await request('route',{start:[.13327,52.20420],end:[.13089,52.20197]}),coords=routed.routes?.[0]?.geometry?.coordinates,route=measure(coords);result.checks.push('OSRM connected driving route');
+ const elements=new Map(),bounds=[Infinity,Infinity,-Infinity,-Infinity];const count=Math.ceil(route.length/600);
+ for(let i=0;i<count;i++){const part=section(route,i);const osm=await request('osm',{bounds:part.bounds});if(osm.remark)throw Error(osm.remark);for(const e of osm.elements)elements.set(e.type+':'+e.id,e);bounds[0]=Math.min(bounds[0],part.bounds[0]);bounds[1]=Math.min(bounds[1],part.bounds[1]);bounds[2]=Math.max(bounds[2],part.bounds[2]);bounds[3]=Math.max(bounds[3],part.bounds[3]);if(i<count-1)await new Promise(r=>setTimeout(r,5500));}
+ const track=generateRoute({elements:[...elements.values()]},{bounds,coordinates:coords,sourceSections:count});result.pins={start:[.13327,52.20420],end:[.13089,52.20197]};result.snaps=routed.waypoints;result.sourceSections=count;result.renderTiles=track.surfaceTiles.length;result.checks.push('Bounded OSM import, native road matching and scenery generation');result.roads=track.network.edges.length;result.buildings=track.objects.filter(o=>o.type==='building').length;result.distance=route.length;result.status='passed';
+ // The current FOSSGIS policy is a live review source, separate from fixture tests.
+ const policy=await fetch('https://routing.openstreetmap.de/about.html',{signal:AbortSignal.timeout(15000)});result.routingPolicy={url:policy.url,status:policy.status};
+}catch(error){result.status='failed';result.error=error.message;process.exitCode=1;}
+finally{fs.mkdirSync('test-results',{recursive:true});fs.writeFileSync('test-results/personal-providers-live.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));}

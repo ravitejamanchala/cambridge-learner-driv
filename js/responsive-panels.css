@@ -1,0 +1,58 @@
+/* One scroll surface per phone panel. Keep headings, close and back reachable. */
+.sheet{position:fixed;max-height:100dvh;overscroll-behavior:contain}
+.sheet .card{min-height:0;max-width:100%}
+.sheet .card>header{flex-shrink:0;min-width:0}
+.sheet .card header h2{min-width:0;overflow-wrap:anywhere;line-height:1.2}
+.sheet .card .x{flex:0 0 44px;width:44px;height:44px;min-height:44px}
+.sheet .card .body{overscroll-behavior:contain;scroll-padding:12px;min-width:0}
+.sheet .list>*{flex-shrink:0}
+.sheet .detail{min-width:0;overflow-wrap:anywhere}
+.sheet .set>span{min-width:0;overflow-wrap:anywhere}
+.sheet .btns .cbtn{white-space:normal;line-height:1.25;padding-block:10px}
+.sheet .item{grid-template-columns:auto minmax(0,1fr) auto}
+.sheet .item .nm,.sheet .item .sub{overflow-wrap:anywhere}
+.sheet-back{display:none}
+@media(max-width:700px){
+ .sheet{padding:calc(8px + var(--safe-t)) calc(10px + var(--safe-r)) calc(12px + var(--safe-b)) calc(10px + var(--safe-l))}
+ .sheet .card{border-radius:22px;max-height:100%;box-shadow:0 0 0 3px #fff,0 5px 0 3px var(--cream-edge),0 18px 40px -20px #18344588}
+ .sheet .card header{padding:10px 10px 10px 16px;gap:8px}
+ .sheet .card header h2{font-size:20px}
+ .sheet .card .body{padding:14px 16px 20px;font-size:14px}
+ .sheet .card .body.split{display:block;overflow:auto}
+ .sheet .card .body.split>*{max-height:none;overflow:visible;min-height:auto}
+ .sheet .card .body.split>.detail{margin:4px 2px 8px}
+ .sheet .card[data-mobile-view=list] .body.split>.detail{display:none}
+ .sheet .card[data-mobile-view=detail] .body.split>.list{display:none}
+ .sheet .card[data-mobile-view=detail] .sheet-back{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:64px;min-height:44px;flex-shrink:0;border:0;border-radius:12px;background:#ffffffa6;color:#073c37;font:600 13px var(--font-display)}
+ .sheet .card[data-mobile-view=detail] header h2{flex:1}
+ .sheet .detail .btns{position:static;margin:4px 0 0;padding:4px 0;background:transparent}
+ .sheet .btns>.cbtn{flex:1 1 120px;min-height:48px;max-width:100%;padding-inline:12px}
+ .sheet .set{flex-wrap:wrap;gap:10px;padding:14px}
+ .sheet .set>span{flex:1 1 100%}
+ .sheet .set>input[type=range]{width:100%;min-width:0;min-height:44px}
+ .sheet .set>.seg{display:flex;flex-wrap:wrap;border-radius:16px;width:100%;box-sizing:border-box}
+ .sheet .set>.seg button{flex:1 1 auto;min-width:44px;max-width:100%;min-height:44px;padding:10px 12px;line-height:1.25;white-space:normal}
+ .sheet .set>.cbtn{width:100%;min-height:44px}
+ .sheet .mode-pick .seg{width:100%;box-sizing:border-box;align-self:stretch}
+ .sheet .mode-pick .seg button{flex:1;min-width:0;padding:8px 6px}
+ .sheet .field input,.sheet input[type=text],.sheet input[type=search],.sheet select{font-size:16px;max-width:100%;min-width:0}
+ .sheet .keys{grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:12px 10px}
+ .sheet .keys dt{flex-wrap:wrap}.sheet .keys kbd{min-width:24px;padding-inline:5px}
+ .sheet .score{flex-wrap:wrap}.sheet .verdict{font-size:clamp(24px,7vw,34px);overflow-wrap:anywhere}
+ .sheet .card .body>.tiles{flex-shrink:0}.sheet #carPreview{flex-shrink:0;height:180px;min-height:180px}
+ .sheet .subscription-offer .cbtn{max-width:100%;height:auto;white-space:normal;line-height:1.3;padding-block:12px}
+}
+@media(max-height:500px) and (orientation:landscape){
+ .sheet{padding-top:calc(8px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
+ .sheet .card header{padding-block:6px}.sheet .card .body{padding-top:12px}
+ .sheet .cbtn,.sheet .seg button{min-height:44px}
+ .sheet #carPreview{height:130px;min-height:130px}
+ #lobby .col.r{display:grid;grid-template-columns:repeat(2,auto);top:68px;gap:8px}
+}
+@media(any-pointer:coarse){.sheet .cbtn,.sheet .seg button{min-height:44px}}
+@media(max-width:600px){
+ .sheet .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .sheet .tile{min-height:118px;padding:12px 9px}
+ .sheet .tile .tt{display:block;overflow:visible;line-height:1.3}
+ .sheet .rule{flex-wrap:wrap}
+}

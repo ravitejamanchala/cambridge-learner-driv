@@ -1,6 +1,7 @@
 import {objectRings} from './roadside-clearance.js';
 import {roadSpace} from './road-space.js';
 import {polygonOperation,solidSurface,roundedSurface,raisedSurfaceGeometry,PAVEMENT_HEIGHT} from './road-surfaces.js';
+export {isGroundPavement} from './road-surfaces.js';
 // Source objects keep their coordinates, IDs and editable transforms. This is
 // render geometry only; a crossing must never acquire a raised slab in the road.
 export function mappedPavementPolygons(net,o){
