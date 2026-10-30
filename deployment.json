@@ -1,0 +1,147 @@
+{
+  "revision": "4b5682f921b87c0baf5c58e7764a20a2211d67b6",
+  "result": "success",
+  "visual": "success",
+  "smoke": "success",
+  "billing": {
+    "status": "not-configured",
+    "missing": [
+      "PREVIEW_DATABASE_URL",
+      "PREVIEW_DATABASE_HOST",
+      "PREVIEW_CLERK_SECRET_KEY",
+      "PREVIEW_CLERK_PUBLISHABLE_KEY",
+      "PREVIEW_STRIPE_SECRET_KEY",
+      "PREVIEW_STRIPE_PRICE_ID"
+    ]
+  },
+  "url": "https://design-review.learner-drive-app.pages.dev/",
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/40998631896",
+  "recordedAt": "2026-10-30T03:43:08.870Z",
+  "mobilePanels": {
+    "passed": 48
+  },
+  "personalRoutes": {
+    "status": "passed",
+    "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
+    "searchRequests": 1,
+    "routeRequests": 1,
+    "osmRequests": 7,
+    "buildings": 50,
+    "performance": {
+      "chunks": 13,
+      "geometries": 105,
+      "textures": 12,
+      "calls": 123,
+      "triangles": 7700,
+      "programs": 14,
+      "heap": 38
+    },
+    "preparedWholeRoute": true,
+    "boundaryWithoutReload": true,
+    "offlineWhileDriving": true,
+    "preflightFailureRecovery": true,
+    "gradedMockPassAndFail": true,
+    "courseRoadLessons": 9,
+    "voiceMute": true
+  },
+  "interface": {
+    "source": "Chromium with fixture account; real controls and renderer",
+    "checks": [
+      "Course focus stays inside, selected lesson retains focus, Escape restores navigation",
+      "Selected free drive opens its own brief and has the correct Start action",
+      "Switching Settings → Garage → Close restores the original trigger",
+      "Keyboard car selection updates the real 3D showroom",
+      "Five viewport layouts, 44px navigation targets, mobile lesson list/detail/back and scroll",
+      "Route callout opens the existing builder and Close restores its trigger"
+    ],
+    "viewports": [
+      {
+        "width": 320,
+        "height": 568,
+        "navigation": "reachable",
+        "horizontalOverflow": false,
+        "primaryAction": "reachable"
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "navigation": "reachable",
+        "horizontalOverflow": false,
+        "primaryAction": "reachable"
+      },
+      {
+        "width": 844,
+        "height": 390,
+        "navigation": "reachable",
+        "horizontalOverflow": false,
+        "primaryAction": "reachable"
+      },
+      {
+        "width": 768,
+        "height": 1024,
+        "navigation": "reachable",
+        "horizontalOverflow": false,
+        "primaryAction": "reachable"
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "navigation": "reachable",
+        "horizontalOverflow": false,
+        "primaryAction": "reachable"
+      }
+    ],
+    "errors": [],
+    "status": "passed",
+    "videoStartMs": 1793331762871
+  },
+  "mapProviders": {
+    "source": "live providers through the deployed Pages map proxy",
+    "at": "2026-10-30T03:42:51.731Z",
+    "checks": [
+      "Cambridge search",
+      "OSRM connected driving route",
+      "Bounded OSM import, native road matching and scenery generation"
+    ],
+    "pins": {
+      "start": [
+        0.13327,
+        52.2042
+      ],
+      "end": [
+        0.13089,
+        52.20197
+      ]
+    },
+    "snaps": [
+      {
+        "hint": "UH4IgLSBCIAYAAAAOwAAAAAAAAAAAAAA3lWOQeUvJUIAAAAAAAAAABgAAAA7AAAAAAAAAAAAAADLKQEA_QgCAD2THAOWCAIAqJIcAwAADwcAAAAA",
+        "location": [
+          0.133373,
+          52.204349
+        ],
+        "name": "Broad Street",
+        "distance": 18.01157359
+      },
+      {
+        "hint": "fIsDgEN-CIAOAAAABgAAACoAAABGAAAA9Eh7QaKRyEDc-TRCLM7-QQ4AAAAGAAAAKgAAAEYAAADLKQEAhP4BAD2KHANK_wEA8okcAwIAPw0AAAAA",
+        "location": [
+          0.130692,
+          52.202045
+        ],
+        "name": "Gonville Place",
+        "distance": 15.89670482
+      }
+    ],
+    "sourceSections": 1,
+    "renderTiles": 4,
+    "roads": 227,
+    "buildings": 281,
+    "distance": 329.15286365728286,
+    "status": "passed",
+    "routingPolicy": {
+      "url": "https://routing.openstreetmap.de/about.html",
+      "status": 200
+    }
+  }
+}
