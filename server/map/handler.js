@@ -38,7 +38,9 @@ export async function handleMapRequest(request,env={},deps={}) {
     if(client&&cache){const rateKey=new Request(url.origin+'/map-api/rate/'+path+'/'+encodeURIComponent(client)),recent=await cache.match(rateKey);if(recent)return json({message:'Please wait a moment before generating another route.'},429,{'Retry-After':'5'});await cache.put(rateKey,new Response('1',{headers:{'Cache-Control':'max-age=5'}}));}
   }
   try{
-    const response=await fetcher(upstream,options);
+    let target=upstream;
+    if(path==='tile-details'){const provider=new URL(upstream),query=provider.searchParams.get('data');provider.search='';target=provider.href;options={...options,method:'POST',headers:{...options.headers,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({data:query}).toString()};}
+    const response=await fetcher(target,options);
     if(!response.ok)return json({message:response.status===429?'The map provider is busy. Please wait and retry.':response.status===400&&path==='route'?'The routing provider cannot connect these pins. Choose points on connected public roads.':'The map provider is unavailable. Please retry shortly.'},response.status===429?429:502,{'Retry-After':response.headers.get('Retry-After')||'6'});
     // Bound response size without buffering an unbounded provider response.
     const reader=response.body.getReader(),chunks=[];let size=0;

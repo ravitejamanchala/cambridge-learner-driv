@@ -68,7 +68,7 @@ test('supplementary markings query is bounded, fixed and rejects partial provide
  assert.match(tileDetailQuery(bounds),/nwr\[road_marking\]/);assert.match(tileDetailQuery(bounds),/amenity=parking_space/);
  assert.throws(()=>tileDetailQuery([52,0,52.012,.015]),/limited/);
  let calls=0;const req=()=>new Request('https://preview.pages.dev/map-api/tile-details',{method:'POST',headers:{Origin:'https://preview.pages.dev'},body:JSON.stringify({bounds})});
- const good=await handleMapRequest(req(),{},{fetch:async url=>{calls++;assert.ok(url.startsWith('https://overpass-api.de/api/interpreter?data='));return Response.json({elements:[]});}});assert.equal(good.status,200);assert.equal(calls,1);
+ const good=await handleMapRequest(req(),{},{fetch:async (url,options)=>{calls++;assert.equal(url,'https://overpass-api.de/api/interpreter');assert.equal(options.method,'POST');assert.match(new URLSearchParams(options.body).get('data'),/nwr\[road_marking\]/);return Response.json({elements:[]});}});assert.equal(good.status,200);assert.equal(calls,1);
  const partial=await handleMapRequest(req(),{},{fetch:async()=>Response.json({elements:[],remark:'timeout'})});assert.equal(partial.status,502);
  const limited=await handleMapRequest(req(),{},{fetch:async()=>new Response('',{status:429,headers:{'Retry-After':'20'}})});assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'20');
  const foreign=new Request('https://preview.pages.dev/map-api/tile-details',{method:'POST',headers:{Origin:'https://other.test'},body:JSON.stringify({bounds})});assert.equal((await handleMapRequest(foreign,{},{})).status,403);
