@@ -4,7 +4,7 @@ export function areaKind(t){return t.natural==='water'||t.waterway==='riverbank'
 export function pointKind(t){return t.natural==='tree'?'tree':t.highway==='street_lamp'?'lamp':t.highway==='bus_stop'?'busStop':t.barrier==='bollard'?'bollard':t.barrier==='gate'||t.barrier==='lift_gate'?'gate':({bench:'bench',waste_basket:'bin',post_box:'postBox',bicycle_parking:'bicycleParking'})[t.amenity]||null;}
 function join(parts){const out=[],left=parts.filter(p=>p?.length>1).map(p=>[...p]);while(left.length){const ring=left.shift();let again=true;while(ring[0]!==ring.at(-1)&&again){again=false;for(let i=0;i<left.length;i++){let p=left[i];if(p.at(-1)===ring.at(-1))p.reverse();if(p[0]===ring.at(-1)){ring.push(...p.slice(1));left.splice(i,1);again=true;break;}if(p[0]===ring[0])p.reverse();if(p.at(-1)===ring[0]){ring.unshift(...p.slice(0,-1));left.splice(i,1);again=true;break;}}}if(ring[0]===ring.at(-1))out.push(ring);}return out;}
 function contains(p,r){let hit=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])hit=!hit;}return hit;}
-export function addOSMDetails(track,data){
+export function addOSMDetails(track,data,{limits={}}={}){
   const nodes=new Map(data.elements.filter(e=>e.type==='node').map(e=>[e.id,e])),ways=new Map(data.elements.filter(e=>e.type==='way').map(e=>[e.id,e]));
   const project=node=>[(node.lon-track.network.origin[1])*track.network.kx,-(node.lat-track.network.origin[0])*track.network.kz];
   const line=ids=>ids?.every(id=>nodes.has(id))?ids.map(id=>project(nodes.get(id))):null;
@@ -28,7 +28,7 @@ export function addOSMDetails(track,data){
     const tags=node.tags||{},kind=pointKind(tags);
     if(kind)features.push({id:`node/${node.id}`,kind,point:project(node),height:metres(tags.height),measured:!!metres(tags.height),tags,name:tags.name});
   }
-  const result=sceneFeatures(track,features);
+  const result=sceneFeatures(track,features,{limits});
   result.osm.restrictions=data.elements.filter(e=>e.type==='relation'&&e.tags?.type==='restriction').map(e=>({osmId:e.id,tags:e.tags,members:e.members}));
   result.osm.controlPoints=[...nodes.values()].filter(e=>['crossing','stop','give_way','traffic_signals'].includes(e.tags?.highway)||e.tags?.traffic_sign).map(e=>({osmId:e.id,...Object.fromEntries(['lat','lon','tags'].map(k=>[k,e[k]]))}));
   return result;

@@ -1,6 +1,6 @@
 import {decode,measure,coordinate} from './geometry.js';
 export const ROUTES_KEY='slaydrive.personal-routes.v1', CACHE_KEY='slaydrive.personal-map-cache.v1';
-export const GENERATOR_VERSION=1;
+export const GENERATOR_VERSION=2;
 export function validateRecipe(r) {
   if(!r||r.version!==1||typeof r.id!=='string'||!/^[-a-z0-9]{1,70}$/.test(r.id)||typeof r.title!=='string'||!r.title.trim()||r.title.length>120||!Number.isFinite(r.createdAt)||!Number.isFinite(r.distance)||r.distance<10)throw Error('Invalid saved route.');
   coordinate(r.start);coordinate(r.end);measure(decode(r.geometry));return r;

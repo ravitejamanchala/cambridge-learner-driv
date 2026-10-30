@@ -1,9 +1,11 @@
+import {routeStore} from './personal/storage.js';
+import {createVoiceGuidance} from './voice.js';
 import {createCockpit} from './cockpit.js';
-import {locate as locatePersonal,project as projectPersonal,unproject as unprojectPersonal,SECTION_METRES} from './personal/geometry.js';
+import {locate as locatePersonal,unproject as unprojectPersonal,MOCK_MIN_METRES} from './personal/geometry.js';
 import {createObstacleIndex} from './obstacle-index.js';
 import {fitRoadCorners} from './roadside-clearance.js';
 import { loadLocalLibrary, mountLocalLibrary, preferredLocalRoute, notifyLocalRoute } from './local-library.js';
-import { addEditorObjects } from './local-world.js';
+import { addEditorObjects,createAuthoredTiles } from './local-world.js';
 import { obstacleContact } from './editor-collisions.js';
 import { canAccessPlan } from './access.js';
 import { initAuth } from './auth.js';
@@ -123,13 +125,14 @@ async function boot() {
       // paint continuous through those artificial cuts. Signals share cluster/group
       // identifiers with traffic, so both graphs display the same live phase.
       const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
-      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
-      if(d.network) addEditorObjects(T,scene,d,visualNet);
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],surfaceTiles:d.renderTiles?d.surfaceTiles:undefined,osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      const authoredTiles=d.renderTiles?createAuthoredTiles(T,scene,d,visualNet,{joinedPavements:world.joinedPavements}):null;
+      if(d.network&&!authoredTiles)addEditorObjects(T,scene,d,visualNet,{joinedPavements:world.joinedPavements});
       world.setShadows(shadowsOn && !lowPower);
       const test = createTest(net, traffic, player);
       test.onFault = () => ui.renderFaults(test); test.onFinish = onFinish;
       test.onReroute = (r) => { if (plan && plan.lesson && plan.lesson.callouts) addCallouts(r, plan.lesson.callouts); };
-      Object.assign(A, { id, net, traffic, world, test, obstacleIndex: d.objects?createObstacleIndex(d.objects):null, trafficInit: false });
+      Object.assign(A, { id, net, traffic, world, test, authoredTiles, obstacleIndex: d.objects?createObstacleIndex(d.objects):null, trafficInit: false });
       ui.setNet(net); disposeScene(old); farMode = -2;
       $('areaLoad').hidden = true;
     }).catch(err => { console.error(err); const el = $('areaLoad'); el.textContent = 'Map did not load. Reload to try again.'; el.hidden = false; throw err; });
@@ -220,7 +223,7 @@ async function boot() {
     route = buildRoute(A.net, nodes, { name: pl.kind==='personal'?pl.title:pl.kind === 'mock' ? ROUTES[pl.index].name : pl.kind === 'free' ? pl.drive.title : pl.lesson.title });
     if (pl.lesson && pl.lesson.callouts) addCallouts(route, pl.lesson.callouts);
     const test = A.test;
-    test.experimental = localTracks.get(A.id)?.practiceMode === 'experimental';
+    test.experimental = pl.kind==='personal'? !pl.graded : localTracks.get(A.id)?.practiceMode === 'experimental';
     test.running = false; test.done = false; test.setRoute(route, nodes); test.wpIndex = 1; test.reset();
     player.operation = pl.lesson?.manoeuvre ? createManoeuvreState()
       : pl.lesson?.vehicle?.transmission === 'automatic' ? createAutomaticState() : createVehicleState(!!pl.lesson?.operationControls); player.observations = []; player.lookAt = -1e9;
@@ -234,9 +237,9 @@ async function boot() {
     if (parkingLayout) { const start = parkingPlan(pl.lesson.parkingKind, parkingLayout).start; player.place(start.x,start.z,start.th); }
     A.world.setRoadsideParking?.(parkingLayout, i => trafficModels.length ? trafficModels[(i + 2) % trafficModels.length].clone(true) : null);
     test.ctx = nearest(A.net,player.x,player.z);
-    test.ungraded = pl.kind === 'free'||pl.kind==='personal'; test.onLap = null; test.onOffRoute = null;
+    test.ungraded = pl.kind === 'free'||(pl.kind==='personal'&&!pl.graded); test.onLap = null; test.onOffRoute = null;
     // time of day comes from the lesson (or the scenario's conditions, or the free drive); lighting only
-    test.marking = botMode ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
+    test.marking = botMode||pl.graded ? 'hard' : getMode(); // fixed for this drive: changing it afterwards changes nothing (js/assessment.js)
     test.timeOfDay = pl.scenarioDefinition?.conditions.visibility === 'dusk' || pl.lesson?.timeOfDay === 'dusk' || pl.drive?.timeOfDay === 'dusk' ? 'dusk' : 'day';
     applyTimeOfDay(test.timeOfDay); setHeadlights(false);
     if (pl.kind==='free') startFreeDrive(pl, test);
@@ -246,10 +249,10 @@ async function boot() {
     if (s0 > 10) { test.sRoute = s0 - 2; let i = 0; while (i < route.cum.length - 2 && route.cum[i + 1] < s0) i++; test.idx = i; }
     if (!A.trafficInit) { A.traffic.init(player.x, player.z, WORLD.npcColours); A.trafficInit = true; }
     if(botMode&&botSeed!==null)A.traffic.reset(player.x,player.z,botSeed);
-    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock' ? 15 : pl.kind === 'free'||pl.kind==='personal' ? 0 : (pl.lesson.maxD ?? 2));
+    ui.renderSteps(route, 0); ui.renderFaults(test, pl.kind === 'mock'||pl.graded ? 15 : pl.kind === 'free'||pl.kind==='personal' ? 0 : (pl.lesson.maxD ?? 2));
     $('backBtn').textContent = test.experimental ? 'Reset to spawn' : 'Back to last instruction';
-    $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : (pl.kind === 'puzzle' ? 'Puzzle' : 'Lesson') + ' · not started';
-    document.body.classList.toggle('free-drive', pl.kind === 'free'||pl.kind==='personal');document.body.classList.toggle('personal-drive',pl.kind==='personal'); $('quitBtn').textContent = pl.kind === 'free'||pl.kind==='personal' ? 'End drive' : 'Quit to lobby';
+    $('testState').textContent = test.experimental ? 'Experimental practice · ungraded' : pl.graded ? 'Custom mock · Hard' : pl.kind === 'mock' ? 'Not started' : pl.kind === 'free' ? 'Free drive' : 'Lesson' + ' · not started';
+    document.body.classList.toggle('free-drive', test.ungraded);document.body.classList.toggle('personal-drive',pl.kind==='personal'); $('quitBtn').textContent = pl.kind === 'free'||pl.kind==='personal' ? 'End drive' : 'Quit to lobby';
     A.world.updateChunks(player.x, player.z, 4);
   }
   let pickTok = 0;
@@ -270,58 +273,50 @@ async function boot() {
   }
   const hub = createHub({ meta, initialMockId: preferredLocalRoute(), onPick: (pl) => pickPlan(pl, false), onStart: (pl) => pickPlan(pl, true) });
   mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
-  let personalUI=null,personal=null,personalToken=0;
-  const personalLoad=$('personalLoadSheet');
-  function stopPersonal(){personalToken++;personal?.journey.cancel();personal=null;for(const key of localTracks.keys())if(key.startsWith('personal:'))localTracks.delete(key);index.areas=index.areas.filter(a=>!a.id.startsWith('personal:')); personalLoad.hidden=true;$('personalJourneyProgress').hidden=true;document.body.classList.remove('personal-drive');}
+  let personalUI=null,personal=null;
+  function stopPersonal(){personal?.journey.cancel();personal=null;for(const key of localTracks.keys())if(key.startsWith('personal:'))localTracks.delete(key);index.areas=index.areas.filter(a=>!a.id.startsWith('personal:')); $('personalJourneyProgress').hidden=true;document.body.classList.remove('personal-drive');}
   async function openPersonal(){
     hub.closeSheets();
-    try{if(!personalUI){const {createRoutesUI}=await import('./personal/ui.js');personalUI=createRoutesUI({onDrive:startPersonal,canDrive:()=>canAccessPlan({kind:'personal'}),requestLogin:()=>{personalUI.close();hub.requestAccess();},onClose:()=>$('myRoutesBtn').focus()});}personalUI.open();}
+    try{if(!personalUI){const {createRoutesUI}=await import('./personal/ui.js');personalUI=createRoutesUI({onDrive:startPersonal,canDrive:graded=>canAccessPlan({kind:'personal',graded}),requestLogin:()=>{personalUI.close();hub.requestAccess();},onClose:()=>$('myRoutesBtn').focus()});}personalUI.open();}
     catch(e){$('personalOpenStatus').textContent='Route creator could not load. Check your connection and retry.';}
   }
   $('myRoutesBtn').onclick=openPersonal;
-  async function installPersonal(track,part){
+  async function installPersonal(track){
     const current=personal;if(!current)throw Error('Drive cancelled.');
-    const id=`personal:${current.journey.recipe.id}:${part}`,old=A.id;
+    const id=`personal:${current.journey.recipe.id}`,old=A.id;
     localTracks.set(id,track);if(!index.areas.some(a=>a.id===id))index.areas.push({id,file:''});
     await useArea(id);if(personal!==current||current.journey.cancelled)throw new DOMException('Drive cancelled.','AbortError');
-    const pl={kind:'personal',key:id,area:id,title:current.journey.recipe.title,waypoints:track.plan.waypoints,nodes:track.plan.nodes};loadPlan(pl);
+    const pl={kind:'personal',graded:current.graded,key:id,area:id,title:current.journey.recipe.title,waypoints:track.plan.waypoints,nodes:track.plan.nodes};loadPlan(pl);
     if(old?.startsWith('personal:')&&old!==id){localTracks.delete(old);index.areas=index.areas.filter(a=>a.id!==old);}
   }
-  async function startPersonal(journey,first){
-    if(!canAccessPlan({kind:'personal'})){hub.requestAccess();throw Error('Sign in to drive your route.');}
-    stopPersonal();personal={journey,part:0,progress:0,seconds:0,distance:0,loading:false,complete:false};
-    try{await installPersonal(first,0);}catch(e){if(personal?.journey===journey)stopPersonal();throw e;}begin();journey.prefetch(1);$('personalJourneyProgress').hidden=false;
+  async function startPersonal(journey,world,{graded=false}={}){
+    if(graded&&journey.route.length<=MOCK_MIN_METRES)throw Error('A graded mock needs a route longer than 6 miles.');
+    if(!canAccessPlan({kind:'personal',graded})){hub.requestAccess();throw Error('Sign in to drive your route.');}
+    stopPersonal();personal={journey,graded,progress:0,seconds:0,distance:0,complete:false};
+    try{await installPersonal(world);await A.authoredTiles?.prepare(player.x,player.z,()=>journey.cancelled);if(journey.cancelled)throw new DOMException('Cancelled','AbortError');}catch(e){if(personal?.journey===journey)stopPersonal();throw e;}
+    begin();A.world.updateChunks(player.x,player.z,100);$('personalJourneyProgress').hidden=false;
   }
-  async function nextPersonalSection(){
-    if(!personal||personal.loading)return;const current=personal,token=personalToken,next=current.part+1;
-    if(next>=Math.ceil(current.journey.route.length/SECTION_METRES))return;
-    current.loading=true;A.test.running=false;releaseControls();personalLoad.hidden=false;$('personalLoadMessage').textContent='Loading the next section of your route…';$('retryPersonalSection').hidden=true;
-    const position=unprojectPersonal(A.net,player),velocity=player.v,heading=player.th,steer=player.steer;
-    try{
-      const track=await current.journey.get(next);if(token!==personalToken)return;
-      await installPersonal(track,next);if(token!==personalToken)return;
-      const p=projectPersonal(A.net,position);player.place(p.x,p.z,heading);player.v=velocity;player.steer=steer;
-      // Navigation restarts inside the overlap; keep geographic position/speed.
-      let best=0,d=Infinity;for(let i=0;i<route.xs.length;i++){const dist=Math.hypot(route.xs[i]-p.x,route.zs[i]-p.z);if(dist<d){d=dist;best=i;}}
-      A.test.idx=Math.min(best,route.xs.length-2);A.test.sRoute=route.cum[best];A.test.wpIndex=Math.max(1,Math.floor((current.progress-track.section.start)/24));
-      A.test.parked=false;current.part=next;current.loading=false;personalLoad.hidden=true;
-      // Never resume behind a pause dialog or after sign-out/tab hiding.
-      A.test.running=!paused&&!document.hidden&&canAccessPlan(plan);if(!A.test.running){paused=true;$('pauseSheet').hidden=false;}
-      current.journey.prefetch(next+1);
-    }catch(error){if(token!==personalToken)return;current.loading=false;$('personalLoadMessage').textContent=error.message+' Your car is paused here.';$('retryPersonalSection').hidden=false;}
-  }
-  $('retryPersonalSection').onclick=nextPersonalSection;$('endPersonalLoad').onclick=()=>showPersonalSummary(false);
   function stepPersonal(dt){
-    if(!personal||personal.loading||personal.complete)return;
+    if(!personal||personal.complete)return;
     const hit=locatePersonal(personal.journey.route,unprojectPersonal(A.net,player),personal.progress);
     if(hit.d<25)personal.progress=Math.max(personal.progress,hit.s);
     personal.seconds+=dt;personal.distance+=Math.abs(player.v)*dt;
     const remaining=Math.max(0,personal.journey.route.length-personal.progress);$('personalJourneyProgress').textContent=(remaining/1609.344).toFixed(1)+' mi to finish';
-    if(remaining<12&&Math.abs(player.v)<.5&&hit.d<15){personal.complete=true;showPersonalSummary(true);return;}
-    if(personal.progress>=(personal.part+1)*SECTION_METRES)nextPersonalSection();
+    // A graded drive can finish only through the native examiner's waypoint checks.
+    if(!personal.graded&&remaining<12&&Math.abs(player.v)<.5&&hit.d<15){personal.complete=true;showPersonalSummary(true);return;}
+  }
+  function showPersonalMockResult(completed){
+    if(!personal)return;const t=A.test;t.running=false;t.done=true;paused=false;personal.complete=true;voice.cancel();
+    const verdict=judgeMock('hard',t),pass=completed&&verdict.pass;
+    $('pauseSheet').hidden=true;$('endTag').textContent=completed?'Custom mock complete':'Custom mock ended';$('verdict').textContent=completed?(pass?'Pass. Well driven.':'Not this time'):'Incomplete';$('verdict').className='verdict '+(pass?'pass':'fail');
+    $('rD').textContent=t.D;$('rS').textContent=t.S;$('rNote').textContent=personal.journey.recipe.title+' · Hard marking · generated route';
+    $('rReasons').replaceChildren();const note=document.createElement('li');note.textContent=completed?'15 or fewer driving faults and no serious faults to pass. Generated map details may differ from the road.':'The drive ended before the finish. No pass was awarded.';$('rReasons').append(note);
+    $('coachingReport').textContent=t.faults.map(f=>f.cat+': '+f.text).join(' ')||'No faults recorded.';showRunDetail({kind:'mock',lesson:null,test:t,scenario:null});
+    if(driveScope===learnerScope())try{const store=routeStore(),saved=store.list().find(r=>r.id===personal.journey.recipe.id);if(saved)store.save({...saved,lastMock:{completed,pass,D:t.D,S:t.S,duration:t.elapsed,finishedAt:Date.now(),mode:'hard'}});}catch(e){const warning=document.createElement('li');warning.textContent='Result could not be saved: '+e.message;$('rReasons').append(warning);}
+    $('nextBtn').hidden=true;$('againBtn').textContent='Try again';$('resultSheet').hidden=false;setMode('lobby');
   }
   function showPersonalSummary(complete){
-    if(!personal)return;A.test.running=false;paused=false;$('pauseSheet').hidden=true;personalLoad.hidden=true;
+    if(!personal)return;voice.cancel();A.test.running=false;paused=false;$('pauseSheet').hidden=true;
     $('endTag').textContent=complete?'Route complete':'Personal practice';$('verdict').textContent=(personal.distance/1609.344).toFixed(1)+' miles driven';$('verdict').className='verdict pass';
     $('rD').textContent=$('rS').textContent='–';$('rNote').textContent=personal.journey.recipe.title+' · ungraded, nothing added to your record';$('rReasons').replaceChildren();
     for(const text of [`${Math.round(personal.seconds/60)} minutes of practice.`,complete?'You reached your chosen finish.':'Your route is saved here for another drive.']){const li=document.createElement('li');li.textContent=text;$('rReasons').append(li);}
@@ -331,6 +326,11 @@ async function boot() {
   window.addEventListener('learner-access-change',()=>{
     if(!canAccessPlan(plan)){stopPersonal();if(A.test)A.test.running=false;paused=false;$('pauseSheet').hidden=true;$('resultSheet').hidden=true;$('quizSheet').hidden=true;hub.closeSheets();setMode('lobby');}
   });
+  const voice=createVoiceGuidance();
+  const renderVoice=()=>{document.querySelectorAll('[data-voice]').forEach(b=>{b.disabled=!voice.supported;b.setAttribute('aria-pressed',String((b.dataset.voice==='1')===voice.enabled));});if(!voice.supported)$('voiceAvailability').textContent='Voice is unavailable in this browser. Written instructions remain available.';};
+  renderVoice();$('voiceSeg').onclick=e=>{const b=e.target.closest('[data-voice]');if(b){voice.setEnabled(b.dataset.voice==='1');renderVoice();}};
+  document.addEventListener('learner-read-lesson',e=>voice.say(e.detail));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)voice.cancel();});
   const prefs = (() => { try { return JSON.parse(localStorage.getItem('cambridge-learner-drive.prefs') || '{}'); } catch (_) { return {}; } })();
   const savePrefs = () => { try { localStorage.setItem('cambridge-learner-drive.prefs', JSON.stringify(prefs)); } catch (_) {} };
 
@@ -503,9 +503,9 @@ async function boot() {
   ui.setClock(() => A.traffic ? A.traffic.clock : 0);
   // Hook for future input devices (e.g. a USB steering wheel via the Gamepad API): return {throttle, brake, steer} or null.
   const extraInputs = [];
-  window.cambridgeDrive = { get personalJourney(){return personal?{id:personal.journey.recipe.id,part:personal.part,progress:personal.progress,length:personal.journey.route.length,loading:personal.loading}:null;}, addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
+  window.cambridgeDrive = { get personalJourney(){return personal?{id:personal.journey.recipe.id,progress:personal.progress,length:personal.journey.route.length,ready:personal.journey.ready,tiles:A.authoredTiles?.stats()||null}:null;}, addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     get roadsidePlacements(){return A.world?.placements||[];},
-    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
+    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.flatMap(m=>m.userData.authoredTile?m.children:[m]).filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; }, steerFor };
@@ -543,7 +543,8 @@ async function boot() {
     $('runDetailList').innerHTML = lines.map(line => `<li>${line.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</li>`).join('');
   }
   function onFinish() {
-    const test = A.test; if (test.experimental) return; if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
+    voice.cancel();
+    const test = A.test; if (test.experimental) return; if(plan?.kind==='personal'&&plan.graded){showPersonalMockResult(true);return;} if (scenario) scenario.stop(); $('againBtn').textContent = 'Try again';
     $('rD').textContent = test.D; $('rS').textContent = test.S;
     const v = $('verdict'), reasons = $('rReasons'), next = $('nextBtn');
     if (plan.kind !== 'mock') {
@@ -552,15 +553,15 @@ async function boot() {
       $('coachingReport').textContent = report.summary + (report.practice.length ? ' ' + report.practice.map(p => `${p.category} (${p.evidence}): ${p.advice}`).join(' ') : '');
       showRunDetail({ kind: plan.kind, lesson: plan.lesson, test, scenario });
       if (!botMode && driveScope === learnerScope()) hub.Profiles.recordLesson(plan.lesson.id, { pass: res.pass, D: test.D, S: test.S, duration: test.elapsed, report, stars: res.stars, mode: res.mode }); // bot runs never touch a learner's progress
-      $('endTag').textContent = pz ? 'Puzzle complete' : 'Lesson complete';
-      v.textContent = res.pass ? (pz ? 'Solved' : 'Lesson passed') : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
+      $('endTag').textContent = 'Lesson complete';
+      v.textContent = res.pass ? 'Lesson passed' : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
       const n = res.stars || 0, mode = modeOf(res.mode);
       $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
-      if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = nx.kind === 'puzzle' ? 'Next puzzle' : 'Next lesson'; }
-      $('testState').textContent = res.pass ? (pz ? 'Puzzle solved' : 'Lesson passed') : 'Not passed yet';
+      if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = 'Next lesson'; }
+      $('testState').textContent = res.pass ? 'Lesson passed' : 'Not passed yet';
     } else {
       const j = judgeMock(test.marking, test), pass = j.pass, mode = modeOf(j.mode);
       if (!botMode && driveScope === learnerScope()) hub.Profiles.recordMock(ROUTES[plan.index].id, { pass, D: test.D, S: test.S, duration: test.elapsed, mode: j.mode, stars: j.stars, report: buildReport({ pass, faults: test.faults, duration: test.elapsed }) });
@@ -576,39 +577,41 @@ async function boot() {
     }
     $('resultSheet').hidden = false; hub.render();
   }
-  function pause() { if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
+  function pause() { voice.cancel(); if (!A.test || !A.test.running) return; paused = true; A.test.running = false; releaseControls(); $('pauseSheet').hidden = false; }
   function resume() { if (!paused) return; paused = false; A.test.running = true; $('pauseSheet').hidden = true; }
   function toLobby() {
+    voice.cancel();
     stopPersonal();
     document.body.classList.remove('free-drive'); applyTimeOfDay('day');
     if (A.test) A.test.running = false; paused = false; if (scenario) { scenario.stop(); scenario = null; } banner(null);
     $('pauseSheet').hidden = true; $('resultSheet').hidden = true; setMode('lobby'); hub.open();
   }
   function begin() {
+    voice.cancel();
     if(!canAccessPlan(plan)){hub.requestAccess();return;}
     driveScope = learnerScope();
     paused = false; $('pauseSheet').hidden = true; $('resultSheet').hidden = true; hub.closeSheets(); setMode('drive');
     loadPlan(plan);
-    if(plan.kind==='personal'&&personal){personal.progress=Math.max(0,personal.part*SECTION_METRES-150);personal.complete=false;personal.seconds=0;personal.distance=0;}
+    if(plan.kind==='personal'&&personal){personal.progress=0;personal.complete=false;personal.seconds=0;personal.distance=0;}
     // Every mock test includes a blue-light vehicle; lessons get their own scripted event.
     const deps = { net: A.net, traffic: A.traffic, test: A.test, player, ui: { banner }, get scene() { return scene; }, body: () => policeModel && policeModel.clone(true) };
-    scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free' ? null : createScenario(plan.lesson, deps);
+    scenario = A.test.experimental ? null : plan.kind === 'mock' ? createEmergencyEvent(deps) : plan.kind === 'free'||plan.kind==='personal' ? null : createScenario(plan.lesson, deps);
     ui.pinTip(plan.lesson ? plan.lesson.rule : null, plan.lesson ? plan.lesson.title : '');
     // What to do is on the lesson card before you press Start, and what you did is in the feedback
     // afterwards. The drive itself carries only the short stage label in the HUD.
     stats.distance = 0; stats.topSpeed = 0; stats.chaseSeconds = 0; chaseAuto = -1;
     sigBtns(); A.test.running = true; A.test.elapsed = 0; A.test.startedAt = A.traffic.clock;
     A.test.context = { lessonId: plan.lesson?.id || null, scenarioId: plan.scenarioDefinition?.id || null, areaId: A.id }; banner(null); renderTrainingControls();
-    $('testState').textContent = A.test.experimental ? 'Experimental practice · no grading or recorded results' : plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : (plan.kind === 'puzzle' ? 'Puzzle · ' : 'Lesson · ') + plan.lesson.title;
+    $('testState').textContent = A.test.experimental ? 'Experimental practice · no grading or recorded results' : plan.graded ? 'Custom mock · Hard' : plan.kind === 'mock' ? 'In progress' : plan.kind === 'free' ? 'Free drive · ' + plan.drive.title : 'Lesson · ' + plan.lesson.title;
     A.test.coach = coachLine();
     ui.hud(player, A.test, true); renderTrainingControls();
     lastStep = -1;
   }
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume); $('resumeX').addEventListener('click', resume);
-  $('quitBtn').addEventListener('click', () => plan?.kind==='personal'?showPersonalSummary(false):plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
+  $('quitBtn').addEventListener('click', () => plan?.kind==='personal'?(plan.graded?showPersonalMockResult(false):showPersonalSummary(false)):plan?.kind === 'free' && A.test?.ungraded ? showFreeSummary() : toLobby()); $('hubBtn').addEventListener('click', toLobby);
   $('nextBtn').addEventListener('click', () => { const b = $('nextBtn'); pickPlan(hub.select(b.dataset.kind, b.dataset.id), true); });
-  async function restartDrive(){if(plan?.kind!=='personal')return begin();if(!personal)return openPersonal();const current=personal;A.test.running=false;try{await installPersonal(await current.journey.get(0),0);current.part=0;begin();}catch(e){personalLoad.hidden=false;$('personalLoadMessage').textContent=e.message;$('retryPersonalSection').hidden=true;}}
+  async function restartDrive(){return begin();}
   $('againBtn').addEventListener('click', restartDrive); $('restartBtn').addEventListener('click', restartDrive);
   $('camBtn').addEventListener('click', () => setCam((cam + 1) % 3, true));
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
@@ -806,6 +809,7 @@ async function boot() {
     if (!A.net || !route) return;
     const { traffic, test, world } = A, drive = document.body.dataset.mode === 'drive';
     sim(dt);
+    A.authoredTiles?.update(player.x,player.z,cam===2?WORLD.fogFar+200+ov.h:0);
     player.sync(traffic.clock);
     $('sigL').classList.toggle('on', player.indicator === 'L' && Math.floor(traffic.clock * 3) % 2 === 0);
     $('sigR').classList.toggle('on', player.indicator === 'R' && Math.floor(traffic.clock * 3) % 2 === 0);
@@ -824,7 +828,7 @@ async function boot() {
     if (drive && cam < 2) { const gv = guide.group.visible; guide.group.visible = false; mirrors.update(scene, player, cam === 1 ? 'cockpit' : 'chase'); guide.group.visible = gv; }
     if(drive&&cam===1)interior.update(player,test,A.net,traffic.clock,{lowPower});
     if(drive||botMode)renderer.render(scene, camera);
-    uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); } }
+    uiT += dt; if (uiT > 0.1) { uiT = 0; test.coach = coachLine(); ui.hud(player, test, test.running || paused); renderTrainingControls(); if (test.step !== lastStep || test.route !== lastRoute) { lastStep = test.step; lastRoute = test.route; ui.renderSteps(test.route, test.step); if(test.running&&drive)voice.say(test.route.instructions[test.step]?.text||test.route.instructions[test.step]?.short); } }
     mapT += dt; if (mapT > 0.05) { mapT = 0; ui.drawMap(player, test.route, test.step, traffic.clock); }
   }
   requestAnimationFrame(frame);

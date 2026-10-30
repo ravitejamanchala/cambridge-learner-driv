@@ -1,6 +1,8 @@
-// Geographic route recipes stay in lon/lat. Only bounded driving sections are
-// projected into the simulator's X-east / Z-south metre coordinate system.
+// Recipes stay in lon/lat. Bounded provider requests are combined into one
+// X-east / Z-south world with a stable origin before the drive starts.
 export const SECTION_METRES = 600, OVERLAP_METRES = 150;
+export const MOCK_MIN_METRES=6*1609.344;
+export const eligibleForMock=recipe=>measure(decode(recipe.geometry)).length>MOCK_MIN_METRES;
 export function coordinate(p) {
   if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite) || Math.abs(p[0]) > 180 || Math.abs(p[1]) > 85) throw Error('Choose a valid location on the map.');
   return p;

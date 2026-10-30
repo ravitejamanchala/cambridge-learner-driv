@@ -38,6 +38,7 @@ jobs:
         env:
           TEST_SITE: dist
       - run: node tests/modal-layout-browser.mjs
+      - run: node tests/cambridge-surfaces-browser.mjs
       - run: node tests/local-tracks-browser.mjs
       - run: node tests/experimental-practice-browser.mjs
       - run: node tests/cambridge-pilot-browser.mjs

@@ -22,7 +22,7 @@ const matrix=[
 ];
 let browser;
 try {
- for(let n=0;n<100;n++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ for(let n=0;n<100;n++){try{const response=await fetch(url);await response.arrayBuffer();if(response.ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
  for(const engine of ['webkit','chromium'].filter(e=>!process.env.MOBILE_ENGINE||process.env.MOBILE_ENGINE===e)){
   try {browser=await (engine==='webkit'?webkit:chromium).launch(engine==='chromium'?{executablePath:process.env.CHROMIUM_PATH,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{});}
   catch(e){results.push({engine,status:'unavailable',error:e.message.slice(0,600)});continue;}
@@ -31,7 +31,7 @@ try {
    const context=await browser.newContext({...devices[spec.preset],locale:'en-GB',timezoneId:'Europe/London'});
    const page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',e=>result.errors.push(e.message));
    try {
-    await context.route('**/auth-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.LEARNER_CONFIG={};'}));
+    await context.route('**/auth-config.js*',r=>r.fulfill({contentType:'application/javascript',body:'window.LEARNER_CONFIG={};'}));
     await context.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'application/javascript'}));
     await context.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'application/javascript'}));
     await context.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));

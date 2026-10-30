@@ -3,7 +3,7 @@ export const isFreeLesson = id => FREE_LESSON_IDS.includes(id);
 export function canUsePlan(plan, full=false) {
  // Personal routes are ungraded practice; they never grant access to paid mocks
  // or write learner progress. The configured sign-in gate still applies.
- return full === true || plan?.kind === 'personal' || (plan?.kind === 'lesson' && isFreeLesson(plan.lesson?.id));
+ return full === true || (plan?.kind === 'personal' && !plan.graded) || (plan?.kind === 'lesson' && isFreeLesson(plan.lesson?.id));
 }
 // Free accounts may retain old paid progress, but cannot change it through the API.
 export function basicProgressAllowed(next, previous) {

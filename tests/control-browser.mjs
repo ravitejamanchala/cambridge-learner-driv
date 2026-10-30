@@ -103,10 +103,10 @@ try {
     const lobby = () => page.evaluate(() => { const t = window.cambridgeDrive.test; if (t) t.running = false; document.querySelector('#hubBtn').click(); });
     await lobby();
     const drive = async (mode, nD) => {
-      await page.locator('[data-open=puzzleSheet]').first().click(); await page.locator('[data-z="pz-trumpington"]').click();
-      await page.locator(`#puzzleDetail .mode-pick [data-mode="${mode}"]`).click();
-      assert.equal(await page.locator(`#puzzleDetail .mode-pick [data-mode="${mode}"]`).getAttribute('aria-checked'), 'true');
-      await page.locator('#puzzleDetail [data-start]').click();
+      await page.locator('[data-open=courseSheet]').first().click(); await page.locator('[data-z="pz-trumpington"]').click();
+      await page.locator(`#lessonDetail .mode-pick [data-mode="${mode}"]`).click();
+      assert.equal(await page.locator(`#lessonDetail .mode-pick [data-mode="${mode}"]`).getAttribute('aria-checked'), 'true');
+      await page.locator('#lessonDetail [data-start]').click();
       await page.waitForFunction(() => document.body.dataset.mode === 'drive' && window.cambridgeDrive.test?.running, {}, { timeout: 45000 });
       await page.evaluate(n => { const a = window.cambridgeDrive; a.manual(true); for (let i = 0; i < n; i++) a.test.fault('D', 'Signals – necessary', 'Test fault ' + i, 'tf' + i, 0); if (a.scenario && a.scenario.result) a.scenario.result = () => ({ ok: true, why: '' }); a.test.finish(); }, nD); // the puzzle's own goal stands in as met: only the faults are being judged here
       return page.evaluate(() => ({ reasons: [...document.querySelectorAll("#rReasons li")].map(l => l.textContent).join(" / "), verdict: document.querySelector("#verdict").textContent, note: document.querySelector('#rNote').textContent, stars: document.querySelectorAll('#rNote .stars [data-on], #rNote .stars .on').length, label: document.querySelector('#rNote .stars').getAttribute('aria-label') }));
@@ -115,7 +115,7 @@ try {
     assert.equal(hard.verdict, 'Not yet'); assert.match(hard.label, /^0 of 3/);
     await lobby();
     const medium = await drive('medium', 4);
-    assert.equal(medium.verdict, 'Solved', medium.reasons); assert.match(medium.label, /^2 of 3/); assert.match(medium.note, /marked on Medium/);
+    assert.equal(medium.verdict, 'Lesson passed', medium.reasons); assert.match(medium.label, /^2 of 3/); assert.match(medium.note, /marked on Medium/);
     // changing the mode afterwards changes nothing already earned
     await page.evaluate(() => { localStorage.setItem('cambridge-learner-drive.mode', 'easy'); });
     const rec = await page.evaluate(() => { for (const k of Object.keys(localStorage)) { if (!k.startsWith('cambridge-learner-drive.v1')) continue; const d = JSON.parse(localStorage.getItem(k)); const p = (d.profiles || []).find(x => x.id === d.current); if (p && p.lessons['pz-trumpington']) return p.lessons['pz-trumpington']; } return null; });

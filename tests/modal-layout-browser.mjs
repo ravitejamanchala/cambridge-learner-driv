@@ -7,7 +7,7 @@ try{
  await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'text/javascript'}));await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'text/javascript'}));await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));await installAuthFixture(page);await page.goto(url);await page.waitForFunction(()=>document.querySelector('#loadOv').hidden);await signedIn(page);await page.evaluate(()=>cambridgeDrive.manual(true));await page.addStyleTag({content:'*,*::before,*::after{animation:none!important;transition:none!important}'});
  await page.evaluate(async()=>{await cambridgeDrive.pick('lesson','q-showme',true);});
  await page.evaluate(async()=>{await cambridgeDrive.pick('mock','east-road',true);cambridgeDrive.test.onFinish();cambridgeDrive.test.running=false;document.body.dataset.mode='lobby';});
- const sheets=['courseSheet','puzzleSheet','mockSheet','freeSheet','codeSheet','carSheet','creditsSheet','controlsSheet','settingsSheet','profileSheet','quizSheet','pauseSheet','resultSheet'];fs.mkdirSync('test-results/modals',{recursive:true});
+ const sheets=['courseSheet','mockSheet','freeSheet','codeSheet','carSheet','creditsSheet','controlsSheet','settingsSheet','profileSheet','quizSheet','pauseSheet','resultSheet'];fs.mkdirSync('test-results/modals',{recursive:true});
  for(const [width,height]of[[320,568],[390,844],[844,390],[768,1024]]){
   await page.setViewportSize({width,height});
   for(const id of sheets){
@@ -21,10 +21,10 @@ try{
  }
  // Touch list -> detail -> back, with controls reachable without scrolling through the course.
  await page.setViewportSize({width:390,height:844});
- for(const [id,selector]of[['courseSheet','[data-l]'],['puzzleSheet','[data-z]'],['mockSheet','[data-i]'],['freeSheet','[data-f]']]){
+ for(const [id,selector]of[['courseSheet','[data-l]'],['courseSheet','[data-z]'],['mockSheet','[data-i]'],['freeSheet','[data-f]']]){
   await page.evaluate(id=>{document.querySelectorAll('.sheet').forEach(s=>s.hidden=true);const s=document.querySelector('#'+id);s.hidden=false;s.querySelector('.card').dataset.mobileView='list';s.querySelector('.body').scrollTop=0;},id);
   await page.locator('#'+id+' '+selector).first().click();assert.equal(await page.locator('#'+id+' .list').isVisible(),false);assert.equal(await page.locator('#'+id+' .detail').isVisible(),true);
-  await page.screenshot({path:'test-results/modals/390-844-'+id+'-detail.png'});
+  await page.screenshot({path:'test-results/modals/390-844-'+id+(selector==='[data-z]'?'-road':'')+'-detail.png'});
   await page.locator('#'+id+' .sheet-back').click();assert.equal(await page.locator('#'+id+' .list').isVisible(),true);assert.equal(await page.locator('#'+id+' .detail').isVisible(),false);
  }
  // The Linux fallback is wider than the local default font. It previously made

@@ -2,6 +2,7 @@ import {billingPreviewConfig} from './preview-config.mjs';
 // Demo build: one minified script with no comments, cleaned data headers. Source stays readable in the project.
 import { execFileSync } from 'node:child_process';
 import { VISIBLE_LESSONS as LESSONS } from '../js/course-menu.js';
+import {PUZZLES} from '../js/puzzles.js';
 import fs from 'fs'; import path from 'path'; import { build } from 'esbuild';
 const SRC = process.argv[2], OUT = process.argv[3];
 const billingPreview=process.argv.includes('--billing-preview');
@@ -37,7 +38,7 @@ for (const f of fs.readdirSync(path.join(SRC, 'models'))) if(fs.statSync(path.jo
 console.log('built', fs.statSync(path.join(OUT, 'app.js')).size, 'bytes');
 
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
-fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length }));
+fs.writeFileSync(path.join(OUT, 'release.json'), JSON.stringify({ sourceCommit, sourceDirty, lessons: LESSONS.length+PUZZLES.length }));
 
 // The Pages JSON sandbox (--pages-preview) authors routes in the browser with no account service; a
 // pull-request preview (--preview) runs as a guest with the whole course open; production copies the

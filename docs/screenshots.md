@@ -14,11 +14,11 @@ The lobby: learner, level and the selected drive.
 
 ## The course menu
 
-### The course: seven units of lessons, with what you have passed
+### Courses: practical and theory units followed by road challenge lessons; existing progress is retained
 
-![The course: seven units of lessons, with what you have passed.](screenshots/course-menu.jpg)
+![Courses: practical and theory units followed by road challenge lessons; existing progress is retained.](screenshots/course-menu.jpg)
 
-The course: seven units of lessons, with what you have passed.
+Courses: practical and theory units followed by road challenge lessons; existing progress is retained.
 
 ## The garage
 

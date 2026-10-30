@@ -12,7 +12,7 @@ export function applyMappedRoadTags(net,sources=[]){
    const width=typeof raw==='string'&&/^\s*\d+(\.\d+)?\s*(m)?\s*$/.test(raw)?parseFloat(raw):NaN;
    return Number.isFinite(width)?Math.max(.3,Math.min(10,width)):2;
   };
-  way.sidewalkWidths=[sideWidth('left'),sideWidth('right')];
+  way.sidewalkWidths=['motorway','motorway_link'].includes(way.cls)?[0,0]:[sideWidth('left'),sideWidth('right')];
   if(tags.oneway==='-1')way.sidewalkWidths.reverse();
  }
 }

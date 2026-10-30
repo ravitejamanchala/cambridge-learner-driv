@@ -152,9 +152,9 @@ function inPolygon(p, ring) {
   }
   return inside;
 }
-export function convertOSM(data, b, { boundsCheck, makeTrack, object }) {
+export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} }) {
   boundsCheck(b);
-  if (!Array.isArray(data?.elements) || data.elements.length > 30000)
+  if (!Array.isArray(data?.elements) || data.elements.length > (limits.elements||30000))
     throw Error(
       "Import is too large. Choose a smaller area (maximum 30,000 OSM elements).",
     );
@@ -459,9 +459,9 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object }) {
       "No drivable roads in this area. Move the selection or make it larger.",
     );
   if (
-    n.edges.length > 10000 ||
-    n.nodes.length > 40000 ||
-    objects.length > 10000
+    n.edges.length > (limits.edges||10000) ||
+    n.nodes.length > (limits.nodes||40000) ||
+    objects.length > (limits.objects||10000)
   )
     throw Error("Area exceeds editor limits. Choose a smaller selection.");
   const buildingDetails = enrichBuildings(objects, data, project);
@@ -496,5 +496,5 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object }) {
     heading: Math.atan2(-tx, -tz),
   };
   t.plan.waypoints = [{ x: t.spawn.x, z: t.spawn.z, road: "", label: "Imported start" }];
-  return clearRoadside(addOSMDetails(clearRoadBuildings(t),data));
+  return clearRoadside(addOSMDetails(clearRoadBuildings(t),data,{limits}));
 }

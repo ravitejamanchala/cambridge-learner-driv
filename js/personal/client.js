@@ -26,25 +26,37 @@ function convert(osm,part,signal) {
     const built=!!document.querySelector('meta[name=app-release]'),worker=new Worker(new URL(built?'personal-worker.js':'js/personal/generator-worker.js',document.baseURI),{type:'module'});
     const stop=()=>{worker.terminate();signal?.removeEventListener('abort',cancel);},cancel=()=>{stop();reject(new DOMException('Cancelled','AbortError'));};
     if(signal?.aborted)return cancel();signal?.addEventListener('abort',cancel,{once:true});
-    worker.onmessage=({data})=>{stop();data.error?reject(Error(data.error)):resolve(data.track);};worker.onerror=()=>{stop();reject(Error('Map generation failed. Please retry.'));};worker.postMessage({osm,part});
+    worker.onmessage=({data})=>{stop();data.error?reject(Error(data.error)):resolve(data.track);};worker.onerror=()=>{stop();reject(Error('Map generation failed. Please retry.'));};worker.postMessage({osm,part,wholeRoute:true});
   });
 }
-export function createJourney(recipe,{store=routeStore(),onStatus=()=>{},fetchSection=request,generate=convert}={}) {
-  const route=measure(decode(recipe.geometry)),cache=new Map(),pending=new Map(),controller=new AbortController();let lastRequest=0;
-  async function get(index){
-    if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
-    if(cache.has(index))return cache.get(index);if(pending.has(index))return pending.get(index);
-    const job=(async()=>{
-      const part=section(route,index);onStatus(`Loading roads and buildings · section ${index+1} of ${part.count}…`);
-      let track=store.getSection(recipe.id,index);
-      if(!track?.plan?.nodes?.length||track.buildingStyle!=='simulator'){
-        await abortableDelay(Math.max(0,lastRequest+5200-Date.now()),controller.signal);lastRequest=Date.now();
-        const osm=await fetchSection('osm',{body:{bounds:part.bounds},signal:controller.signal,onStatus});
-        onStatus('Preparing roads, junctions and buildings…');track=await generate(osm,part,controller.signal);store.putSection(recipe.id,index,track);
+export function createJourney(recipe,{store=routeStore(),onStatus=()=>{},fetchSection=request,generate=convert,requestInterval=5200}={}) {
+  const route=measure(decode(recipe.geometry)),controller=new AbortController(),count=Math.ceil(route.length/600);
+  let prepared=null,pending=null,lastRequest=0;
+  const check=()=>{if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');};
+  async function prepare(){
+    check();if(prepared)return prepared;if(pending)return pending;
+    pending=(async()=>{
+      const elements=new Map(),bounds=[Infinity,Infinity,-Infinity,-Infinity];let timestamp;
+      for(let index=0;index<count;index++){
+        check();const part=section(route,index);onStatus(`Preparing your whole route · map ${index+1} of ${count}…`);
+        let source=store.getSection(recipe.id,index);
+        if(source?.kind!=='osm-source'||JSON.stringify(source.bounds)!==JSON.stringify(part.bounds)){
+          await abortableDelay(Math.max(0,lastRequest+requestInterval-Date.now()),controller.signal);lastRequest=Date.now();
+          const osm=await fetchSection('osm',{body:{bounds:part.bounds},signal:controller.signal,onStatus});check();
+          if(osm?.remark||!Array.isArray(osm?.elements)||osm.elements.length>30000)throw Error('The map provider returned an incomplete or oversized area. Retry before starting the drive.');
+          source={kind:'osm-source',bounds:part.bounds,elements:osm.elements,osm3s:osm.osm3s};store.putSection(recipe.id,index,source);
+        }
+        // Adjacent requests overlap. Union source IDs before conversion so a road,
+        // junction, building or signal crossing a data tile is created only once.
+        for(const element of source.elements){const key=element.type+':'+element.id,old=elements.get(key);if(!old||(element.version||0)>=(old.version||0))elements.set(key,element);}
+        if(elements.size>600000)throw Error('This route has more map detail than this browser can prepare safely. Your saved route is kept.');
+        bounds[0]=Math.min(bounds[0],part.bounds[0]);bounds[1]=Math.min(bounds[1],part.bounds[1]);bounds[2]=Math.max(bounds[2],part.bounds[2]);bounds[3]=Math.max(bounds[3],part.bounds[3]);timestamp=source.osm3s||timestamp;
       }
-      if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
-      cache.set(index,track);for(const key of cache.keys())if(key<index-1||key>index+1)cache.delete(key);return track;
-    })();pending.set(index,job);try{return await job;}finally{pending.delete(index);}
+      check();onStatus('Building continuous roads and preparing scenery tiles…');
+      const track=await generate({elements:[...elements.values()],osm3s:timestamp},{bounds,coordinates:route.coordinates,sourceSections:count},controller.signal);check();
+      prepared=track;return track;
+    })();
+    try{return await pending;}finally{pending=null;}
   }
-  return {recipe,route,get,cancel:()=>controller.abort(),get cancelled(){return controller.signal.aborted;},prefetch(index){if(index<Math.ceil(route.length/600))get(index).catch(()=>{});}};
+  return {recipe,route,prepare,cancel:()=>controller.abort(),get cancelled(){return controller.signal.aborted;},get ready(){return !!prepared;}};
 }

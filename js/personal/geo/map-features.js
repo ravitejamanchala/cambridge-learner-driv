@@ -4,7 +4,7 @@ import polygonClipping from '../../vendor/polygon-clipping.js';
 export const AREA_KINDS=new Set(['grass','forest','park','sports','water','parking','plaza','industrial','gravel','cemetery','railway','sand','garden']);
 export const PATH_KINDS=new Set(['footway','cycleway','path','pedestrian','steps','bridleway']);
 const POINT_SIZES={tree:[4,7,4],lamp:[.25,6,.25],bench:[1.8,.9,.65],bin:[.6,1,.6],bollard:[.2,.9,.2],gate:[2,1.2,.2],postBox:[.5,1.3,.5],bicycleParking:[1.5,.8,.6],busStop:[.18,2.5,.18],sign:[.6,2.2,.15]};
-export function sceneFeatures(track,features,{source='OpenStreetMap',attribution=track.attribution}={}){
+export function sceneFeatures(track,features,{source='OpenStreetMap',attribution=track.attribution,limits={}}={}){
   const b=track.georeference.bounds,n=track.network;
   const box=[(b[1]-n.origin[1])*n.kx,-(b[2]-n.origin[0])*n.kz,(b[3]-n.origin[1])*n.kx,-(b[0]-n.origin[0])*n.kz];
   const boundary=[[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]],[box[0],box[1]]]];
@@ -12,14 +12,14 @@ export function sceneFeatures(track,features,{source='OpenStreetMap',attribution
   const push=(f,o,part)=>{
     o.id=`map:${f.id}:${part}`;if(ids.has(o.id))return;ids.add(o.id);
     o.name=f.name||f.kind;o.properties={...o.properties,mapFeature:f.kind,source,sourceId:f.id,tags:f.tags||{},estimatedDimensions:true,heightSource:f.measured?'OSM height tag':'estimate or processed reference',collision:o.type==='scenery',reviewRequired:true};
-    if(Math.max(o.sx,o.sy,o.sz)>2000)throw Error('Mapped feature exceeds the simulator 2 km object limit. Build a smaller section.');
+    if(Math.max(o.sx,o.sy,o.sz)>(limits.extent||2000))throw Error('Mapped feature exceeds the simulator object limit.');
     output.push(o);counts[f.kind]=(counts[f.kind]||0)+1;
-    if(output.length+track.objects.length>10000)throw Error('Detailed world exceeds 10,000 objects. Choose a smaller area.');
+    if(output.length+track.objects.length>(limits.objects||10000))throw Error('Detailed world exceeds browser object capacity.');
   };
   const object=(type,x,z,sx,sy,sz,y=0,rotation=0)=>({type,x,z,sx,sy,sz,y,rotation,properties:{}});
   for(const f of features){
     if(!f||typeof f.id!=='string'||!/^[\w:./-]{1,180}$/.test(f.id))throw Error('Invalid mapped feature ID');
-    const valid=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=100000);
+    const valid=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=(limits.coordinate||100000));
     if(f.rings){
       if(!AREA_KINDS.has(f.kind))continue;
       if(!Array.isArray(f.rings)||f.rings.length>100||f.rings.some(r=>!Array.isArray(r)||r.length<3||r.length>5000||!r.every(valid)))throw Error('Invalid mapped area');

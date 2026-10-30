@@ -1,0 +1,21 @@
+{
+  "source": "user supplied Cambridge export, exact reported A/B location; local render",
+  "pins": [
+    [
+      0.13327,
+      52.2042
+    ],
+    [
+      0.13089,
+      52.20197
+    ]
+  ],
+  "pinDistances": [
+    17.870676664587144,
+    15.869935532605536
+  ],
+  "roadTiles": 12,
+  "flatPavementMeshes": 24,
+  "overlapArea": 0,
+  "status": "passed"
+}

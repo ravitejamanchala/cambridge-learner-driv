@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-import {measure,section,metres,at,encode,decode,project,unproject,locate} from '../js/personal/geometry.js';
+import {measure,section,metres,at,encode,decode,project,unproject,locate,eligibleForMock,MOCK_MIN_METRES} from '../js/personal/geometry.js';
 import {routeStore,ROUTES_KEY,CACHE_KEY} from '../js/personal/storage.js';
 import {generateSection} from '../js/personal/section.js';
 import {handleMapRequest} from '../server/map/handler.js';
@@ -29,7 +29,22 @@ test('Cambridge mapped road imports reuse native geometry, clearance and simulat
 });
 test('personal practice is available to basic accounts without unlocking mocks or progress writes',()=>{
  assert.ok(canUsePlan({kind:'personal'},false));assert.equal(canUsePlan({kind:'mock'},false),false);
+  assert.equal(canUsePlan({kind:'personal',graded:true},false),false);assert.equal(canUsePlan({kind:'personal',graded:true},true),true);
  const profile={lessons:{},mocks:[],history:[]};assert.equal(basicProgressAllowed({...profile,mocks:[{id:'personal'}]},profile),false);
+});
+test('a graded mock needs more than six actual route miles, not an edited display distance',()=>{
+ const r=recipe();assert.equal(eligibleForMock({...r,distance:99999}),false);
+ const coords=[[.12,52.2],[.12,52.3]];assert.ok(measure(coords).length>MOCK_MIN_METRES);assert.equal(eligibleForMock({...r,geometry:encode(coords)}),true);
+});
+test('prepare downloads every bounded area once, deduplicates source IDs and does no work during driving',async()=>{
+ const {createJourney}=await import('../js/personal/client.js');const r={...recipe(),geometry:encode([[.12,52.2],[.12,52.22]])},calls=[],writes=[];let conversions=0;
+ const journey=createJourney(r,{requestInterval:0,store:{getSection:()=>null,putSection:(...a)=>writes.push(a)},fetchSection:async(_,opts)=>{calls.push(opts.body.bounds);return{elements:[{type:'node',id:1,lat:52.2,lon:.12},{type:'node',id:calls.length+1,lat:52.2,lon:.12}]};},generate:async(osm,part)=>{conversions++;assert.equal(osm.elements.filter(e=>e.id===1).length,1);assert.equal(part.sourceSections,4);return{renderTiles:true};}});
+ const [a,b]=await Promise.all([journey.prepare(),journey.prepare()]);assert.equal(a,b);assert.equal(journey.ready,true);assert.equal(calls.length,4);assert.equal(writes.length,4);assert.equal(conversions,1);await journey.prepare();assert.equal(calls.length,4);
+});
+test('an unavailable later area prevents starting with a partial map and can be retried',async()=>{
+ const {createJourney}=await import('../js/personal/client.js');const saved=new Map();let fail=true,conversions=0;
+ const journey=createJourney({...recipe(),geometry:encode([[.12,52.2],[.12,52.21]])},{requestInterval:0,store:{getSection:(_,i)=>saved.get(i),putSection:(_,i,s)=>saved.set(i,s)},fetchSection:async()=>{if(saved.size&&fail)throw Error('unavailable');return{elements:[]};},generate:async()=>{conversions++;return{renderTiles:true};}});
+ await assert.rejects(journey.prepare(),/unavailable/);assert.equal(journey.ready,false);assert.equal(conversions,0);fail=false;await journey.prepare();assert.equal(journey.ready,true);assert.equal(conversions,1);
 });
 const req=(path,body,origin='https://routes-review.learner-drive-app.pages.dev')=>new Request(origin+'/map-api/'+path,{method:body?'POST':'GET',...(body?{body:JSON.stringify(body),headers:{'Content-Type':'application/json'}}:{})});
 test('map proxy validates requests, rejects arbitrary URLs/methods and missing production routing config',async()=>{
@@ -55,5 +70,5 @@ test('personal drive honours configured sign-in but needs no paid entitlement',a
 test('cancelled section requests do not finish or write map cache',async()=>{
  const {createJourney,abortableDelay}=await import('../js/personal/client.js');let writes=0;
  const journey=createJourney(recipe(),{store:{getSection:()=>null,putSection:()=>writes++},fetchSection:async(_,options)=>{await abortableDelay(500,options.signal);return{};},generate:()=>({})});
- const request=journey.get(0);journey.cancel();await assert.rejects(request,e=>e.name==='AbortError');assert.equal(writes,0);assert.equal(journey.cancelled,true);
+ const request=journey.prepare();journey.cancel();await assert.rejects(request,e=>e.name==='AbortError');assert.equal(writes,0);assert.equal(journey.cancelled,true);
 });
