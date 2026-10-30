@@ -2,12 +2,13 @@
 const T=THREE;
 export function createShowroom(stage) {
  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
- let renderer=null,scene=null,camera=null,model=null,frame=null,last=0,phase=0,failed=false;
- const visible=()=>document.body.dataset.mode==='lobby'&&!document.hidden&&![...document.querySelectorAll('.sheet')].some(s=>!s.hidden);
+ let renderer=null,scene=null,camera=null,model=null,frame=null,last=0,phase=0,failed=false,inView=true;
+ let fitWidth=3.9,fitHeight=2.34;
+ const visible=()=>inView&&document.body.dataset.mode==='lobby'&&!document.hidden&&![...document.querySelectorAll('.sheet')].some(s=>!s.hidden);
  function draw() {
   if(!renderer||!model||failed)return;
   const width=stage.clientWidth,height=stage.clientHeight;if(!width||!height)return;
-  const aspect=width/height,halfHeight=Math.max(2.34,3.9/aspect);
+  const aspect=width/height,halfHeight=Math.max(fitHeight,fitWidth/aspect);
   camera.left=-halfHeight*aspect;camera.right=halfHeight*aspect;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
   if(renderer.domElement.width!==Math.round(width*renderer.getPixelRatio())||renderer.domElement.height!==Math.round(height*renderer.getPixelRatio()))renderer.setSize(width,height,false);
   model.rotation.y=reduced.matches?0:Math.sin(phase)*.12;
@@ -34,6 +35,7 @@ export function createShowroom(stage) {
   camera=new T.OrthographicCamera(-3.9,3.9,2.34,-2.34,.1,50);camera.position.set(6,3.1,-7);camera.lookAt(0,.65,0);
  }
  new ResizeObserver(sync).observe(stage);
+ new IntersectionObserver(([entry])=>{inView=entry.isIntersecting;sync();}).observe(stage);
  const observer=new MutationObserver(sync);observer.observe(document.body,{attributes:true,attributeFilter:['data-mode']});document.querySelectorAll('.sheet').forEach(sheet=>observer.observe(sheet,{attributes:true,attributeFilter:['hidden']}));
  document.addEventListener('visibilitychange',sync);reduced.addEventListener('change',sync);
  return {update(source){
@@ -42,6 +44,17 @@ export function createShowroom(stage) {
    if(!renderer)init();if(model)scene.remove(model);
    model=new T.Group();for(const child of source.children)model.add(child.clone(true));
    model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});scene.add(model);phase=0;
+   // Frame the selected model, not a fixed viewport-sized box. The garage now fits
+   // beside the next lesson and must also show the longer cars on a narrow phone.
+   model.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+   const bounds=new T.Box3().setFromObject(model);
+   if(!bounds.isEmpty()){
+    fitWidth=0;fitHeight=0;
+    for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){
+     const p=new T.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse);
+     fitWidth=Math.max(fitWidth,Math.abs(p.x)*1.15);fitHeight=Math.max(fitHeight,Math.abs(p.y)*1.15);
+    }
+   }
    sync();
   }catch(_){failed=true;stage.classList.remove('ready');renderer?.dispose();}
  }};

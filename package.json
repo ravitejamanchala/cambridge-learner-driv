@@ -26,7 +26,8 @@
     "test:control": "node tests/control-browser.mjs",
     "evidence": "node tools/record_evidence.mjs",
     "dev:routes": "node --use-env-proxy tools/local-routes-server.mjs",
-    "test:routes": "node tests/personal-routes-browser.mjs"
+    "test:routes": "node tests/personal-routes-browser.mjs",
+    "test:interface": "node tests/interface-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",

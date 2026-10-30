@@ -3,7 +3,7 @@ import {spawnSync} from 'node:child_process';
 import {appendFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {stripeClient,validatePrice,BILLING_EVENTS} from '../src/billing.mjs';
 const env=process.env,alias=env.PREVIEW_ALIAS;
-if(!/^(pr-\d+|cockpit-review|routes-review)$/.test(alias||''))throw Error('Invalid preview alias');
+if(!/^(pr-\d+|cockpit-review|routes-review|design-review)$/.test(alias||''))throw Error('Invalid preview alias');
 const required=['PREVIEW_DATABASE_URL','PREVIEW_DATABASE_HOST','PREVIEW_CLERK_SECRET_KEY','PREVIEW_CLERK_PUBLISHABLE_KEY','PREVIEW_STRIPE_SECRET_KEY','PREVIEW_STRIPE_PRICE_ID'];
 const missing=required.filter(k=>!env[k]);
 mkdirSync('../test-results',{recursive:true});

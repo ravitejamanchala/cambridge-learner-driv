@@ -1,0 +1,56 @@
+{
+  "source": "Chromium with fixture account; real controls and renderer",
+  "checks": [
+    "Course focus stays inside, selected lesson retains focus, Escape restores navigation",
+    "Selected free drive opens its own brief and has the correct Start action",
+    "Switching Settings → Garage → Close restores the original trigger",
+    "Keyboard car selection updates the real 3D showroom",
+    "Five viewport layouts, 44px navigation targets, mobile lesson list/detail/back and scroll",
+    "Route callout opens the existing builder and Close restores its trigger"
+  ],
+  "viewports": [
+    {
+      "width": 320,
+      "height": 568,
+      "navigation": "reachable",
+      "horizontalOverflow": false,
+      "primaryAction": "reachable"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "navigation": "reachable",
+      "horizontalOverflow": false,
+      "primaryAction": "reachable"
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "navigation": "reachable",
+      "horizontalOverflow": false,
+      "primaryAction": "reachable"
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "navigation": "reachable",
+      "horizontalOverflow": false,
+      "primaryAction": "reachable"
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "navigation": "reachable",
+      "horizontalOverflow": false,
+      "primaryAction": "reachable"
+    }
+  ],
+  "errors": [],
+  "status": "passed",
+  "videoMarks": {
+    "desktop": 7.033,
+    "desktopEnd": 18.641,
+    "mobile": 20.695,
+    "mobileEnd": 27.256
+  }
+}

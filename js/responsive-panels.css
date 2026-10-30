@@ -47,7 +47,6 @@
  .sheet .card header{padding-block:6px}.sheet .card .body{padding-top:12px}
  .sheet .cbtn,.sheet .seg button{min-height:44px}
  .sheet #carPreview{height:130px;min-height:130px}
- #lobby .col.r{display:grid;grid-template-columns:repeat(2,auto);top:68px;gap:8px}
 }
 @media(any-pointer:coarse){.sheet .cbtn,.sheet .seg button{min-height:44px}}
 @media(max-width:600px){

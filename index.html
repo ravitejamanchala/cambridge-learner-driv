@@ -3,16 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#79a9d2">
-<title>Learner Drive</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap">
+<meta name="theme-color" content="#172b2a">
+<title>SlayDrive · Driving practice</title>
 <link rel="stylesheet" href="js/vendor/leaflet.css">
 <link rel="stylesheet" href="js/personal/routes.css">
 <style>
-/* Layout: one full-screen landscape stage. The 3D city is the background; a game-style lobby,
-   a driving HUD and slide-up sheets sit on top. Blue showroom, cream round buttons, teal cards and pink actions. */
+/* Simulator layout and instruments. The dashboard and shared surface theme live in js/interface.css. */
 :root{
   --orange:#79a9d2; --orange-deep:#087f83; --peach:#a1cce5;
   --cream:#fff6ea; --cream-2:#e1f2ed; --cream-edge:#91cfc6;
@@ -38,71 +34,6 @@ button{font:inherit;color:inherit}
 .layer>*{pointer-events:auto}
 body:not([data-mode="lobby"]) #lobby{display:none}
 body:not([data-mode="drive"]) #hud{display:none}
-
-/* ---------- lobby ---------- */
-#lobby{padding:calc(14px + var(--safe-t)) calc(18px + var(--safe-r)) calc(14px + var(--safe-b)) calc(18px + var(--safe-l))}
-#lobby .tint{position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 46% 52% at 50% 58%,rgba(255,200,140,0) 0%,rgba(255,190,130,.08) 45%,rgba(243,154,82,.72) 78%,rgba(222,122,51,.9) 100%)}
-#lobby .dots{position:absolute;inset:0;pointer-events:none;opacity:.5;
-  background-image:radial-gradient(rgba(255,255,255,.55) 1.3px,transparent 1.8px);background-size:15px 15px;
-  -webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 55%,transparent 55%,#000 85%);mask-image:radial-gradient(ellipse 70% 70% at 50% 55%,transparent 55%,#000 85%)}
-#lobby .wm{position:absolute;left:0;right:0;top:46%;transform:translateY(-50%);text-align:center;pointer-events:none;
-  font:700 clamp(80px,17vw,240px)/1 var(--font-display);letter-spacing:.04em;color:rgba(255,255,255,.13)}
-.topbar{position:absolute;left:calc(18px + var(--safe-l));right:calc(18px + var(--safe-r));top:calc(14px + var(--safe-t));display:flex;justify-content:space-between;align-items:center;gap:12px}
-.who{display:flex;align-items:center;gap:10px;border:0;cursor:pointer;background:transparent;padding:0;text-align:left}
-.avatar{width:54px;height:54px;border-radius:16px;background:var(--cream);box-shadow:0 0 0 3px #fff,0 4px 0 var(--cream-edge),0 10px 20px -10px rgba(110,50,10,.6);display:grid;place-items:center;font:700 22px/1 var(--font-display);color:var(--orange-deep);flex:none}
-.who .meta{display:flex;flex-direction:column;gap:4px;min-width:0}
-.who .nm{font:700 17px/1 var(--font-display);color:#fff;text-shadow:0 2px 0 rgba(120,50,10,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
-.xp{display:flex;align-items:center;gap:6px}
-.lv{width:24px;height:24px;border-radius:50%;background:var(--teal);color:#06302b;font:700 12px/24px var(--font-display);text-align:center;box-shadow:0 0 0 2px #fff;flex:none}
-.xpbar{width:120px;height:9px;border-radius:9px;background:var(--plum-a);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
-.xpbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#7ff0df);border-radius:9px;transition:width .8s var(--spring)}
-.stats{display:flex;align-items:center;gap:10px}
-.pill{display:flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 4px;border-radius:999px;background:var(--plum-a);color:#fff;font:600 15px/1 var(--font-mono);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
-.pill .pl{font:600 10px/1 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-left:-3px}
-.pill .ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;margin-left:-2px}
-.pill .ic svg{width:26px;height:26px}
-.iconbtn{width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;background:var(--plum-a);display:grid;place-items:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .4s var(--spring)}
-.iconbtn:active{transform:scale(.94)}
-.iconbtn svg{width:22px;height:22px}
-
-.col{position:absolute;top:50%;transform:translateY(-46%);display:flex;flex-direction:column;gap:clamp(10px,2.6vh,22px)}
-.col.l{left:calc(22px + var(--safe-l))}
-.col.r{right:calc(22px + var(--safe-r));top:calc(84px + var(--safe-t));transform:none}
-.gbtn{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:transparent;cursor:pointer;padding:0;width:76px}
-.gbtn .disc{width:clamp(52px,9.5vh,68px);height:clamp(52px,9.5vh,68px);border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffdf8,var(--cream) 55%,var(--cream-2));
-  box-shadow:0 0 0 3px #fff,0 5px 0 var(--cream-edge),0 14px 22px -10px rgba(110,50,10,.65);display:grid;place-items:center;transition:transform .45s var(--spring)}
-.gbtn .disc svg{width:56%;height:56%}
-.gbtn:hover .disc{transform:translateY(-2px)}
-.gbtn:active .disc{transform:translateY(2px) scale(.97);box-shadow:0 0 0 3px #fff,0 2px 0 var(--cream-edge),0 8px 14px -8px rgba(110,50,10,.6)}
-.gbtn .lb{font:700 11.5px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 2px 0 rgba(120,50,10,.5)}
-.gbtn .badge{position:absolute;margin:-6px 0 0 44px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--pink);color:#fff;font:700 11px/20px var(--font-display);text-align:center;box-shadow:0 0 0 2px #fff}
-
-.passcard{position:absolute;left:calc(22px + var(--safe-l));bottom:calc(18px + var(--safe-b));width:min(300px,34vw);border:0;cursor:pointer;text-align:left;
-  border-radius:20px;padding:12px 16px 14px 62px;background:linear-gradient(180deg,#c3aefa,var(--lav));color:#fff;box-shadow:0 0 0 3px #fff,0 5px 0 var(--lav-deep),0 16px 26px -14px rgba(60,30,120,.6)}
-.passcard .tk{position:absolute;left:12px;top:50%;transform:translateY(-50%) rotate(-12deg);width:42px;height:30px;border-radius:7px;background:linear-gradient(180deg,#ffe07a,var(--gold));box-shadow:0 3px 0 #d9971b;display:grid;place-items:center;font:700 11px/1 var(--font-display);color:#7a4a00}
-.passcard b{display:block;font:700 15px/1.1 var(--font-display);letter-spacing:.04em;text-transform:uppercase;text-shadow:0 2px 0 rgba(70,40,150,.45)}
-.passcard .row{display:flex;align-items:center;gap:8px;margin-top:8px}
-.passcard .n{width:22px;height:22px;border-radius:50%;background:#fff;color:var(--lav-deep);font:700 12px/22px var(--font-display);text-align:center;flex:none}
-.passcard .bar{flex:1;height:10px;border-radius:9px;background:rgba(43,32,48,.35);overflow:hidden}
-.passcard .bar i{display:block;height:100%;width:0;background:#fff;border-radius:9px;transition:width .8s var(--spring)}
-
-.credit-line{position:absolute;left:50%;bottom:calc(10px + var(--safe-b));transform:translateX(-50%);margin:0;max-width:24vw;text-align:center;font:500 10px/1.35 var(--font-body);color:rgba(255,255,255,.78);text-shadow:0 1px 0 rgba(120,50,10,.4);pointer-events:none}
-.playzone{position:absolute;right:calc(22px + var(--safe-r));bottom:calc(18px + var(--safe-b));display:flex;flex-direction:column;align-items:flex-end;gap:12px;width:min(320px,38vw)}
-.event{position:relative;width:100%;display:flex;align-items:center;gap:12px;border:0;cursor:pointer;text-align:left;padding:10px 14px 10px 10px;border-radius:18px;
-  background:linear-gradient(180deg,#c6b3fb,var(--lav));color:#fff;box-shadow:0 0 0 3px #fff,0 5px 0 var(--lav-deep),0 16px 26px -14px rgba(60,30,120,.6)}
-.event .th{width:52px;height:52px;border-radius:13px;background:var(--cream);display:grid;place-items:center;flex:none;box-shadow:inset 0 0 0 2px #fff}
-.event .th svg{width:34px;height:34px}
-.event .tx{min-width:0;display:flex;flex-direction:column;gap:3px}
-.event .k{font:600 11px/1 var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85)}
-.event .t{font:700 17px/1.15 var(--font-display);text-shadow:0 2px 0 rgba(70,40,150,.4);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.event .s{font:500 12px/1.2 var(--font-body);color:rgba(255,255,255,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.event .i{position:absolute;right:-8px;top:-8px;width:26px;height:26px;border-radius:50%;background:var(--pink);color:#fff;font:700 14px/26px var(--font-display);text-align:center;box-shadow:0 0 0 2px #fff}
-.play{width:100%;height:clamp(64px,13vh,84px);border:0;cursor:pointer;border-radius:28px;background:linear-gradient(180deg,#fffaf2,#ffe9ef);
-  box-shadow:0 0 0 4px var(--lav),0 0 0 7px #fff,0 8px 0 4px var(--lav-deep),0 22px 30px -14px rgba(80,30,90,.7);
-  font:700 clamp(30px,6vh,40px)/1 var(--font-display);letter-spacing:.06em;color:var(--pink);text-shadow:0 2px 0 #fff,0 3px 0 rgba(239,79,151,.25);transition:transform .45s var(--spring)}
-.play:hover{transform:translateY(-2px)}
-.play:active{transform:translateY(3px) scale(.985)}
 
 /* ---------- sheets (panels) ---------- */
 .sheet{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:calc(14px + var(--safe-t)) 16px calc(14px + var(--safe-b));background:rgba(46,24,12,.42);pointer-events:auto;animation:fade .35s var(--spring)}
@@ -364,79 +295,6 @@ body.parking-drive #gearControls p{display:none}
 #carPreview{height:190px;min-height:150px;border-radius:20px;background:linear-gradient(160deg,var(--cream-2),#fff);overflow:hidden}#carPreview canvas{width:100%;height:100%;display:block}#carStatus{margin:0;text-align:center;color:var(--ink-soft);font:600 14px/1.3 var(--font-display)}.car-symbol svg{width:64px;height:40px}.car-choice{min-height:104px}.car-selected{font:600 11px/1 var(--font-display);color:var(--lav-deep);visibility:hidden}.car-choice[aria-checked=true] .car-selected{visibility:visible}@media(max-height:500px){#carPreview{height:120px;min-height:120px}}
 
 
-body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1cce5 0%,#8bbade 47%,#709fca 100%)}
-.showcase{position:absolute;left:12%;right:12%;top:95px;bottom:250px;pointer-events:none!important}
-.showcase h1{position:absolute;top:14%;left:-10%;right:-10%;text-align:center;color:white;font:600 clamp(100px,19vw,280px)/1 var(--font-display);letter-spacing:-.045em;white-space:nowrap;margin:0;z-index:1}
-.showcase #homeCarStage{position:absolute;z-index:2;left:0;top:8%;width:100%;height:100%;transform:scale(1.12);pointer-events:none}
-.selection{position:absolute;left:50%;transform:translateX(-50%);bottom:145px;max-width:calc(100% - 270px);z-index:4;text-align:center}
-.selection p{font:600 12px/1 var(--font-display);color:#254962;margin:0 0 12px}.cars{display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:8px 8px 12px}.cars::-webkit-scrollbar{display:none}
-.home-car-choice{width:62px;height:62px;min-height:0;border:3px solid white;border-radius:50%;padding:0;background:var(--cream);flex:none;position:relative;box-shadow:0 3px 0 #557f9f;cursor:pointer}
-.home-car-choice img{width:100%;height:100%;object-fit:contain;transform:scale(1.5);pointer-events:none}
-.home-car-choice[aria-checked=true]{box-shadow:0 0 0 4px var(--lav-deep),0 0 0 7px white,0 7px 0 #557f9f}
-.home-car-choice[aria-checked=true]:after{content:'✓';position:absolute;bottom:-3px;right:-4px;background:var(--lav-deep);color:white;width:20px;height:20px;border-radius:50%;border:2px solid white;font:700 12px/16px system-ui}
-.car-label{font:500 15px/1.5 var(--font-display);color:#16374f;margin-top:2px}.car-label span{color:#254962;font-size:12px;margin-left:8px}
-.credit-line{color:#254962;text-shadow:none}
-@media(max-width:700px) and (orientation:portrait){
- .topbar{left:16px;right:16px}.stats .pill:nth-child(3){display:none}.xpbar{width:70px}.stats{gap:7px}.pill{padding-right:9px;font-size:12px}.pill .pl{font-size:9px}
- .col.l{top:185px;transform:none}.col.r{top:100px}.col{gap:18px}.gbtn{width:58px;gap:6px}.gbtn .disc{width:49px;height:49px}.gbtn .lb{font-size:9px;letter-spacing:.03em}
- .showcase{top:150px;bottom:auto;height:340px;left:8%;right:8%}.showcase h1{top:24%;left:-5%;right:-5%;font-size:29vw}.showcase #homeCarStage{transform:scale(1.35);top:9%}
- .selection{top:505px;bottom:auto;width:100%;max-width:100%;padding:0 12px}.selection p{font-size:11px;margin-bottom:6px}.cars{gap:12px;padding:8px 9px 13px}.home-car-choice{width:51px;height:51px}.car-label{font-size:13px}
- .passcard{left:18px;width:34vw;padding:12px 10px 12px 42px}.passcard .tk{left:8px;width:26px;height:26px}.passcard b{font-size:11px;letter-spacing:0}.passcard .row{gap:5px}.passcard .n{width:18px;height:18px;font-size:10px;line-height:18px}
- .playzone{right:18px;width:49vw;gap:12px}.event{gap:7px;padding:9px}.event .th{width:36px;height:42px}.event .th svg{width:28px;height:28px}.event .k{font-size:9px;letter-spacing:0}.event .t{font-size:13px}.event .s{font-size:9px}.play{height:66px;font-size:30px}
- .credit-line{bottom:1px;font-size:9px}
-}
-@media(max-width:700px) and (orientation:portrait) and (max-height:760px){.showcase{top:125px;height:290px}.selection{top:425px}.col.l{top:155px}.col{gap:13px}.gbtn .disc{width:44px;height:44px}.play{height:56px}.event .s{display:none}}
-
-
-/* Compact home cards and teal accents; no redundant car-selection labels. */
-#lobby{--lav:#38cbb9;--lav-deep:#087f83}
-#lobby .passcard,#lobby .event{background:linear-gradient(180deg,#61dccb,#38cbb9);color:#073c37;box-shadow:0 0 0 3px #fff,0 4px 0 #168e84,0 14px 24px -14px rgba(7,60,55,.45)}
-#lobby .passcard b,#lobby .event .t{text-shadow:none}
-#lobby .event .k,#lobby .event .s{color:#0c4a44}
-#lobby .passcard .bar{background:#207e74}#lobby .passcard .n{color:#087f83}
-#lobby .passcard{width:min(240px,30vw);padding:9px 12px 10px 52px;border-radius:17px}
-#lobby .passcard .tk{left:10px;width:32px;height:26px;font-size:10px}#lobby .passcard b{font-size:12px}#lobby .passcard .row{margin-top:6px}
-#lobby .playzone{width:min(260px,34vw);gap:10px}
-#lobby .event{gap:9px;padding:8px 11px 8px 8px;border-radius:16px}
-#lobby .event .th{width:38px;height:38px;border-radius:11px}#lobby .event .th svg{width:28px;height:28px}
-#lobby .event .k{font-size:9px}#lobby .event .t{font-size:14px}#lobby .event .s{font-size:10px}
-#lobby .play{height:56px;border-radius:20px;font-size:28px;box-shadow:0 0 0 3px var(--lav),0 0 0 5px #fff,0 5px 0 3px var(--lav-deep),0 18px 25px -14px rgba(7,60,55,.4)}
-#lobby [fill="#b49cf5"]{fill:#38cbb9}#lobby [stroke="#8a6ae3"],#lobby [stroke="#6a4fc4"]{stroke:#087f83}
-@media(max-width:700px) and (orientation:portrait){
- #lobby .passcard{left:18px;width:32vw;padding:8px 8px 9px 36px;min-height:52px}
- #lobby .passcard .tk{left:6px;width:23px;height:24px}#lobby .passcard b{font-size:10px;letter-spacing:0}
- #lobby .playzone{right:18px;width:47vw;gap:9px}
- #lobby .event{padding:7px;gap:6px}#lobby .event .th{width:30px;height:34px}#lobby .event .th svg{width:24px;height:24px}
- #lobby .event .k{font-size:8px;letter-spacing:0}#lobby .event .t{font-size:12px}#lobby .event .s{font-size:9px}
- #lobby .play{height:50px;font-size:25px;border-radius:18px}
-}
-
-/* Shared theme for every lesson, quiz, menu, report and loading screen. */
-.sheet{background:rgba(24,49,69,.46)}
-.card{box-shadow:0 0 0 4px #fff,0 8px 0 4px var(--cream-edge),0 30px 60px -24px rgba(22,52,70,.55)}
-.card header{background:linear-gradient(180deg,#61dccb,#38cbb9);color:#073c37}.card header h2{text-shadow:none}.card header .x{color:#073c37;background:rgba(255,255,255,.65)}
-.cbtn.lav{background:linear-gradient(180deg,#61dccb,#38cbb9);color:#073c37;box-shadow:0 4px 0 #168e84}
-.cbtn.go{background:linear-gradient(180deg,#cf2875,#b81f65);color:#fff;box-shadow:0 4px 0 #871548}
-.full{background:radial-gradient(ellipse at 50% 43%,#a1cce5,#709fca);color:#fff}.full h1{text-shadow:0 2px 0 rgba(24,49,69,.2)}
-.hud-next .ico{background:#087f83}.glass{background:rgba(24,43,60,.84)}.tb{background:rgba(24,43,60,.64)}
-#trainingControls button[aria-pressed=true]{background:#b9eee3;color:#073c37}
-
-.tile[aria-checked=true],.item[aria-checked=true]{box-shadow:0 0 0 3px var(--lav-deep),0 4px 0 var(--lav-deep)}
-:focus-visible{outline-color:var(--lav-deep)}
-.sheet [fill="#b49cf5"]{fill:#38cbb9}.sheet [stroke="#8a6ae3"],.sheet [stroke="#6a4fc4"]{stroke:#087f83}
-#homeCarStage>img,#homeCarStage>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-#homeCarStage.ready>img{visibility:hidden}#homeCarStage{z-index:2}
-.showcase h1.long-name{font-size:13vw}
-.showcase.switching #homeCarStage{animation:car-enter .45s var(--spring)}
-@keyframes car-enter{from{opacity:0;translate:24px 0}to{opacity:1;translate:0 0}}
-.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-#homeCarStatus.error{position:static!important;width:auto!important;height:auto!important;margin:8px 0 0!important;clip:auto!important;white-space:normal!important;color:#16374f;font:600 12px/1.4 var(--font-body)}
-.home-car-choice[aria-busy=true]{opacity:.6}
-@media(max-width:700px) and (orientation:portrait){.showcase h1.long-name{font-size:18vw}.topbar .who .nm{max-width:90px}.selection{overflow:hidden}}
-@media(max-width:360px) and (orientation:portrait){.xpbar{width:44px}.avatar{width:44px;height:44px}.topbar{left:12px;right:12px;gap:6px}.stats .pill .pl{display:none}.pill{padding-right:8px}.gbtn{width:50px}.col.l{left:14px}.col.r{right:14px}}
-@media(max-height:620px) and (orientation:portrait){.showcase{top:105px;height:240px}.selection{top:350px}.col.l{top:128px}.col.r{top:88px}.col{gap:9px}.gbtn .disc{width:44px;height:44px}.home-car-choice{width:46px;height:46px}.cars{gap:10px}#lobby .passcard{bottom:16px}#lobby .playzone{bottom:16px}}
-@media(orientation:landscape) and (max-height:600px){.showcase{top:56px;bottom:108px;left:20%;right:20%}.showcase h1{font-size:19vw;top:12%}.showcase h1.long-name{font-size:12vw}.selection{bottom:76px;max-width:calc(100% - 330px)}.home-car-choice{width:44px;height:44px}.cars{gap:10px}.col.l{top:92px}.col.r{top:76px}.gbtn .disc{width:44px;height:44px}.gbtn .lb{font-size:9px}#lobby .playzone{width:185px;bottom:14px}#lobby .passcard{width:180px;bottom:14px}#lobby .play{height:44px;font-size:24px}#lobby .event .th{display:none}#lobby .event .s{display:none}.avatar{width:44px;height:44px}.col{gap:10px}.col.r{display:flex}}
-
 .account-panel{padding:12px 0;border-bottom:1px solid #ddd;margin-bottom:12px}.account-panel .cbtn{margin:4px 4px 4px 0}.account-panel [hidden]{display:none!important}
 .access-locked{opacity:.6}
 .subscription-offer{margin:12px 0;padding:12px;border:1px solid #c9b8de;border-radius:12px;background:#fffaf3}
@@ -454,6 +312,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 }
 </style>
 <link rel="stylesheet" href="js/responsive-panels.css">
+<link rel="stylesheet" href="js/interface.css">
 </head>
 <body>
 <div id="app">
@@ -461,47 +320,73 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 
   <!-- ================= LOBBY ================= -->
   <div class="layer" id="lobby">
-    <div class="showcase"><h1 id="carTitle">RX-7</h1><div id="homeCarStage" role="img" aria-label="Selected RX-7 car"><img id="heroCar" src="models/car-rx7.png" alt="" draggable="false"></div></div>
-    <section class="selection" aria-label="Choose your car"><div class="cars" id="homeCars" role="radiogroup" aria-label="Cars"></div><p id="homeCarStatus" role="status" class="visually-hidden"></p></section>
-    <div class="topbar">
+    <header class="topbar">
+      <div class="brand" aria-label="SlayDrive"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 28 28" fill="none"><path d="M20 6H11a5 5 0 0 0 0 10h6a3 3 0 0 1 0 6H8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="6" r="3" fill="currentColor"/></svg></span><span>slaydrive<span class="brand-caption">DRIVING PRACTICE</span></span></div>
+      <div class="account-tools">
       <button class="who" id="whoBtn" aria-label="Switch learner">
         <span class="avatar" id="whoAv">?</span>
         <span class="meta"><span class="nm" id="whoName">Learner</span><span class="xp"><span class="lv" id="whoLv">1</span><span class="xpbar"><i id="whoXp"></i></span></span></span>
       </button>
-      <div class="stats">
-        <div class="pill" title="Course modules passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M4 8c4-2 8-2 12 1v17c-4-3-8-3-12-1z" fill="#ffd28a" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/><path d="M28 8c-4-2-8-2-12 1v17c4-3 8-3 12-1z" fill="#ffe7bd" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/></svg></span><span id="statLessons">0/13</span><span class="pl">course</span></div>
-        <div class="pill" title="Puzzle stars"><span class="ic"><svg viewBox="0 0 32 32"><path d="M16 3l3.9 8 8.6 1.2-6.3 6 1.5 8.6L16 22.7 8.3 26.8l1.5-8.6-6.3-6L12.1 11z" fill="#ffc23d" stroke="#c98a0e" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statStars">0</span><span class="pl">stars</span></div>
-        <div class="pill" title="Mock tests passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M9 5h14v6a7 7 0 0 1-14 0z" fill="#ef4f97" stroke="#a52a63" stroke-width="1.5"/><path d="M9 7H5v2a5 5 0 0 0 5 5M23 7h4v2a5 5 0 0 1-5 5" fill="none" stroke="#a52a63" stroke-width="1.5"/><path d="M16 18v4M11 27h10l-1.5-5h-7z" fill="#ffc23d" stroke="#a52a63" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statMocks">0</span><span class="pl">mocks</span></div>
         <button class="iconbtn" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg></button>
       </div>
-    </div>
-    <div class="col l">
-      <button class="gbtn" data-open="courseSheet" aria-label="Course"><span class="disc"><svg viewBox="0 0 40 40"><path d="M6 9c5-2 10-2 14 1v22c-4-3-9-3-14-1z" fill="#ffd28a" stroke="#c9741f" stroke-width="2" stroke-linejoin="round"/><path d="M34 9c-5-2-10-2-14 1v22c4-3 9-3 14-1z" fill="#ffe7bd" stroke="#c9741f" stroke-width="2" stroke-linejoin="round"/><path d="M10 15c2.5-.8 5-.6 7 .6M10 20c2.5-.8 5-.6 7 .6M23 15.6c2-1.2 4.5-1.4 7-.6" stroke="#c9741f" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="lb">Course</span></button>
-      <button class="gbtn" data-open="mockSheet" aria-label="Mock test"><span class="disc"><svg viewBox="0 0 40 40"><rect x="8" y="7" width="24" height="28" rx="4" fill="#fff" stroke="#8a6ae3" stroke-width="2"/><rect x="14" y="4" width="12" height="7" rx="2.5" fill="#b49cf5" stroke="#8a6ae3" stroke-width="2"/><path d="M13 19l3 3 6-6M13 28h14" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lb">Mock test</span></button>
-      <button class="gbtn" data-open="codeSheet" aria-label="Highway Code"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff" stroke="#d2232a" stroke-width="4.5"/><text x="20" y="25" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="14" fill="#2b2030">20</text></svg></span><span class="lb">Highway Code</span></button>
+    </header>
+    <nav class="lobby-nav" aria-label="Practice and resources">
+      <span class="nav-label">YOUR PRACTICE</span>
+      <div class="col l">
+          <button class="gbtn" data-open="courseSheet" aria-label="Course"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a3 3 0 0 1 3 3v12a4 4 0 0 0-3-2H4zM13 8a3 3 0 0 1 3-3h4v13h-4a4 4 0 0 0-3 2"/></svg></span><span class="lb">Course</span></button>
+          <button class="gbtn" data-open="mockSheet" aria-label="Mock test"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M8 10l2 2 5-5M9 16h6"/></svg></span><span class="lb">Mock test</span></button>
+          <button class="gbtn" data-open="freeSheet" aria-label="Free drive"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21 9 3m6 0 4 18M12 4v3m0 4v3m0 4v3"/></svg></span><span class="lb">Free drive</span></button>
+          <button class="gbtn" id="myRoutesBtn" aria-label="My routes"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="18" r="2"/><path d="M7 18h7a4 4 0 0 0 0-8h-3a3 3 0 0 1 0-6h6M17 2l3 2-3 2"/></svg></span><span class="lb">My routes</span></button>
+      </div>
+      <span class="nav-label">RESOURCES</span>
+      <div class="col r">
+          <button class="gbtn" data-open="codeSheet" aria-label="Highway Code"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 8h4v8M7 16h10"/></svg></span><span class="lb">Highway Code</span></button>
+          <button class="gbtn" data-open="controlsSheet" aria-label="Controls"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="m4 9 6 2m4 0 6-2m-8 5v7"/></svg></span><span class="lb">Controls</span></button>
+          <button class="gbtn" id="profBtn2" data-open="profileSheet" aria-label="Learners"><span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span class="lb">Learners</span></button>
+      </div>
+      <div class="nav-footer"><span class="learner-plate" aria-hidden="true">L</span><p>A little practice.<br>A little more confidence.</p><small>A learning aid for your real lessons.</small></div>
+    </nav>
+    <main class="lobby-main" aria-labelledby="homeHeading">
+      <div class="dashboard-heading"><div><p class="eyebrow">YOUR DRIVING SPACE</p><h1 id="homeHeading">Ready for the road.</h1><p>Build confidence, one drive at a time.</p></div><div class="stats" aria-label="Your progress">
 
-    </div>
-    <div class="col r">
-      <button class="gbtn" data-open="freeSheet" aria-label="Free drive"><span class="disc"><svg viewBox="0 0 40 40"><path d="M13 34 18 6h4l5 28z" fill="#fff" stroke="#8a6ae3" stroke-width="2" stroke-linejoin="round"/><path d="M20 10v4M20 19v4M20 28v4" stroke="#ef4f97" stroke-width="2.4" stroke-linecap="round"/><path d="M9 34 15 6M31 34 25 6" stroke="#b49cf5" stroke-width="2" stroke-linecap="round"/></svg></span><span class="lb">Free drive</span></button>
-      <button class="gbtn" id="myRoutesBtn" aria-label="My routes"><span class="disc"><svg viewBox="0 0 40 40"><path d="M8 30C28 30 12 12 31 12" fill="none" stroke="#ef4f97" stroke-width="4" stroke-linecap="round"/><circle cx="8" cy="30" r="5" fill="#fff" stroke="#087f83" stroke-width="3"/><path d="M31 7a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z" fill="#ffc23d" stroke="#b47a11" stroke-width="2"/></svg></span><span class="lb">My routes</span></button>
-      <button class="gbtn" id="profBtn2" data-open="profileSheet" aria-label="Learners"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="15" r="6.5" fill="#ffc28c" stroke="#c9741f" stroke-width="2"/><path d="M8 33c1.5-7 6.5-10 12-10s10.5 3 12 10z" fill="#ef4f97" stroke="#a52a63" stroke-width="2" stroke-linejoin="round"/></svg></span><span class="lb">Learners</span></button>
-      <button class="gbtn" data-open="controlsSheet" aria-label="Controls"><span class="disc"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff" stroke="#3b2416" stroke-width="2.6"/><circle cx="20" cy="20" r="3.4" fill="#3b2416"/><path d="M8 18c4-1.5 8-2 12-2s8 .5 12 2M20 23.5V33" stroke="#3b2416" stroke-width="2.6" stroke-linecap="round"/></svg></span><span class="lb">Controls</span></button>
-    </div>
-    <button class="passcard" id="passCard" data-open="courseSheet" aria-label="Course progress">
-      <span class="tk">L</span>
-      <b id="passTitle">Learner pass</b>
-      <span class="row"><span class="n" id="passUnit">1</span><span class="bar"><i id="passBar"></i></span></span>
-    </button>
+        <div class="pill" title="Course modules passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M4 8c4-2 8-2 12 1v17c-4-3-8-3-12-1z" fill="#ffd28a" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/><path d="M28 8c-4-2-8-2-12 1v17c4-3 8-3 12-1z" fill="#ffe7bd" stroke="#c9741f" stroke-width="1.6" stroke-linejoin="round"/></svg></span><span id="statLessons">0/13</span><span class="pl">course</span></div>
+        <div class="pill" title="Road lesson stars"><span class="ic"><svg viewBox="0 0 32 32"><path d="M16 3l3.9 8 8.6 1.2-6.3 6 1.5 8.6L16 22.7 8.3 26.8l1.5-8.6-6.3-6L12.1 11z" fill="#ffc23d" stroke="#c98a0e" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statStars">0</span><span class="pl">stars</span></div>
+        <div class="pill" title="Mock tests passed"><span class="ic"><svg viewBox="0 0 32 32"><path d="M9 5h14v6a7 7 0 0 1-14 0z" fill="#ef4f97" stroke="#a52a63" stroke-width="1.5"/><path d="M9 7H5v2a5 5 0 0 0 5 5M23 7h4v2a5 5 0 0 1-5 5" fill="none" stroke="#a52a63" stroke-width="1.5"/><path d="M16 18v4M11 27h10l-1.5-5h-7z" fill="#ffc23d" stroke="#a52a63" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span id="statMocks">0</span><span class="pl">mocks</span></div>
 
-    <p id="personalOpenStatus" role="status"></p>
-    <div class="playzone">
-      <button class="event" id="eventCard" aria-label="Selected drive details">
-        <span class="th" id="eventIco"></span>
-        <span class="tx"><span class="k" id="eventKind">Next lesson</span><span class="t" id="eventTitle">Moving off and stopping</span><span class="s" id="eventSub">Gresham Road</span></span>
-        <span class="i">i</span>
-      </button>
-      <button class="play" id="playBtn">START</button>
-    </div>
+      </div></div>
+      <div class="dashboard-overview">
+        <section class="playzone" aria-label="Your selected drive">
+          <span class="eyebrow">YOUR NEXT DRIVE</span>
+          <button class="event" id="eventCard" aria-label="Selected drive details">
+            <span class="th" id="eventIco" aria-hidden="true"></span>
+            <span class="tx"><span class="k" id="eventKind">Next lesson</span><span class="t" id="eventTitle">Moving off and stopping</span><span class="s" id="eventSub">Gresham Road</span></span>
+            <span class="event-link">View brief <svg class="arrow-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></span>
+          </button>
+          <button class="play" id="playBtn">Start lesson <span aria-hidden="true">→</span></button>
+          <button class="text-button" data-open="courseSheet">Browse all lessons</button>
+        </section>
+        <section class="showcase" aria-labelledby="carTitle">
+          <div class="garage-heading"><div><p class="eyebrow">YOUR GARAGE</p><h2 id="carTitle">RX-7</h2></div><button class="text-button" data-open="carSheet">View garage <svg class="arrow-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></button></div>
+          <div id="homeCarStage" role="img" aria-label="Selected RX-7 car"><img id="heroCar" src="models/car-rx7.png" alt="" draggable="false"></div>
+          <section class="selection" aria-label="Choose your car"><div class="cars" id="homeCars" role="radiogroup" aria-label="Cars"></div><p id="homeCarStatus" role="status" class="visually-hidden"></p></section>
+        </section>
+      </div>
+      <div class="dashboard-lower">
+        <button class="passcard" id="passCard" data-open="courseSheet" aria-label="Course progress">
+          <span class="eyebrow">YOUR LEARNING JOURNEY <svg class="arrow-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></span>
+          <b id="passTitle">Getting started</b>
+          <span class="row"><span class="n">Unit <span id="passUnit">1</span></span><span class="pass-count" id="courseProgressLabel">0 of 59 lessons</span></span>
+          <span class="bar" id="courseProgress" role="progressbar" aria-label="Course completion" aria-valuemin="0" aria-valuemax="59" aria-valuenow="0"><i id="passBar"></i></span>
+          <span class="pass-hint">Every lesson is a step forward.</span>
+        </button>
+        <section class="route-callout" aria-labelledby="routeCalloutTitle">
+          <div class="route-art" aria-hidden="true"><svg viewBox="0 0 130 130" fill="none"><path d="M-10 40 140 90M-10 80 140 130M25-10l-20 150M80-10 45 140M130-10 100 140" stroke="currentColor" stroke-width="16"/><path d="M29 96 45 30l58 20-14 48" stroke="#087f73" stroke-width="3" stroke-linecap="round" stroke-dasharray="5 6"/><circle cx="29" cy="96" r="7" fill="#087f73" stroke="white" stroke-width="3"/><circle cx="89" cy="98" r="7" fill="#172b2a" stroke="white" stroke-width="3"/></svg></div>
+          <div class="route-callout-copy"><span class="eyebrow">EXPLORE YOUR AREA <span class="tag">Experimental</span></span><h2 id="routeCalloutTitle">Your roads. Your route.</h2><p>Choose a start and finish, then practise the drive.</p><button class="text-button" data-route-builder>Create a route <span aria-hidden="true">→</span></button></div>
+        </section>
+      </div>
+      <p id="personalOpenStatus" role="status"></p>
+      <footer class="dashboard-footer"><span>UK driving practice</span><button class="text-button" data-open="creditsSheet">Map credits &amp; technology</button></footer>
+    </main>
   </div>
 
   <!-- ================= DRIVING HUD ================= -->
@@ -560,7 +445,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
     <header><h2 id="profH">Who's learning?</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
     <div class="body">
       <p id="accessNotice" class="muted" role="status">Free: Highway Code and the first three practical lessons. Subscribe for £4.99/month to unlock the full course and mock tests. Renews monthly until cancelled.</p>
-      <p id="practiceSummary" class="muted"></p><ul id="recentHistory"></ul><div class="list" id="profList"></div>
+      <p id="practiceSummary" class="muted"></p><ul id="recentHistory"></ul><div class="list" id="profList" role="radiogroup" aria-label="Learners"></div>
       <form class="field" id="profForm" autocomplete="off"><label for="profName">New learner</label><div class="row2"><input type="text" id="profName" maxlength="40" placeholder="First name"><button class="cbtn go" type="submit">Add learner</button></div></form>
       <p class="muted">Guest progress is saved in this browser. Sign in to sync your account across devices.</p>
     </div></div></div>
@@ -583,7 +468,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
 
   <div class="sheet" id="codeSheet" hidden><div class="card" role="dialog" aria-labelledby="codeH">
     <header><h2 id="codeH">Highway Code</h2><button class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
-    <div class="body"><p class="muted">The rules each lesson is built on, paraphrased. Read the full Highway Code at gov.uk.</p><div class="list" id="codeList"></div></div></div></div>
+    <div class="body" tabindex="0" role="region" aria-label="Highway Code rules"><p class="muted">The rules each lesson is built on, paraphrased. Read the full Highway Code at gov.uk.</p><div class="list" id="codeList"></div></div></div></div>
 
   <div class="sheet" id="carSheet" hidden><div class="card" role="dialog" aria-labelledby="carH">
     <header><h2 id="carH">Your car</h2><button class="x" data-close aria-label="Close">×</button></header>
@@ -648,7 +533,7 @@ body{background:#79a9d2}#lobby{background:radial-gradient(ellipse at 50% 43%,#a1
     </div></div></div>
 
   <!-- ================= LOADING & ROTATE ================= -->
-  <div class="full" id="loadOv"><div class="in"><h1>Learner Drive</h1><div class="loader"><i></i></div><p id="loadMsg">Loading…</p><p id="loadErr" hidden>Reload the page to try again.</p></div></div>
+  <div class="full" id="loadOv"><div class="in"><span class="eyebrow">SLAYDRIVE</span><h1>Your next drive awaits.</h1><div class="loader"><i></i></div><p id="loadMsg">Loading…</p><p id="loadErr" hidden>Reload the page to try again.</p></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

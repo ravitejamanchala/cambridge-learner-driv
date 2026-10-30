@@ -1,4 +1,5 @@
 import {routeStore} from './personal/storage.js';
+import {initDialogs} from './dialogs.js';
 import {createVoiceGuidance} from './voice.js';
 import {createCockpit} from './cockpit.js';
 import {locate as locatePersonal,unproject as unprojectPersonal,MOCK_MIN_METRES} from './personal/geometry.js';
@@ -43,6 +44,7 @@ import { buildReport, runDetail } from './reports.js';
 import { FREE_DRIVES, createFreeStats, stepFreeStats, freeSummaryLines } from './free-drive.js';
 import { centreLine, onCarriageway } from './motorway.js';
 
+initDialogs();
 initAuth().catch(() => {});
 
 const T = THREE, $ = id => document.getElementById(id);
@@ -281,6 +283,7 @@ async function boot() {
     catch(e){$('personalOpenStatus').textContent='Route creator could not load. Check your connection and retry.';}
   }
   $('myRoutesBtn').onclick=openPersonal;
+  document.querySelectorAll('[data-route-builder]').forEach(button => button.addEventListener('click', openPersonal));
   async function installPersonal(track){
     const current=personal;if(!current)throw Error('Drive cancelled.');
     const id=`personal:${current.journey.recipe.id}`,old=A.id;
@@ -360,8 +363,8 @@ async function boot() {
     if (save) { if (portrait()) prefs.camP = cam; else prefs.cam = cam; savePrefs(); }
   };
   window.addEventListener('keydown', e => {
-    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (e.code === 'Escape') { if (hub.anyOpen()) hub.closeSheets(); else if (document.body.dataset.mode === 'drive' && $('resultSheet').hidden) paused ? resume() : pause(); return; }
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (document.body.dataset.mode !== 'drive') return;
     const k = KM[e.code];
     if (k) { key[k] = 1; if (A.test && A.test.running) e.preventDefault(); }
@@ -557,7 +560,7 @@ async function boot() {
       v.textContent = res.pass ? 'Lesson passed' : 'Not yet'; v.className = 'verdict ' + (res.pass ? 'pass' : 'fail');
       // the stars this drive earned, from the marking it was driven on: one for Easy, two for Medium, three for Hard
       const n = res.stars || 0, mode = modeOf(res.mode);
-      $('rNote').innerHTML = `<span class="stars big" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
+      $('rNote').innerHTML = `<span class="stars big" role="img" aria-label="${n} of 3 stars">${[1, 2, 3].map(i => STAR(i <= n)).join('')}</span>` + plan.lesson.title.replace(/[<>&]/g, '') + ` · marked on ${mode.title}`;
       reasons.innerHTML = res.reasons.map(r => `<li>${r}</li>`).join('');
       const nx = res.pass ? hub.next(plan) : null; next.hidden = !nx;
       if (nx) { next.dataset.kind = nx.kind; next.dataset.id = nx.id; next.textContent = 'Next lesson'; }
@@ -568,7 +571,7 @@ async function boot() {
       $('endTag').textContent = 'Mock test complete';
       v.textContent = pass ? 'Pass. Well driven.' : 'Not this time'; v.className = 'verdict ' + (pass ? 'pass' : 'fail');
       const real = mode.id === 'hard' ? '' : ` Marked on ${mode.title}; the real test is Hard (15 driving faults, no serious).`;
-      $('rNote').innerHTML = `<span class="stars big" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
+      $('rNote').innerHTML = `<span class="stars big" role="img" aria-label="${j.stars} of 3 stars">${[1, 2, 3].map(i => STAR(i <= j.stars)).join('')}</span>` + (pass ? (test.D ? `You picked up ${test.D} driving fault${test.D > 1 ? 's' : ''}. The marking sheet shows where.` : 'A clean drive with no faults recorded.')
         : (test.S > j.maxS ? `${test.S} serious fault${test.S > 1 ? 's' : ''} means a fail. The marking sheet shows what to work on.` : j.collision ? 'A collision is never forgiven. The marking sheet shows what to work on.' : `More than ${j.maxD} driving faults means a fail. The marking sheet shows what to work on.`)) + real;
       $('coachingReport').textContent = test.faults.map(f => f.cat + ': ' + f.text).join(' ') || 'No faults recorded in this mock test.';
       showRunDetail({ kind: 'mock', lesson: null, test, scenario });

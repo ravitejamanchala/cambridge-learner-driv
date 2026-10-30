@@ -49,7 +49,7 @@ try{
  await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='rx7');
  assert.equal(await page.locator('#carTitle').textContent(),'RX-7');
  assert.equal(await page.locator('#homeCars [aria-checked="true"]').count(),1);
- await page.locator('#setBtn').click();await page.locator('[data-open="carSheet"]').click();
+ await page.locator('#setBtn').click();await page.locator('#settingsSheet [data-open="carSheet"]').click();
  await page.locator('#carList [data-car="suv"]').click();await page.waitForFunction(()=>window.cambridgeDrive.player.carId==='suv');
  assert.equal(await page.locator('#carTitle').textContent(),'SUV');
  await page.locator('#carSheet [data-close]').click();

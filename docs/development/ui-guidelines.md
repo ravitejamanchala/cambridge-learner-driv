@@ -3,6 +3,28 @@
 House rules for anything the learner sees while driving. They come from testing the simulator, and they
 are the first thing to check before adding a panel, a message or a control.
 
+## Dashboard and panels
+
+`js/interface.css` holds the shared SlayDrive surface theme: slate navigation, warm white panels,
+teal actions, consistent borders and the locally served Geist font. Keep new interface work in this
+theme instead of adding another palette or large shadow to the inline driving styles.
+
+- Use the dashboard navigation and panels for choosing a drive. A phone has one scrolling content
+  area, with large navigation targets; controls must stay reachable at 320 px and in landscape.
+- Name the primary action for the selected activity: Start lesson, Start quiz, Start free drive or
+  Start mock test. Keep experimental practice labelled as practice.
+- `js/dialogs.js` manages keyboard focus for every app panel. Keep meaningful dialog titles, visible
+  focus, Escape and return focus. The app's background becomes inert while a panel is open; external
+  sign-in dialogs remain available.
+- Use `aria-checked` for radio choices and `aria-pressed` for toggle buttons, not both on one control.
+- Preserve real earned progress. The dashboard counts the same stable lesson IDs and recorded
+  results; visual changes never add progress or alter marking.
+- Respect reduced motion. The garage stops rendering when a panel covers it, the tab is hidden or
+  the car has scrolled out of view. It fits the existing model without changing the driving camera.
+
+Run `npm run test:interface`, `node tests/modal-layout-browser.mjs` and the driving/mobile checks below.
+`npm run evidence -- interface` records the desktop and phone flows in `docs/evidence/interface/`.
+
 ## Learner Drive is dopamine-driven
 
 Learners come back because driving here *feels* like progress. Every feature has to earn that feeling,

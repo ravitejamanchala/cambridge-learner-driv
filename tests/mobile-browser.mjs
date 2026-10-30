@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { installAuthFixture, signedIn } from './auth-fixture.mjs';
 const require=createRequire(import.meta.url), three=path.dirname(require.resolve('three/package.json'));
 const output=path.resolve(process.env.MOBILE_OUTPUT || '../../outputs/mobile-tests');await mkdir(output,{recursive:true});
-const root=path.resolve(process.env.TEST_SITE || 'dist'),port=8781,url=`http://127.0.0.1:${port}`;
+const root=path.resolve(process.env.TEST_SITE || 'dist'),port=Number(process.env.MOBILE_TEST_PORT||8781),url=`http://127.0.0.1:${port}`;
 const server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1','--directory',root],{stdio:'ignore'});
 const results=[];
 const matrix=[

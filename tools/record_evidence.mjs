@@ -418,6 +418,7 @@ GROUPS.boxes = {
   ],
 };
 GROUPS.personal={run:()=>execFileSync(process.execPath,['tools/record-personal-evidence.mjs'],{stdio:'inherit'})};
+GROUPS.interface={run:()=>execFileSync(process.execPath,['tools/record-interface-evidence.mjs'],{stdio:'inherit'})};
 const group = GROUPS[process.argv[2]];
 if (!group) { console.error(`usage: node tools/record_evidence.mjs <${Object.keys(GROUPS).join('|')}>`); process.exit(2); }
 if(group.run){group.run();process.exit(0);}
