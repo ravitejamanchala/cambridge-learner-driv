@@ -1,5 +1,5 @@
 {
-  "revision": "ddf4a1655c6ecb41c562e2e62974d9eb215e5243",
+  "revision": "78e79120d110dc90ddb9b144df6e78a7030316d4",
   "result": "success",
   "visual": "success",
   "smoke": "success",
@@ -15,8 +15,8 @@
     ]
   },
   "url": "https://pr-25.learner-drive-app.pages.dev/",
-  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/41121458771",
-  "recordedAt": "2026-10-30T20:17:09.491Z",
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/41125421095",
+  "recordedAt": "2026-10-30T20:48:30.741Z",
   "mobilePanels": {
     "passed": 48
   },
@@ -46,7 +46,7 @@
   },
   "mapProviders": {
     "source": "live providers through the deployed Pages map proxy",
-    "at": "2026-10-30T20:16:51.140Z",
+    "at": "2026-10-30T20:48:09.336Z",
     "checks": [
       "Cambridge search",
       "OSRM connected driving route",
