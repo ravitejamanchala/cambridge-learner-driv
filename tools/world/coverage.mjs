@@ -1,13 +1,6 @@
-import clipping from "polygon-clipping";
-import { bounds, signedArea } from "../../js/world-data/geometry.js";
-export const area = (polygons) =>
-  polygons.reduce(
-    (sum, rings) =>
-      sum +
-      Math.abs(signedArea(rings[0])) -
-      rings.slice(1).reduce((a, r) => a + Math.abs(signedArea(r)), 0),
-    0,
-  );
+import {clipping,area} from "../../js/world-data/polygons.js";
+export {area};
+import { bounds } from "../../js/world-data/geometry.js";
 export const rectangle = ([x, z, X, Z]) => [
   [
     [

@@ -1,7 +1,7 @@
 import {enrichBuildings} from './building-details.js';
 import {clearRoadside} from '../../roadside-clearance.js';
 import {clearRoadBuildings} from '../../editor-road-clearance.js';
-import {addOSMDetails} from './osm-details.js';
+import {GENERATOR,normalizeForTrack,normalizedScenery} from './normalized.js';
 // OSM geometry -> the simulator's existing decimetre network plus editable footprints.
 const DRIVABLE = new Set([
   "motorway",
@@ -63,95 +63,6 @@ function clip(a, b, box) {
     { x: a.x + hi * dx, z: a.z + hi * dz },
   ];
 }
-function polygonClip(points, box) {
-  let out = points.slice();
-  for (const [inside, cross] of [
-    [
-      (p) => p.x >= box.minX,
-      (a, b) => ({
-        x: box.minX,
-        z: a.z + ((b.z - a.z) * (box.minX - a.x)) / (b.x - a.x),
-      }),
-    ],
-    [
-      (p) => p.x <= box.maxX,
-      (a, b) => ({
-        x: box.maxX,
-        z: a.z + ((b.z - a.z) * (box.maxX - a.x)) / (b.x - a.x),
-      }),
-    ],
-    [
-      (p) => p.z >= box.minZ,
-      (a, b) => ({
-        z: box.minZ,
-        x: a.x + ((b.x - a.x) * (box.minZ - a.z)) / (b.z - a.z),
-      }),
-    ],
-    [
-      (p) => p.z <= box.maxZ,
-      (a, b) => ({
-        z: box.maxZ,
-        x: a.x + ((b.x - a.x) * (box.maxZ - a.z)) / (b.z - a.z),
-      }),
-    ],
-  ]) {
-    const input = out;
-    out = [];
-    if (!input.length) break;
-    for (let i = 0; i < input.length; i++) {
-      const a = input[(i + input.length - 1) % input.length],
-        c = input[i];
-      if (inside(c)) {
-        if (!inside(a)) out.push(cross(a, c));
-        out.push(c);
-      } else if (inside(a)) out.push(cross(a, c));
-    }
-  }
-  return out;
-}
-function rings(parts) {
-  const pending = parts.filter((p) => p?.length > 1).map((p) => [...p]),
-    result = [];
-  while (pending.length) {
-    let chain = pending.shift(),
-      progress = true;
-    while (chain[0] !== chain.at(-1) && progress) {
-      progress = false;
-      for (let i = 0; i < pending.length; i++) {
-        let p = pending[i];
-        if (chain.at(-1) === p.at(-1)) p = p.toReversed();
-        if (chain.at(-1) === p[0]) {
-          chain.push(...p.slice(1));
-          pending.splice(i, 1);
-          progress = true;
-          break;
-        }
-        if (chain[0] === p[0]) p = p.toReversed();
-        if (chain[0] === p.at(-1)) {
-          chain.unshift(...p.slice(0, -1));
-          pending.splice(i, 1);
-          progress = true;
-          break;
-        }
-      }
-    }
-    if (chain[0] === chain.at(-1)) result.push(chain);
-  }
-  return result;
-}
-function inPolygon(p, ring) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const a = ring[i],
-      b = ring[j];
-    if (
-      a.z > p.z !== b.z > p.z &&
-      p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x
-    )
-      inside = !inside;
-  }
-  return inside;
-}
 export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} }) {
   boundsCheck(b);
   if (!Array.isArray(data?.elements) || data.elements.length > (limits.elements||30000))
@@ -179,12 +90,13 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
       )
       .map((e) => [e.id, e]),
   );
+  const normalized=normalizeForTrack(data,origin),validRoads=new Set(normalized.features.filter(f=>f.kind==='road'&&f.geometry.type==='LineString').map(f=>f.id));
   const allWays = new Map(
     data.elements.filter((e) => e.type === "way").map((e) => [e.id, e]),
   );
   const roads = [...allWays.values()].filter(
     (w) =>
-      DRIVABLE.has(w.tags?.highway) &&
+      validRoads.has("way/"+w.id) && DRIVABLE.has(w.tags?.highway) &&
       !["no", "private"].includes(w.tags?.motor_vehicle) &&
       w.nodes?.length > 1,
   );
@@ -238,7 +150,7 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
         (tags.junction === "roundabout" || tags.highway === "motorway"));
     const lanes = Math.min(
       12,
-      Math.max(1, parseInt(tags.lanes) || (oneway || ["service", "track", "living_street"].includes(tags.highway) ? 1 : 2)),
+      Math.max(1, parseInt(tags.lanes) || (Number(tags['lanes:forward'])>0&&Number(tags['lanes:backward'])>0?Number(tags['lanes:forward'])+Number(tags['lanes:backward']):0) || (oneway || ["service", "track", "living_street"].includes(tags.highway) ? 1 : 2)),
     );
     const width = Math.min(60, Math.max(2, osmLength(tags.width, lanes * 3.2)));
     let cls = n.classes.indexOf(tags.highway);
@@ -267,7 +179,7 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
     if (tags.bridge === "yes" || tags.tunnel === "yes" || Number(tags.layer))
       flags.push("Elevation needs review");
     if (tags.highway === "road") flags.push("Road type unknown");
-    sourceWays.push({ osmId: way.id, tags, flags });
+    sourceWays.push({ osmId: way.id, tags, flags, generator:GENERATOR, markingEvidence:tags.lane_markings==='yes'?'tagged':tags.lane_markings==='no'?'absent':'unknown' });
     let current = null;
     const flush = () => {
       if (current && current.points.length > 1) {
@@ -374,86 +286,23 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
       )
         n.minis.push([Math.round(p.x * 10), Math.round(p.z * 10)]);
     }
-  const objects = [],
-    relationWays = new Set();
-  function building(ids, tags, osmId, holes = []) {
-    if (ids.some((id) => !nodes.has(id))) return;
-    let footprint = polygonClip(
-      ids.map((id) => project(nodes.get(id))),
-      box,
-    );
-    if (
-      footprint.length > 1 &&
-      Math.hypot(
-        footprint[0].x - footprint.at(-1).x,
-        footprint[0].z - footprint.at(-1).z,
-      ) < 0.01
-    )
-      footprint.pop();
-    if (footprint.length < 3) return;
-    const xs = footprint.map((p) => p.x),
-      zs = footprint.map((p) => p.z),
-      width = Math.max(...xs) - Math.min(...xs),
-      depth = Math.max(...zs) - Math.min(...zs);
-    if (width < 0.3 || depth < 0.3) return;
-    const height = Math.min(
-      150,
-      osmLength(tags.height, (parseFloat(tags["building:levels"]) || 2) * 3),
-    );
-    const o = object(
-      "building",
-      (Math.min(...xs) + Math.max(...xs)) / 2,
-      (Math.min(...zs) + Math.max(...zs)) / 2,
-    );
-    Object.assign(o, {
-      name: tags.name || "Building " + osmId,
-      sx: width,
-      sz: depth,
-      sy: height,
-      y: Math.max(0, osmLength(tags.min_height, 0)),
-    });
-    o.properties = {
-      osmId,
-      tags,
-      footprint,
-      holes: holes
-        .map((h) =>
-          h.filter((id) => nodes.has(id)).map((id) => project(nodes.get(id))),
-        )
-        .filter((h) => h.length > 2 && inPolygon(h[0], footprint)),
-      heightEstimated: !tags.height && !tags["building:levels"],
-    };
-    objects.push(o);
+  const objects = [],memberBuildings=new Set();
+  // Relations own their member footprints; keep complete source rings and holes at
+  // selection edges instead of rectangle-clipping a house into an invented shape.
+  for(const f of normalized.features)if(f.kind==='building'&&f.sourceGeometry?.members)
+    for(const m of f.sourceGeometry.members)if(m.type==='way')memberBuildings.add('way/'+m.ref);
+  for(const f of normalized.features){
+    if(f.kind!=='building'||f.geometry.type!=='MultiPolygon'||memberBuildings.has(f.id))continue;
+    for(const [part,rings] of f.geometry.coordinates.entries()){
+      const footprint=rings[0].slice(0,-1).map(([x,z])=>({x,z})),xs=footprint.map(p=>p.x),zs=footprint.map(p=>p.z);
+      const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
+      if(maxX<box.minX||minX>box.maxX||maxZ<box.minZ||minZ>box.maxZ||maxX-minX<.3||maxZ-minZ<.3)continue;
+      const tags=f.tags||{},o=object('building',(minX+maxX)/2,(minZ+maxZ)/2);
+      Object.assign(o,{id:'building:'+f.id+':'+part,name:tags.name||'Building '+f.id,sx:maxX-minX,sz:maxZ-minZ,sy:6,y:Math.max(0,osmLength(tags.min_height,0))});
+      o.properties={osmId:f.id,tags,footprint,holes:rings.slice(1).map(r=>r.slice(0,-1).map(([x,z])=>({x,z}))),provenance:f.provenance,heightEstimated:!tags.height};
+      objects.push(o);
+    }
   }
-  for (const rel of data.elements.filter(
-    (e) =>
-      e.type === "relation" &&
-      e.tags?.building &&
-      e.tags.type === "multipolygon",
-  )) {
-    const members = rel.members?.filter((m) => m.type === "way") || [],
-      outer = rings(
-        members
-          .filter((m) => m.role !== "inner")
-          .map((m) => allWays.get(m.ref)?.nodes),
-      ),
-      inner = rings(
-        members
-          .filter((m) => m.role === "inner")
-          .map((m) => allWays.get(m.ref)?.nodes),
-      );
-    for (const m of members) relationWays.add(m.ref);
-    for (const ring of outer)
-      building(ring, rel.tags, "relation/" + rel.id, inner);
-  }
-  for (const w of allWays.values())
-    if (
-      w.tags?.building &&
-      !relationWays.has(w.id) &&
-      w.nodes?.length > 3 &&
-      w.nodes[0] === w.nodes.at(-1)
-    )
-      building(w.nodes, w.tags, "way/" + w.id);
   if (!n.edges.length)
     throw Error(
       "No drivable roads in this area. Move the selection or make it larger.",
@@ -475,6 +324,8 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
     edges: sourceEdges,
     warnings,
     dataTimestamp: data.osm3s?.timestamp_osm_base || null,
+    generator:GENERATOR,datasetVersion:normalized.version||null,
+    validation:{accepted:false,rejected:normalized.errors,normalizedFeatures:normalized.features.length,unknownMarkings:sourceWays.filter(w=>w.markingEvidence==='unknown').length},
   };
   t.georeference = {
     bounds: b,
@@ -496,5 +347,5 @@ export function convertOSM(data, b, { boundsCheck, makeTrack, object, limits={} 
     heading: Math.atan2(-tx, -tz),
   };
   t.plan.waypoints = [{ x: t.spawn.x, z: t.spawn.z, road: "", label: "Imported start" }];
-  return clearRoadside(addOSMDetails(clearRoadBuildings(t),data,{limits}));
+  return clearRoadside(normalizedScenery(clearRoadBuildings(t),normalized,{limits}));
 }

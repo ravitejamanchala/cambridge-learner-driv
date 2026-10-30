@@ -294,7 +294,7 @@ async function boot() {
     if(!canAccessPlan({kind:'personal',graded})){hub.requestAccess();throw Error('Sign in to drive your route.');}
     stopPersonal();personal={journey,graded,progress:0,seconds:0,distance:0,complete:false};
     try{await installPersonal(world);await A.authoredTiles?.prepare(player.x,player.z,()=>journey.cancelled);if(journey.cancelled)throw new DOMException('Cancelled','AbortError');}catch(e){if(personal?.journey===journey)stopPersonal();throw e;}
-    begin();A.world.updateChunks(player.x,player.z,100);$('personalJourneyProgress').hidden=false;
+    begin();A.world.updateChunks(player.x,player.z,100);$('personalJourneyProgress').hidden=false;window.dispatchEvent(new Event('personal-route-ready'));
   }
   function stepPersonal(dt){
     if(!personal||personal.complete)return;
@@ -303,6 +303,7 @@ async function boot() {
     personal.seconds+=dt;personal.distance+=Math.abs(player.v)*dt;
     const remaining=Math.max(0,personal.journey.route.length-personal.progress);$('personalJourneyProgress').textContent=(remaining/1609.344).toFixed(1)+' mi to finish';
     // A graded drive can finish only through the native examiner's waypoint checks.
+    if(botMode&&!personal.graded&&remaining<12&&Math.abs(player.v)<.5&&hit.d<15){personal.complete=true;A.test.running=false;A.test.done=true;return;}
     if(!personal.graded&&remaining<12&&Math.abs(player.v)<.5&&hit.d<15){personal.complete=true;showPersonalSummary(true);return;}
   }
   function showPersonalMockResult(completed){
@@ -505,7 +506,7 @@ async function boot() {
   const extraInputs = [];
   window.cambridgeDrive = { get personalJourney(){return personal?{id:personal.journey.recipe.id,progress:personal.progress,length:personal.journey.route.length,ready:personal.journey.ready,tiles:A.authoredTiles?.stats()||null}:null;}, addInput: (fn) => { extraInputs.push(fn); return () => { const i = extraInputs.indexOf(fn); if (i >= 0) extraInputs.splice(i, 1); }; }, look: () => look(), lanePoint: (s) => guide.lanePoint(A.test.route, s, A.net), pick: (kind, id, start) => pickPlan(hub.select(kind, id), start), get net() { return A.net; }, get test() { return A.test; }, player, get traffic() { return A.traffic; }, CAR, get area() { return A.id; }, ready: () => areaChain, get camera() { return camera; }, get scenario() { return scenario; }, get cockpitColour() { return bonnetM.color.getHex(); }, get wheelAngle() { return wheel.rotation.z; },
     get roadsidePlacements(){return A.world?.placements||[];},
-    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.flatMap(m=>m.userData.authoredTile?m.children:[m]).filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
+    get importedScene() { return localTracks.has(A.id)?{sourceObjects:localTracks.get(A.id).objects.length,roads:localTracks.get(A.id).renderNetwork.edges.length,objects:scene.children.flatMap(m=>m.userData.authoredTile?m.children:[m]).filter(m=>m.userData.editorObjectId).map(m=>({id:m.userData.editorObjectId,mapFeature:m.userData.mapFeature||null,streetAsset:m.userData.streetAsset||null,shopSign:m.userData.shopSign||null,ukBuilding:m.userData.ukBuilding||null,ukFrontage:m.userData.ukFrontage||null,x:m.position.x,z:m.position.z,geometry:m.geometry?.type}))}:null; },
     // memory as the renderer and the scenery see it, for the sustained-drive benchmark
     perf: () => ({ chunks: A.world?.chunkCount() ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
     get freeStats() { return freeStats; }, steerFor };
@@ -808,7 +809,7 @@ async function boot() {
   function tick(dt) {
     if (!A.net || !route) return;
     const { traffic, test, world } = A, drive = document.body.dataset.mode === 'drive';
-    sim(dt);
+    if(dt>0)sim(dt);
     A.authoredTiles?.update(player.x,player.z,cam===2?WORLD.fogFar+200+ov.h:0);
     player.sync(traffic.clock);
     $('sigL').classList.toggle('on', player.indicator === 'L' && Math.floor(traffic.clock * 3) % 2 === 0);
@@ -836,6 +837,16 @@ async function boot() {
   setMode('lobby'); hub.open();
   // bot lab: open the sim with ?bots to run and watch the test driver on any lesson, puzzle or mock test
   if (/[?&]bots\b/.test(location.search)) createBotLab({
+    openMyRoutes:openPersonal,
+    previewExample:!!document.querySelector('meta[name=world-data-index]'),
+    async loadExample(){
+      const response=await fetch(new URL('data/world/water-street-route.json',document.baseURI));if(!response.ok)throw Error('Preview example could not load.');
+      const recipe=await response.json(),store=routeStore();store.save(recipe);
+      const {createJourney}=await import('./personal/client.js');const journey=createJourney(recipe,{store});
+      try{const world=await journey.prepare();await startPersonal(journey,world);}catch(error){journey.cancel();throw error;}
+    },
+    isPersonal:()=>plan?.kind==='personal',
+    sourceEvidence:()=>{const track=localTracks.get(A.id);return track?.osm?{generator:track.osm.generator,datasetVersion:track.osm.datasetVersion,validation:track.osm.validation}:null;},
     lesson: () => plan.lesson, scenarioStatus: () => scenario?.progress, scenarioPhase: () => scenario?.phase, operate: cockpitAction, gear: gearAction,
     get A() { return A; }, player, look, frame: (dt) => tick(dt), step: (n, dt) => window.cambridgeDrive.step(n, dt),
     // screenshot of the 3D view (rendered now, so the drawing buffer is still there to read)
@@ -854,14 +865,15 @@ async function boot() {
     botMode: (on) => { botMode = on; manual = on; },
     async start(kind, id, seed, { traffic = 'lesson' } = {}) {
       botSeed=seed;
+      if(kind==='personal'){if(!personal||plan.kind!=='personal')throw Error('Open My routes, then load a practice drive first.');if(personal.graded)throw Error('Choose Practice drive for map validation, not a graded mock.');begin();if(traffic==='random'){A.traffic.setDensity('normal');A.traffic.reset(player.x,player.z,seed);}return;}
       const pl = kind === 'mock' ? { kind: 'mock', key: 'route:' + id, index: ROUTES.findIndex(r => r.id === id) } : hub.select(kind, id);
       await pickPlan(pl, true); await areaChain;
       // random traffic on top of whatever the lesson places, from this run's seed: a lesson with its own
       // scripted traffic otherwise meets exactly the same drive every time
       if (traffic === 'random') { A.traffic.setDensity('normal'); A.traffic.reset(player.x, player.z, seed); }
     },
-    result: () => plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
-    plans: [...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]
+    result: () => plan.kind==='personal'?{pass:null,completed:!!personal?.complete,why:'Driving check only; geographic accuracy is not assessed'}:plan.kind === 'mock' ? { pass: A.test.passed(), why: '' } : evaluate(plan.lesson, A.test, scenario),
+    plans: [{kind:'personal',id:'current',title:'Current My routes map'},...LESSONS.filter(l => l.waypoints).map(l => ({ kind: 'lesson', id: l.id, title: l.title })), ...PUZZLES.map(p => ({ kind: 'puzzle', id: p.id, title: p.title })), ...ROUTES.map(r => ({ kind: 'mock', id: r.id, title: 'Mock: ' + r.name }))]
   });
   await areaChain; await new Promise(r => setTimeout(r, 0));
   $('loadOv').hidden = true;

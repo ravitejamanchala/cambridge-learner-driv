@@ -16,7 +16,7 @@ The older simulator and UI worktrees have unrelated edits and were not modified.
 
 ## Deliberately deferred by the requested acceptance gate
 
-No new driving city provider, 3D tile coordinator, terrain elevation, asset gallery, asset redesign or production entry point has been enabled. Existing physics, grading, accounts, payments and road rendering have no modifications. The personal-route conversion import is the only existing application logic touched.
+At the owner’s follow-up request, My routes now uses the shared normalizer and the preview can adapt the pinned Cambridge tiles into the existing native driving world. The existing Bot lab can watch and repeat checks on that generated route. See `my-routes-source-generator.md`. This does not introduce full-city streaming, terrain elevation, an asset gallery, a new roaming UI, or geographic acceptance. Physics, accounts and payments are retained; known source lane splits and evidence-based paint selection are connected to the existing lane renderer.
 
 The Cambridge regional source extract is acquired and its boundary is **relation/295355**. Actual Google satellite imagery is accessible again. Source acceptance is still incomplete: malformed upstream relations, source reconciliation, supporting data and the full geographic review remain unresolved. `accepted:false` is mandatory for every dataset produced at this stage; a successful structural fixture test does not promote a dataset. The future review/acceptance operation must bind decisions to an immutable source version and refuse unresolved critical findings.
 

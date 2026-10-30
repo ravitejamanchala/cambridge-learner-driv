@@ -49,3 +49,9 @@ The latest local suite passes **267 tests**. `regional-unit.txt` and `regional-e
 Live source access: Geofabrik PBF and current OSM relation API successfully retrieved. Google satellite imagery visible with trusted managed CA and normal TLS verification. Source defects, supporting datasets and geographic review remain unresolved; this is not a city-driving performance result.
 
 PR: https://github.com/ravitejamanchala/cambridge-learner-driv/pull/25 . Test link: https://pr-25.learner-drive-app.pages.dev/world-inspector.html . No merge is needed.
+
+## My routes replacement and Bot lab follow-up
+
+The owner requested connecting this generator to existing My routes and the existing Bot lab. `docs/my-routes-source-generator.md` describes the integration and remaining accuracy limits. The source normalizer is now shared with the runtime worker. Source geometry/footprints and known directional lane splits are preserved; unknown paint is not automatically promoted to source-backed centre lines. The existing personal-route regression was rerun successfully after this change. A real-data browser check demonstrates the native car moving under the existing bot, pause/stop, source version export and ungraded behaviour. It is not a full-route or full-city accuracy certificate.
+
+The real Water Street bot check now also completes the 155 m example (148 m reached, finish tolerance, seed 7), and the original controlled-stopping lesson completes D0/S0. Ten original street assets have geometry-budget/envelope tests and a WebGL gallery capture. These are local checks until the corresponding PR preview CI is confirmed. Total unit suite: 275 passing. See `docs/evidence/world/replacement-*` and `my-routes-bot.json`.

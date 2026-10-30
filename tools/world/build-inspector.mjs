@@ -15,6 +15,8 @@ export async function buildInspector(out, src = ".") {
   let html = (await fs.readFile(path.join(src, "world-inspector.html"), "utf8"))
     .replace("js/world-data/inspector.js", "world-inspector.js")
     .replace("js/world-data/inspector.css", "world-inspector.css");
+  await build({entryPoints:[path.join(src,'js/world-data/assets-preview.js')],bundle:true,format:'esm',target:'es2022',outfile:path.join(out,'street-assets.js')});
+  await fs.writeFile(path.join(out,'street-assets.html'),(await fs.readFile(path.join(src,'street-assets.html'),'utf8')).replace('js/world-data/assets-preview.js','street-assets.js'));
   const archive = path.join(src, "data/world/cambridge.json.gz");
   const available = await fs.access(archive).then(
     () => true,

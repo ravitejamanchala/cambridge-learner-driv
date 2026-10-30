@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "cambridge-overlay-audit",
+  "title": "Water Street \u00b7 source pipeline audit",
+  "createdAt": 1793318400000,
+  "start": [
+    0.1455398,
+    52.2178348
+  ],
+  "end": [
+    0.1475022,
+    52.2185399
+  ],
+  "geometry": "gg{Gu}brbBuc@kKaz@}SsQwFmBk@yCs@",
+  "distance": 155.05890496033953,
+  "provider": "OpenStreetMap",
+  "attribution": "\u00a9 OpenStreetMap contributors, ODbL 1.0"
+}

@@ -59,6 +59,6 @@ export function lineDashes(net, e) {
     }
   }
   if (!wy.oneway && (/^(primary|secondary|tertiary|trunk)/.test(wy.cls) || wy.lanes >= 2))
-    for (let s = start; s + 1.2 < end; s += 9) out.push({ s, len: Math.min(3.2, end - s), off: 0, kind: 'centre' });
+    for (let s = start; s + 1.2 < end; s += 9) out.push({ s, len: Math.min(3.2, end - s), off: laneInfo(e,1).inner, kind: 'centre' });
   return out;
 }

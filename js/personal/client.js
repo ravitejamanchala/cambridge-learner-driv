@@ -1,5 +1,6 @@
 import {coordinate,measure,encode,decode,section} from './geometry.js';
 import {routeStore} from './storage.js';
+import {cityRouteSource} from './city-source.js';
 export function abortableDelay(ms,signal){return new Promise((resolve,reject)=>{if(signal?.aborted)return reject(new DOMException('Cancelled','AbortError'));const stop=()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},timer=setTimeout(()=>{signal?.removeEventListener('abort',stop);resolve();},ms);signal?.addEventListener('abort',stop,{once:true});});}
 export async function request(path,{signal,body,onStatus,fetcher=fetch}={}) {
   for(let attempt=0;attempt<3;attempt++){
@@ -29,13 +30,15 @@ function convert(osm,part,signal) {
     worker.onmessage=({data})=>{stop();data.error?reject(Error(data.error)):resolve(data.track);};worker.onerror=()=>{stop();reject(Error('Map generation failed. Please retry.'));};worker.postMessage({osm,part,wholeRoute:true});
   });
 }
-export function createJourney(recipe,{store=routeStore(),onStatus=()=>{},fetchSection=request,generate=convert,requestInterval=5200}={}) {
+export function createJourney(recipe,{store=routeStore(),onStatus=()=>{},fetchSection=request,generate=convert,requestInterval=5200,citySource=cityRouteSource}={}) {
   const route=measure(decode(recipe.geometry)),controller=new AbortController(),count=Math.ceil(route.length/600);
   let prepared=null,pending=null,lastRequest=0;
   const check=()=>{if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');};
   async function prepare(){
     check();if(prepared)return prepared;if(pending)return pending;
     pending=(async()=>{
+      const city=await citySource?.(route,{signal:controller.signal,onStatus});check();
+      if(city){onStatus('Building roads and scenery from the Cambridge dataset…');prepared=await generate(city.data,city.part,controller.signal);check();return prepared;}
       const elements=new Map(),bounds=[Infinity,Infinity,-Infinity,-Infinity];let timestamp;
       for(let index=0;index<count;index++){
         check();const part=section(route,index);onStatus(`Preparing your whole route · map ${index+1} of ${count}…`);

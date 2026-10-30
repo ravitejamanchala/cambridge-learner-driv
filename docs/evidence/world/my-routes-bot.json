@@ -1,0 +1,180 @@
+{
+  "passed": true,
+  "sourceObjects": 414,
+  "roads": 79,
+  "providerCalls": 0,
+  "run": {
+    "key": "personal:personal:cambridge-overlay-audit",
+    "title": "Water Street · source pipeline audit",
+    "kind": "personal",
+    "seed": 7,
+    "release": "b4ad31917ea9fe694be0f81fa53ab59d2dfd49a7",
+    "at": 1793391079682,
+    "tab": "zprd9",
+    "end": "stopped",
+    "pass": null,
+    "completed": false,
+    "source": {
+      "generator": "source-normalized-v1",
+      "datasetVersion": "52fdf092cb5e518587df60f81ee649591e457ede6b761af903e7ecf17563bef9",
+      "validation": {
+        "accepted": false,
+        "rejected": [
+          {
+            "id": "relation/10283897",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/10402",
+            "kind": "building",
+            "reason": "Missing exterior"
+          },
+          {
+            "id": "relation/1116128",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/12741856",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/16075364",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/18814223",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/5546965",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          }
+        ],
+        "normalizedFeatures": 4609,
+        "unknownMarkings": 349
+      }
+    },
+    "D": 0,
+    "S": 0,
+    "faults": [],
+    "cats": [],
+    "where": [],
+    "hitBy": [],
+    "why": "stopped",
+    "len": 155,
+    "reached": 31,
+    "simT": 6,
+    "wallT": 6.9,
+    "rerouted": 0,
+    "at_xz": [
+      -41,
+      23
+    ],
+    "traffic": "lesson",
+    "driver": "reference",
+    "offRoad": {
+      "max": 0,
+      "seconds": 0
+    },
+    "steering": null
+  },
+  "completed": {
+    "key": "personal:personal:cambridge-overlay-audit",
+    "title": "Water Street · source pipeline audit",
+    "kind": "personal",
+    "seed": 7,
+    "release": "b4ad31917ea9fe694be0f81fa53ab59d2dfd49a7",
+    "at": 1793391083875,
+    "tab": "zprd9",
+    "end": "done",
+    "pass": null,
+    "completed": true,
+    "source": {
+      "generator": "source-normalized-v1",
+      "datasetVersion": "52fdf092cb5e518587df60f81ee649591e457ede6b761af903e7ecf17563bef9",
+      "validation": {
+        "accepted": false,
+        "rejected": [
+          {
+            "id": "relation/10283897",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/10402",
+            "kind": "building",
+            "reason": "Missing exterior"
+          },
+          {
+            "id": "relation/1116128",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/12741856",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/16075364",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/18814223",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          },
+          {
+            "id": "relation/5546965",
+            "kind": "restriction",
+            "reason": "Incomplete turn restriction"
+          }
+        ],
+        "normalizedFeatures": 4609,
+        "unknownMarkings": 349
+      }
+    },
+    "D": 0,
+    "S": 0,
+    "faults": [],
+    "cats": [],
+    "where": [],
+    "hitBy": [],
+    "why": "Driving check only; geographic accuracy is not assessed",
+    "len": 155,
+    "reached": 148,
+    "simT": 25,
+    "wallT": 0.4,
+    "rerouted": 0,
+    "at_xz": [
+      60,
+      -37
+    ],
+    "traffic": "lesson",
+    "driver": "reference",
+    "offRoad": {
+      "max": 0,
+      "seconds": 0
+    },
+    "steering": null
+  },
+  "pageErrors": [],
+  "checks": [
+    "existing My routes saved recipe",
+    "packaged real Cambridge source",
+    "native car driven more than 8 metres by existing bot",
+    "watch and pause",
+    "stop and exportable evidence",
+    "no grading",
+    "one-click example and short route completion",
+    "ten original street assets rendered in WebGL"
+  ],
+  "scope": "Local real-data integration, one short route/seed completion, not a city accuracy certificate"
+}

@@ -1,9 +1,10 @@
+import {STREET_ASSETS,streetAssetHeading} from '../../uk-street-assets.js';
 import polygonClipping from '../../vendor/polygon-clipping.js';
 // Shared native-object adapter. All geometry entering this module is in the
 // track's metre coordinates (X east, Z south), never source tile coordinates.
 export const AREA_KINDS=new Set(['grass','forest','park','sports','water','parking','plaza','industrial','gravel','cemetery','railway','sand','garden']);
 export const PATH_KINDS=new Set(['footway','cycleway','path','pedestrian','steps','bridleway']);
-const POINT_SIZES={tree:[4,7,4],lamp:[.25,6,.25],bench:[1.8,.9,.65],bin:[.6,1,.6],bollard:[.2,.9,.2],gate:[2,1.2,.2],postBox:[.5,1.3,.5],bicycleParking:[1.5,.8,.6],busStop:[.18,2.5,.18],sign:[.6,2.2,.15]};
+const POINT_SIZES={tree:[4,7,4],...STREET_ASSETS};
 export function sceneFeatures(track,features,{source='OpenStreetMap',attribution=track.attribution,limits={}}={}){
   const b=track.georeference.bounds,n=track.network;
   const box=[(b[1]-n.origin[1])*n.kx,-(b[2]-n.origin[0])*n.kz,(b[3]-n.origin[1])*n.kx,-(b[0]-n.origin[0])*n.kz];
@@ -48,7 +49,8 @@ export function sceneFeatures(track,features,{source='OpenStreetMap',attribution
       if(!valid(f.point))throw Error('Invalid mapped point');
       const [x,z]=f.point;if(x<box[0]||x>box[2]||z<box[1]||z>box[3])continue;
       const dims=[...POINT_SIZES[f.kind]];if(Number.isFinite(f.height)&&f.height>0)dims[1]=Math.min(50,f.height);
-      const o=object('scenery',x,z,...dims);if(Number.isFinite(f.heading))o.rotation=f.heading;
+      const o=object('scenery',x,z,...dims);const heading=Number.isFinite(f.heading)?f.heading:streetAssetHeading(f.tags);if(Number.isFinite(heading))o.rotation=heading;
+      o.properties.orientationSource=Number.isFinite(heading)?'source direction':'unknown';
       push(f,o,0);
     }
   }

@@ -1,6 +1,7 @@
 import {chromium} from 'playwright';import {spawn} from 'node:child_process';import {createRequire} from 'node:module';import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
 import {roadFixture} from './personal-route-fixture.mjs';
 import {PUZZLES} from '../js/puzzles.js';
+import {GENERATOR_VERSION} from '../js/personal/storage.js';
 import {measure,section,encode} from '../js/personal/geometry.js';
 const require=createRequire(import.meta.url),three=path.dirname(require.resolve('three/package.json')),port=Number(process.env.ROUTE_TEST_PORT||8796),base=process.env.PREVIEW_URL||`http://127.0.0.1:${port}/`,root=path.resolve(process.env.TEST_SITE||'.');
 const server=process.env.PREVIEW_URL?null:spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1','--directory',root],{stdio:'ignore'});let browser,fixture;let osmRequests=0,routeRequests=0,searchRequests=0,rateLimit=true,failMapRequests=false;
@@ -15,6 +16,7 @@ try{
  await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',r=>r.fulfill({path:three+'/build/three.min.js',contentType:'text/javascript'}));
  await page.route('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',r=>r.fulfill({path:three+'/examples/js/loaders/GLTFLoader.js',contentType:'text/javascript'}));
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
+ await page.route('**/world-data/cambridge/index.json',r=>r.fulfill({status:404,body:'fixture uses live-source adapter'}));
  await page.route('https://tile.openstreetmap.org/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e4ebdf"/><path d="M0 100h256M100 0v256" stroke="#fff" stroke-width="12"/><text x="120" y="145" fill="#799080" font-size="12">Map fixture</text></svg>'}));
  await page.route('**/map-api/search?*',r=>{searchRequests++;return r.fulfill({json:[{name:'Cambridge',display_name:'Cambridge, Cambridgeshire, England',lat:'52.205',lon:'.12',boundingbox:['52.195','52.215','.105','.135']}]});});
  await page.route('**/map-api/route',r=>{routeRequests++;const {start,end}=r.request().postDataJSON();fixture=roadFixture(start,end);return r.fulfill({json:{code:'Ok',routes:[{geometry:{type:'LineString',coordinates:fixture.coordinates},distance:1000,duration:120}],waypoints:fixture.waypoints}});});
@@ -66,7 +68,7 @@ try{
  const corners=[[.12,52.2],[.123,52.2],[.123,52.202],[.12,52.202]],coords=[];for(let lap=0;lap<13;lap++)coords.push(...corners);coords.push(corners[0],[.121,52.2]);const measured=measure(coords);
  const mockRecipe={version:1,id:'graded-loop-test',title:'Long Cambridge practice loop',createdAt:Date.now(),start:coords[0],end:coords.at(-1),distance:measured.length,geometry:encode(coords)};
  const osm={elements:[...corners.map(([lon,lat],i)=>({type:'node',id:i+1,lon,lat})),{type:'way',id:10,nodes:[1,2,3,4,1],tags:{highway:'residential',name:'Fixture loop',oneway:'yes',lanes:'1',width:'3.2',maxspeed:'20 mph'}}]};
- const cached=Array.from({length:Math.ceil(measured.length/600)},(_,i)=>({key:`${mockRecipe.id}:2:${i}`,track:{kind:'osm-source',bounds:section(measured,i).bounds,elements:osm.elements}}));
+ const cached=Array.from({length:Math.ceil(measured.length/600)},(_,i)=>({key:`${mockRecipe.id}:${GENERATOR_VERSION}:${i}`,track:{kind:'osm-source',bounds:section(measured,i).bounds,elements:osm.elements}}));
  await page.evaluate(({mockRecipe,cached})=>{localStorage.setItem('slaydrive.personal-routes.v1',JSON.stringify({version:1,routes:[mockRecipe]}));localStorage.setItem('slaydrive.personal-map-cache.v1',JSON.stringify(cached));},{mockRecipe,cached});
  await page.locator('#myRoutesBtn').click();await page.locator('#personalSavedRoutes').getByRole('button',{name:'Mock test',exact:true}).click();await page.waitForFunction(()=>cambridgeDrive.test.running&&document.body.dataset.mode==='drive');
  assert.deepEqual(await page.evaluate(()=>({ungraded:cambridgeDrive.test.ungraded,experimental:cambridgeDrive.test.experimental,marking:cambridgeDrive.test.marking})),{ungraded:false,experimental:false,marking:'hard'});

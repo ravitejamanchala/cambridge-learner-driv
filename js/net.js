@@ -192,8 +192,8 @@ export const cycleLeft = (e, dir) => dir > 0 ? e.way.cl : e.way.cr;
 const isLane = (c) => c === 1 || c === 2;
 export function laneInfo(e, dir) {
   const w = e.way, cyc = isLane(cycleLeft(e, dir)) ? w.cw : 0;
-  const n = w.oneway ? Math.max(1, w.lanes || (w.w > 7.6 && !w.rb ? 2 : 1)) : Math.max(1, Math.floor((w.lanes || 2) / 2));
-  const inner = w.oneway ? -w.w / 2 : 0, outer = w.w / 2 - cyc;
+  const n = !w.oneway && w.directionalLanes ? w.directionalLanes[dir>0?0:1] : w.oneway ? Math.max(1, w.lanes || (w.w > 7.6 && !w.rb ? 2 : 1)) : Math.max(1, Math.floor((w.lanes || 2) / 2));
+  const inner = w.oneway ? -w.w / 2 : w.directionalLanes ? (w.w / 2 - w.w*w.directionalLanes[0]/(w.directionalLanes[0]+w.directionalLanes[1]))*dir : 0, outer = w.w / 2 - cyc;
   return { n, inner, outer, laneW: (outer - inner) / n, cyc };
 }
 // centre of lane i (0 = nearest the kerb)

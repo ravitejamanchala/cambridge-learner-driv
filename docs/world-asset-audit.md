@@ -39,3 +39,9 @@ Counts are source/code evidence, not a city-wide visual acceptance result. `C` m
 The new stage-A normalizer reports accepted/rejected/unsupported/dependency source entries, retains missing height/width as unknown and records building overlap candidates. These are data capabilities, **not completed new visuals**. No asset file from the captured Roadarium app is bundled.
 
 A later asset registry/gallery must document dimensions, orientation/pivot, selectors, generator/file, material variants, LOD, fallback, licensing and collision policy. It is deferred with the renderer rather than presenting an unconnected gallery as a completed world.
+
+## Follow-up: My routes and missing street assets
+
+The original table above records the main-branch baseline. The PR now connects normalized city data to My routes and adds ten original single-mesh street assets in `js/uk-street-assets.js`. Bus stops now have a flag/pictogram/timetable; benches have slats/arms; racks have individual stands; bins, post boxes, bollards, gates and lamps have distinct geometry. The mapped public-transport shelter node adapter and shelter renderer are implemented. Cambridge raw source contains eight public-transport shelter nodes and three ways; this change supports the nodes, while polygon shelters remain pending. Unknown sign faces are blank and do not invent legal instructions. Existing simulator buildings, controls and vegetation are reused.
+
+Preview the pack at `street-assets.html`, linked from Bot lab. Node source IDs/locations and usable directions survive the adapter; dimensions and appearance remain estimates. The existing clearance pass may still move/archive conflicting scenery, with records. Geometry envelope/finite/budget tests and a WebGL screenshot are in the replacement evidence. Full-city scene counts, terrain and geographic acceptance are still unmeasured/pending.

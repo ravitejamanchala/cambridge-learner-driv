@@ -1,0 +1,22 @@
+import {STREET_ASSETS,streetAssetGeometry} from '../uk-street-assets.js';
+const T=window.THREE,scene=new T.Scene(),renderer=new T.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0xd9ddd5);renderer.shadowMap.enabled=true;document.body.append(renderer.domElement);
+const camera=new T.PerspectiveCamera(42,1,.1,120),sun=new T.DirectionalLight(0xfff5de,.65);
+sun.position.set(-6,14,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-16,right:16,top:12,bottom:-12});sun.shadow.normalBias=.03;scene.add(sun,new T.HemisphereLight(0xd5e4eb,0x898773,.7));
+const ground=new T.Mesh(new T.PlaneGeometry(60,60),new T.MeshLambertMaterial({color:0x9ca593}));ground.rotation.x=-Math.PI/2;ground.position.y=-.03;ground.receiveShadow=true;scene.add(ground);
+const labels=[],names={lamp:'Street lamp',bench:'Timber bench',bin:'Litter bin',bollard:'Reflective bollard',gate:'Gate',postBox:'Pillar post box',bicycleParking:'Cycle stands',busStop:'Bus stop',busShelter:'Bus shelter',sign:'Unknown sign face'};
+['lamp','busShelter','busStop','sign','gate','bench','bin','bollard','postBox','bicycleParking'].forEach((kind,i)=>{const d=STREET_ASSETS[kind];
+  const mesh=new T.Mesh(streetAssetGeometry(T,kind,d),new T.MeshLambertMaterial({vertexColors:true}));
+  mesh.scale.set(...d);mesh.position.set((i%5-2)*4,d[1]/2,Math.floor(i/5)*6-3);mesh.castShadow=mesh.receiveShadow=true;scene.add(mesh);
+  const label=document.createElement('span');label.className='label';label.textContent=names[kind];document.body.append(label);
+  labels.push({label,p:new T.Vector3(mesh.position.x,0,mesh.position.z+d[2]/2+.7)});
+});
+let yaw=.12,pitch=.6,distance=27,drag=null;
+const canvas=renderer.domElement;
+canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);};
+canvas.onpointerup=canvas.onpointercancel=()=>drag=null;
+canvas.onpointermove=e=>{if(!drag)return;yaw-=(e.clientX-drag.x)*.006;pitch=Math.max(.15,Math.min(1.2,pitch+(e.clientY-drag.y)*.004));drag={x:e.clientX,y:e.clientY};draw();};
+canvas.addEventListener('wheel',e=>{e.preventDefault();distance=Math.max(12,Math.min(45,distance*Math.exp(e.deltaY*.001)));draw();},{passive:false});
+function draw(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();const range=distance*Math.max(1,1.3/camera.aspect);camera.position.set(Math.sin(yaw)*Math.cos(pitch)*range,Math.sin(pitch)*range,Math.cos(yaw)*Math.cos(pitch)*range);camera.lookAt(0,1,0);camera.updateMatrixWorld();renderer.render(scene,camera);for(const {label,p}of labels){const v=p.clone().project(camera);label.style.left=(v.x+1)*w/2+'px';label.style.top=(1-v.y)*h/2+'px';label.hidden=v.z>1;}}
+window.addEventListener('resize',draw);draw();document.body.dataset.ready='true';

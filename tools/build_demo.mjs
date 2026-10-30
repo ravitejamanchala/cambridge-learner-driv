@@ -57,4 +57,8 @@ fs.copyFileSync(path.join(SRC,'js/vendor/THIRD-PARTY-LICENSES.txt'),path.join(OU
 if (preview && !billingPreview) {
   const {buildInspector} = await import('./world/build-inspector.mjs');
   await buildInspector(OUT, SRC);
+  if(fs.existsSync(path.join(OUT,'world-data/cambridge/index.json'))){
+    fs.mkdirSync(path.join(OUT,'data/world'),{recursive:true});fs.copyFileSync(path.join(SRC,'tests/fixtures/world/water-street-route.json'),path.join(OUT,'data/world/water-street-route.json'));
+    const file=path.join(OUT,'index.html');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('</head>','<meta name="world-data-index" content="world-data/cambridge/index.json"></head>'));
+  }
 }

@@ -3,7 +3,12 @@
 export function applyMappedRoadTags(net,sources=[]){
  for(let i=0;i<net.ways.length;i++){
   const way=net.ways[i],tags=sources[i]?.tags||{};
-  way.laneMarkings=tags.lane_markings!=='no';
+  way.laneMarkings=sources[i]?.generator==='source-normalized-v1'?tags.lane_markings==='yes':tags.lane_markings!=='no';
+  way.markingEvidence=sources[i]?.markingEvidence||null;
+  const integer=value=>typeof value==='string'&&/^[1-9]\d?$/.test(value)?Number(value):null;
+  const forward=integer(tags['lanes:forward']),backward=integer(tags['lanes:backward']);
+  // Only a complete, consistent tagged split changes the native lane model.
+  if(sources[i]?.generator==='source-normalized-v1'&&!way.oneway&&forward&&backward&&forward+backward===way.lanes&&!tags['lanes:both_ways'])way.directionalLanes=[forward,backward];
   const sideWidth=side=>{
    const both=tags['sidewalk:both'],specific=tags['sidewalk:'+side];
    const value=specific??both??(tags.sidewalk==='both'?'yes':tags.sidewalk==='left'||tags.sidewalk==='right'?(tags.sidewalk===side?'yes':'no'):tags.sidewalk);

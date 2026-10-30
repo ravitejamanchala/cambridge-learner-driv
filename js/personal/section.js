@@ -14,6 +14,7 @@ function generate(data,part,whole) {
   const check=whole?b=>{if(!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||b[0]<-85||b[2]>85||b[1]<-180||b[3]>180||b[0]>=b[2]||b[1]>=b[3])throw Error('Invalid route bounds.');}:boundsCheck;
   const limits=whole?{elements:600000,edges:150000,nodes:600000,objects:100000,extent:20000000,coordinate:20000000}:{};
   const track=convertOSM(data,part.bounds,{boundsCheck:check,makeTrack,object,limits}),selected=measure(part.coordinates),net=buildNet(track.network);
+  applyMappedRoadTags(net,track.osm?.ways);
   const points=[];
   // Dense checks prevent a route falling across an unmapped road or river; do not
   // synthesize a straight connecting road when two provider datasets disagree.
@@ -21,7 +22,7 @@ function generate(data,part,whole) {
   const projected=points.map(p=>project(net,p)),hits=projected.map(q=>nearest(net,q.x,q.z));
   if(hits.some(h=>!h||h.d>12))throw Error('The road map does not cover this route section yet. Try moving a pin or retrying later.');
   track.plan.waypoints=points.filter((_,i)=>i%2===0||i===points.length-1).map(p=>({...project(net,p),road:''}));
-  const prepared=prepareEditorTrack(track),navigation=buildNet(prepared.network),route=buildRoute(navigation,prepared.nodes);
+  const prepared=prepareEditorTrack(track),navigation=buildNet(prepared.network);applyMappedRoadTags(navigation,track.osm?.ways);const route=buildRoute(navigation,prepared.nodes);
   if(!Number.isFinite(route.len)||route.len<selected.length*.75||route.len>selected.length*1.3+25)throw Error('The route and road map disagree at this junction. Move a pin or retry later.');
   // Also reject large detours between nearby anchors on disconnected carriageways.
   const cells=new Map(),key=(x,z)=>Math.floor(x/32)+':'+Math.floor(z/32);

@@ -100,8 +100,10 @@ export function makeDriver(api) {
       if (lesson.scenario === 'controlled-stop' && status?.message?.startsWith('Brake to stop')) target = 0;
       if (lesson.scenario === 'accel-decel' && status?.message?.startsWith('Release accelerator')) target = 3;
     }
-    if (ins.final && t.sRoute > ins.s - 60) target = Math.min(target, 4);
-    if (ins.final && t.sRoute > ins.s - 28) target = 0;
+    // Personal routes end at the chosen pin; authored lessons retain their pull-up zone.
+    const finish = api.isPersonal?.() ? R.len - 8 : ins.s - 28;
+    if (ins.final && t.sRoute > finish - 32) target = Math.min(target, 4);
+    if (ins.final && t.sRoute > finish) target = 0;
     const stopAt = (fw, m) => { target=Math.min(target,Math.max(0,(fw-m)*.45)); };
     // See stop lines along the planned route before steering towards them.
     // A tight turn can otherwise hide a red ring signal from a heading-only scan.
@@ -440,37 +442,42 @@ export function createBotLab(api) {
 #botlab{position:fixed;right:12px;top:84px;max-height:calc(100vh - 100px);width:min(440px,calc(100vw - 24px));z-index:60;background:rgba(18,14,22,.94);color:#fff;border-radius:16px;font:13px/1.35 Geist,ui-sans-serif,system-ui,sans-serif;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 #botlab header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.1)}#botlab h2{margin:0;font-size:16px;flex:1}
 #botlab .row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
-#botlab label{display:flex;gap:5px;align-items:center}#botlab input[type=number]{width:56px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px 5px}
+#botlab a{color:#9fd3ff}#botlab label{display:flex;gap:5px;align-items:center}#botlab input[type=number]{width:56px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px 5px}
 #botlab button{background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:8px;padding:6px 11px;font:inherit;cursor:pointer}#botlab button.go{background:#ff8c28;border-color:#ff8c28;color:#1a0f00;font-weight:700}
 #botlab .live{font:12px/1.4 ui-monospace,monospace;color:#ffcf8a;padding:8px 14px;min-height:36px}
 #botlab .tbl{overflow:auto;flex:1;padding:0 6px 10px}#botlab table{width:100%;border-collapse:collapse;font-size:12px}#botlab th,#botlab td{padding:5px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}#botlab th{position:sticky;top:0;background:#1d1822;font-weight:600;color:#bbb}
 #botlab td.n{text-align:right;font-variant-numeric:tabular-nums}#botlab .bad{color:#ff7b7f}#botlab .ok{color:#6fe0a0}#botlab .min{width:30px;height:30px;padding:0}
 #botlab.min .row,#botlab.min .tbl{display:none}#botlab.min{bottom:auto}</style>
 <header><h2>Bot lab</h2><span id="blCount"></span><button class="min" id="blMin" title="Collapse">–</button></header>
+<div class="row"><button id="blMyRoutes">Open My routes</button><button id="blExample" hidden>Cambridge example</button><span>Load a practice drive, then watch the bot.</span><a id="blAssets" href="street-assets.html" target="_blank" rel="noopener" hidden>Street assets ↗</a></div>
 <div class="row"><label style="flex:1">Drive <select id="blPick" style="flex:1;min-width:0;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:4px"></select></label></div>
 <div class="row"><label>Traffic <select id="blTraffic" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="lesson">The lesson's own</option><option value="random">Add random traffic</option></select></label></div>
 <div class="row"><label>Driver <select id="blDriver" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="reference">Reference bot</option><option value="keys">A person on keys</option><option value="stick">A person on a controller</option></select></label></div>
 <div class="row"><label>Runs <input type="number" id="blN" min="1" max="500" value="1"></label><label>Seed <input type="number" id="blSeed" placeholder="Random" min="0" max="4294967295"></label><label>Speed <select id="blSpd" style="background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:3px"><option value="1">1× watch</option><option value="2">2× watch</option><option value="4">4× watch</option><option value="0">Max, no view</option></select></label><label><input type="checkbox" id="blLoop"> Keep going</label></div>
 <div class="row"><button class="go" id="blGo">Start</button><button id="blStop" disabled>Stop</button><span style="flex:1"></span><button id="blJson">Export JSON</button><button id="blCsv">Export CSV</button><button id="blClear">Clear</button></div>
-<div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
+<div class="row"><button id="blPause" disabled>Pause</button><button id="blPick2">Pick point</button><button id="blShot">Screenshot</button><a id="blSatellite" target="_blank" rel="noreferrer" style="color:#9fd3ff">Google satellite</a><input id="blNote" placeholder="What's wrong here?" style="flex:1;min-width:120px;background:#2a2430;color:#fff;border:1px solid #4a4250;border-radius:6px;padding:5px"><button id="blSave">Save note</button></div>
 <div class="live" id="blPos" style="color:#9fd3ff;padding-top:0"></div>
 <div class="live" id="blLive">Ready. Each window runs its own bots; results from every window appear below.</div>
 <div class="tbl"><table><thead><tr><th>Drive</th><th class="n">Runs</th><th class="n">Pass</th><th class="n">Avg D</th><th class="n">S</th><th class="n">Stuck</th><th>Most common fault</th></tr></thead><tbody id="blBody"></tbody></table></div>`;
   document.body.appendChild(el);
   const $ = (id) => el.querySelector('#' + id);
   $('blMin').onclick = () => el.classList.toggle('min');
+  $('blExample').hidden=!api.previewExample;$('blAssets').hidden=!api.previewExample;
+  $('blExample').onclick=async()=>{if(running)return;$('blExample').disabled=true;$('blLive').textContent='Preparing Cambridge example…';try{await api.loadExample();}catch(e){$('blLive').textContent=e.message;}finally{$('blExample').disabled=false;}};
+  $('blMyRoutes').onclick=()=>{if(running)return;el.classList.add('min');api.openMyRoutes?.();};
+  window.addEventListener('personal-route-ready',()=>{if(!running){$('blPick').value='personal:current';el.classList.remove('min');$('blLive').textContent='Generated map loaded. Start to watch a driving check; this does not certify map accuracy.';}});
   const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
   $('blPick').innerHTML = opt('all:all', 'Everything') + opt('all:lesson', 'All lessons') + opt('all:puzzle', 'All puzzles') + opt('all:mock', 'All mock tests') +
-    ['lesson', 'puzzle', 'mock'].map(k => `<optgroup label="${k === 'mock' ? 'Mock tests' : k[0].toUpperCase() + k.slice(1) + 's'}">${api.plans.filter(p => p.kind === k).map(p => opt(p.kind + ':' + p.id, p.title)).join('')}</optgroup>`).join('');
+    ['personal','lesson', 'puzzle', 'mock'].map(k => `<optgroup label="${k === 'mock' ? 'Mock tests' : k[0].toUpperCase() + k.slice(1) + 's'}">${api.plans.filter(p => p.kind === k).map(p => opt(p.kind + ':' + p.id, p.title)).join('')}</optgroup>`).join('');
   let running = false, stopReq = false, paused = false, picking = false, picked = null;
   // ---- where am I: car position, clicked point, pause, screenshot, notes ----
   const fmt = (v) => v.toFixed(1);
   function where() {
     const A = api.A, pl = api.player, t = A.test, nr = t && t.ctx;
     return { area: A.id, drive: t && t.route ? t.route.name : '', x: +fmt(pl.x), z: +fmt(pl.z), heading: Math.round(((-pl.th * 180 / Math.PI) % 360 + 360) % 360), mph: Math.round(Math.abs(pl.v) * MPH),
-      road: nr ? (nr.way.name || (nr.way.rb ? 'roundabout' : 'unnamed')) : '', s: t ? Math.round(t.sRoute) : 0, clock: Math.round(A.traffic ? A.traffic.clock : 0), picked };
+      latitude:A.net?.origin?A.net.origin[0]-pl.z/A.net.kz:null,longitude:A.net?.origin?A.net.origin[1]+pl.x/A.net.kx:null,source:api.sourceEvidence?.()||null,road: nr ? (nr.way.name || (nr.way.rb ? 'roundabout' : 'unnamed')) : '', s: t ? Math.round(t.sRoute) : 0, clock: Math.round(A.traffic ? A.traffic.clock : 0), picked };
   }
-  setInterval(() => { if (!api.A.net) return; const w = where(); $('blPos').textContent = `car ${w.area} x ${w.x} z ${w.z} · ${w.road} · ${w.mph} mph · route ${w.s} m` + (picked ? `\npoint x ${picked.x} z ${picked.z} (${picked.road || 'off road'})` : ''); }, 250);
+  setInterval(() => { if (!api.A.net) return; const w = where(); const at=picked||api.player,n=api.A.net;$('blSatellite').href='https://www.google.com/maps/@?api=1&map_action=map&center='+(n.origin[0]-at.z/n.kz)+'%2C'+(n.origin[1]+at.x/n.kx)+'&zoom=20&basemap=satellite';$('blPos').textContent = `car ${w.area} x ${w.x} z ${w.z} · ${w.road} · ${w.mph} mph · route ${w.s} m` + (picked ? `\npoint x ${picked.x} z ${picked.z} (${picked.road || 'off road'})` : ''); }, 250);
   $('blPause').onclick = () => { paused = !paused; $('blPause').textContent = paused ? 'Resume' : 'Pause'; };
   $('blPick2').onclick = () => { picking = !picking; $('blPick2').textContent = picking ? 'Click the road…' : 'Pick point'; document.body.style.cursor = picking ? 'crosshair' : ''; };
   document.getElementById('stage').addEventListener('click', (e) => {
@@ -502,11 +509,11 @@ export function createBotLab(api) {
     for (const r of runs) { let g = by.get(r.key); if (!g) by.set(r.key, g = { title: r.title, runs: [] }); g.runs.push(r); }
     $('blCount').textContent = runs.length + ' runs';
     const rows = [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([key, g]) => {
-      const n = g.runs.length, pass = g.runs.filter(r => r.pass).length, avgD = g.runs.reduce((a, r) => a + r.D, 0) / n, S = g.runs.reduce((a, r) => a + r.S, 0), stuck = g.runs.filter(r => r.end !== 'done').length;
+      const n = g.runs.length, pass = g.runs.filter(r => r.kind==='personal'?r.completed:r.pass).length, avgD = g.runs.reduce((a, r) => a + r.D, 0) / n, S = g.runs.reduce((a, r) => a + r.S, 0), stuck = g.runs.filter(r => r.end !== 'done').length;
       const fc = new Map(), at = new Map(); for (const r of g.runs) { for (const f of r.faults) fc.set(f, (fc.get(f) || 0) + 1); for (const w of r.where || []) at.set(w[1], w); }
       const top = [...fc.entries()].sort((a, b) => b[1] - a[1])[0], hits = g.runs.reduce((a, r) => a + (r.hitBy ? r.hitBy.length : 0), 0);
       const loc = top && at.get(top[0]) ? ` <span style="color:#9fd3ff">@ ${at.get(top[0])[2]}, ${at.get(top[0])[3]}</span>` : '';
-      return `<tr><td>${esc(g.title)}<br><span style="color:#888">${esc(key)}</span></td><td class="n">${n}</td><td class="n ${pass === n ? 'ok' : 'bad'}">${Math.round(pass / n * 100)}%</td><td class="n">${avgD.toFixed(1)}</td><td class="n ${S ? 'bad' : ''}">${S}</td><td class="n ${stuck ? 'bad' : ''}">${stuck}</td><td>${top ? esc(top[0]) + ' ×' + top[1] + loc : '<span class="ok">none</span>'}${hits ? `<br><span style="color:#888">hit by others ×${hits}</span>` : ''}</td></tr>`;
+      return `<tr><td>${esc(g.title)}<br><span style="color:#888">${esc(key)}</span></td><td class="n">${n}</td><td class="n ${pass === n ? 'ok' : 'bad'}">${key.startsWith('personal:')?pass+'/'+n+' completed':Math.round(pass / n * 100)+'%'}</td><td class="n">${key.startsWith('personal:')?'—':avgD.toFixed(1)}</td><td class="n ${S ? 'bad' : ''}">${key.startsWith('personal:')?'—':S}</td><td class="n ${stuck ? 'bad' : ''}">${stuck}</td><td>${top ? esc(top[0]) + ' ×' + top[1] + loc : '<span class="ok">none</span>'}${hits ? `<br><span style="color:#888">hit by others ×${hits}</span>` : ''}</td></tr>`;
     });
     $('blBody').innerHTML = rows.join('') || '<tr><td colspan="7" style="color:#888">No runs yet.</td></tr>';
   }
@@ -527,6 +534,7 @@ export function createBotLab(api) {
       if (watch) {
         // watching: one drawn frame per screen refresh, the sim moved on by `speed` × the real time that passed
         const f0 = performance.now(); await new Promise(r => requestAnimationFrame(r));
+        if(paused||stopReq)continue;
         const dt = Math.min(0.1, (performance.now() - f0) / 1000) * speed, n = Math.max(1, Math.ceil(dt / 0.05)), h = dt / n;
         if (n > 1) api.step(n - 1, h); api.frame(h); sim += dt;
       } else {
@@ -543,7 +551,7 @@ export function createBotLab(api) {
     if(!t.done)t.running=false;
     const res = t.done ? api.result() : { pass: false, why: end };
     const pl = api.player;
-    saveRun({ key: p.kind + ':' + p.id, title: p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: !!res.pass && end === 'done', D: t.D, S: t.S,
+    saveRun({ key: p.kind==='personal'?'personal:'+api.A.id:p.kind + ':' + p.id, title: p.kind==='personal'?t.route.name:p.title, kind: p.kind,seed,release:document.querySelector('meta[name="app-release"]')?.content||'source', at: Date.now(), tab: TAB, end, pass: p.kind==='personal'?null:!!res.pass && end === 'done', completed:p.kind==='personal'?!!res.completed&&end==='done':undefined, source:api.sourceEvidence?.()||null, D: t.D, S: t.S,
       faults: t.faults.map(f => f.text), cats: t.faults.map(f => f.cat), where: t.faults.map(f => [f.kind, f.text, f.x, f.z]), hitBy: (t.hits || []).map(h => [h.text, h.x, h.z]), why: res.why || '', len: Math.round(t.route.len), reached: Math.round(t.sRoute),
       simT: Math.round(sim), wallT: Math.round((performance.now() - wall0) / 100) / 10, rerouted: t.rerouted, at_xz: [Math.round(pl.x), Math.round(pl.z)],
       traffic: $('blTraffic').value, driver: who, offRoad: { max: +(t.offRoad?.max || 0).toFixed(2), seconds: +(t.offRoad?.seconds || 0).toFixed(1) }, steering: input.stats || null });
@@ -552,7 +560,7 @@ export function createBotLab(api) {
 
   $('blGo').onclick = async () => {
     if (running) return;
-    const v = $('blPick').value, list = v.startsWith('all:') ? api.plans.filter(p => v === 'all:all' || p.kind === v.slice(4)) : api.plans.filter(p => p.kind + ':' + p.id === v);
+    const v = $('blPick').value, list = v.startsWith('all:') ? api.plans.filter(p => p.kind!=='personal'&&(v === 'all:all' || p.kind === v.slice(4))) : api.plans.filter(p => p.kind + ':' + p.id === v);
     if (!list.length) return;
     running = true; stopReq = false; paused = false; $('blGo').disabled = true; $('blStop').disabled = false; $('blPause').disabled = false; $('blPause').textContent = 'Pause'; api.botMode(true);
     try {
@@ -560,8 +568,8 @@ export function createBotLab(api) {
         const N = Math.max(1, +$('blN').value || 1), total = list.length * N; let k = 0;
         for (const p of list) for (let i = 0; i < N && !stopReq; i++) await runOne(p, `[${++k}/${total}]`,i);
       } while ($('blLoop').checked && !stopReq);
-    } catch (err) { $('blLive').textContent = 'Stopped by an error: ' + err.message; console.error(err); }
-    running = false; api.botMode(false); $('blGo').disabled = false; $('blStop').disabled = true; $('blPause').disabled = true; render();
+    } catch (err) { stopReq=true;$('blLive').textContent = 'Stopped by an error: ' + err.message; console.error(err); }
+    running = false; api.setInput(null);api.botMode(false); $('blGo').disabled = false; $('blStop').disabled = true; $('blPause').disabled = true; render();
     if (!stopReq) $('blLive').textContent = 'Finished. ' + allRuns().length + ' runs stored in this browser.';
   };
   $('blStop').onclick = () => { stopReq = true; $('blLive').textContent = 'Stopping after this step…'; };
