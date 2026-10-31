@@ -1,4 +1,3 @@
-import {createTileControls} from '../tile-builder/controls.js';
 import * as L from '../vendor/leaflet.js';
 import {request,findRoute,createJourney} from './client.js';
 import {decode,metres,eligibleForMock} from './geometry.js';
@@ -9,7 +8,6 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-labelledby="personalRoutesHeading">
     <header><div><span class="route-eyebrow">YOUR PLACES. YOUR PRACTICE.</span><h2 id="personalRoutesHeading">My routes <small>Experimental</small></h2></div><button class="x" type="button" aria-label="Close my routes">×</button></header>
     <div class="personal-layout"><div class="personal-tools">
-      <div class="route-pin-controls route-mode"><button class="cbtn" id="routeMode" aria-pressed="true">Route</button><button class="cbtn" id="tileMode" aria-pressed="false">1 km tile</button></div>
       <ol class="route-steps"><li>Find a place</li><li>Pick two pins</li><li>Drive</li></ol>
       <form id="placeSearch"><label for="routePlace">Search for a place</label><div class="route-search"><input id="routePlace" type="search" placeholder="Cambridge, UK" maxlength="200" autocomplete="off" required><button class="cbtn" type="submit">Search</button></div></form>
       <div id="placeResults" aria-label="Place search results"></div>
@@ -40,13 +38,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
     $('pinSummary').textContent=pins.map((p,i)=>(i?'B · Finish: ':'A · Start: ')+(p?`${p[1].toFixed(5)}, ${p[0].toFixed(5)}`:'click the map')).join(' → ');
   }
   function setPin(i,p){invalidate();pins[i]=p;refreshPins();if(i===0&&!pins[1])select(1);}
-  map.on('click',e=>{if(!tileControls.active)setPin(choice,[e.latlng.lng,e.latlng.lat]);});
-  const tileControls=createTileControls({sheet,map,L,say,onMode:enabled=>{
-    invalidate();pins=[null,null];refreshPins();
-    for(const el of [sheet.querySelector('.route-steps'),sheet.querySelector('.route-pin-controls:not(.route-mode)'),$('pinSummary'),$('pinAtCentre'),$('generatePersonalRoute'),sheet.querySelector('.personal-tools>.route-note'),sheet.querySelector('.personal-library')])el.hidden=enabled;
-    $('routeMode').setAttribute('aria-pressed',String(!enabled));$('tileMode').setAttribute('aria-pressed',String(enabled));
-  }});
-  $('routeMode').onclick=()=>tileControls.enable(false);$('tileMode').onclick=()=>tileControls.enable(true);
+  map.on('click',e=>setPin(choice,[e.latlng.lng,e.latlng.lat]));
   $('chooseStart').onclick=()=>select(0);$('chooseEnd').onclick=()=>select(1);
   $('pinAtCentre').onclick=()=>{const p=map.getCenter();setPin(choice,[p.lng,p.lat]);};
   $('swapPins').onclick=()=>{invalidate();pins.reverse();refreshPins();};
@@ -56,16 +48,16 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
     const snaps=[recipe.snappedStart,recipe.snappedEnd];$('routeSnap').textContent=snaps.every(Boolean)?`Pins snap to nearby driving lanes (start ${Math.round(metres(recipe.start,snaps[0]))} m, finish ${Math.round(metres(recipe.end,snaps[1]))} m).`:'Pins follow nearby driving lanes.';
   }
   $('placeSearch').onsubmit=async e=>{
-    e.preventDefault();const q=$('routePlace').value.trim();if(!q)return;cancel();tileControls.cancel();const token=sequence;controller=new AbortController();setBusy(true);say('Searching places…');$('placeResults').replaceChildren();
+    e.preventDefault();const q=$('routePlace').value.trim();if(!q)return;cancel();const token=sequence;controller=new AbortController();setBusy(true);say('Searching places…');$('placeResults').replaceChildren();
     try{const results=await request('search?q='+encodeURIComponent(q),{signal:controller.signal,onStatus:say});if(token!==sequence)return;
       if(!Array.isArray(results))throw Error('Place search returned an invalid response.');
-      for(const result of results.slice(0,8)){const lat=Number(result.lat),lon=Number(result.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;const button=document.createElement('button');button.className='place-result';button.type='button';button.textContent=result.display_name;button.onclick=()=>{invalidate();pins=[null,null];refreshPins();place=String(result.name||result.display_name||q).split(',')[0];const b=result.boundingbox?.map(Number);if(b?.length===4&&b.every(Number.isFinite))map.fitBounds([[b[0],b[2]],[b[1],b[3]]],{maxZoom:15});else map.setView([lat,lon],14);$('placeResults').replaceChildren();if(tileControls.active){tileControls.select([lon,lat]);tileControls.fit();}else{say('Place start A, then finish B on the map.');select(0);}};$('placeResults').append(button);}
+      for(const result of results.slice(0,8)){const lat=Number(result.lat),lon=Number(result.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;const button=document.createElement('button');button.className='place-result';button.type='button';button.textContent=result.display_name;button.onclick=()=>{invalidate();pins=[null,null];refreshPins();place=String(result.name||result.display_name||q).split(',')[0];const b=result.boundingbox?.map(Number);if(b?.length===4&&b.every(Number.isFinite))map.fitBounds([[b[0],b[2]],[b[1],b[3]]],{maxZoom:15});else map.setView([lat,lon],14);$('placeResults').replaceChildren();say('Place start A, then finish B on the map.');select(0);};$('placeResults').append(button);}
       say($('placeResults').children.length?'Choose a place below.':'No matching places. Try a town, road or postcode.');
     }catch(e){if(e.name!=='AbortError'&&token===sequence)say(e.message);}finally{if(token===sequence)setBusy(false);}
   };
   $('generatePersonalRoute').onclick=async()=>{
     invalidate();const token=sequence;controller=new AbortController();setBusy(true);say('Finding a driving route…');
-    try{const recipe=await findRoute(...pins,{signal:controller.signal,onStatus:say});if(token!==sequence)return;recipe.title=(place+' · A to B').slice(0,120);drawRecipe(recipe);say('Route ready. Save & drive builds it with the refined map generator.');}
+    try{const recipe=await findRoute(...pins,{signal:controller.signal,onStatus:say});if(token!==sequence)return;recipe.title=(place+' · A to B').slice(0,120);drawRecipe(recipe);say('Route ready. Save it here or drive it now.');}
     catch(e){if(e.name!=='AbortError'&&token===sequence)say(e.message);}finally{if(token===sequence)setBusy(false);}
   };
   function save(){if(!draft)throw Error('Generate a route first.');const title=$('personalRouteName').value.trim();if(!title)throw Error('Give your route a name.');draft={...draft,title};store.save(draft);renderSaved();return draft;}
@@ -89,12 +81,12 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
       const del=button('Delete',()=>{if(!confirm(`Delete “${recipe.title}” from this browser?`))return;try{cancel();store.remove(recipe.id);if(draft?.id===recipe.id)invalidate();renderSaved();say('Route deleted from this device.');}catch(e){say(e.message);}});del.setAttribute('aria-label','Delete '+recipe.title);list.append(card);
     }
   }
-  function close(){cancel();tileControls.cancel();sheet.hidden=true;onClose?.();}
+  function close(){cancel();sheet.hidden=true;onClose?.();}
   sheet.querySelector('.x').onclick=close;sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
   sheet.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();close();}if(e.key==='Tab'){const items=[...sheet.querySelectorAll('button,input,a[href],[tabindex="0"]')].filter(e=>!e.disabled&&e.getClientRects().length),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
   window.addEventListener('storage',e=>{if(e.key?.startsWith('slaydrive.personal-routes'))renderSaved();});
   window.addEventListener('learner-access-change',()=>{if(!canDrive()&&busy){cancel();say('Sign in again to drive your saved route.');}});
-  const fit=()=>{map.invalidateSize({pan:false});if(tileControls.active){tileControls.fit();return;}if(line)map.fitBounds(line.getBounds(),{padding:[32,32],maxZoom:16});};
+  const fit=()=>{map.invalidateSize({pan:false});if(line)map.fitBounds(line.getBounds(),{padding:[32,32],maxZoom:16});};
   new ResizeObserver(()=>{if(!sheet.hidden)fit();}).observe($('personalRouteMap'));
-  return {open({tile=false}={}){sheet.hidden=false;renderSaved();tileControls.enable(tile);say(draft?'Saved route ready.':'Search for a place, then choose start and finish.');if(tile)say('Cambridge is selected. Search above or move the 1 km square, then generate it.');setTimeout(()=>{fit();$('routePlace').focus();},0);},close,map};
+  return {open(){sheet.hidden=false;renderSaved();say(draft?'Saved route ready.':'Search for a place, then choose start and finish.');setTimeout(()=>{fit();$('routePlace').focus();},0);},close,map};
 }

@@ -1,3 +1,7 @@
+# Historical tile-prototype evidence
+
+The standalone tile UI has been removed. These captures record renderer development; use My routes for current testing.
+
 # Local verification
 
 - 258 JavaScript unit/regression tests passed (`npm test`).
@@ -10,4 +14,4 @@
 - `synthetic-markings.png` and `synthetic-result.json`: explicitly synthetic junction demonstrating yellow hatching, crossing types, lane arrows and road text. The pixel check confirms yellow paint is rendered. The captured Cambridge base data contains no explicit yellow-box boundaries; this fixture does not establish their real locations.
 - Signal tests cover source direction, separate vehicle/pedestrian roles, duplicate approach suppression, coordinated junction crossings, standalone crossings and push-button inputs independent of controller type. This is a static preview, not a live signal-phase simulation.
 
-The PR workflow additionally checks the deployed preview with live OSM map tiles, search and generation, including supplementary marking import. Its screenshots/results are uploaded separately in the GitHub Actions `cockpit-preview-evidence` artifact. Provider failure remains a failed live check even when base-map generation succeeds.
+Current CI checks personal-route interactions, the shared synthetic marking renderer and the live route providers. The retired tile UI and supplementary marking endpoint are no longer tested or deployed.

@@ -52,6 +52,3 @@ else if(preview)fs.writeFileSync(path.join(OUT,'auth-config.js'),'window.LEARNER
 else fs.copyFileSync(path.join(SRC, 'auth-config.js'), path.join(OUT, 'auth-config.js'));
 
 fs.copyFileSync(path.join(SRC,'js/vendor/THIRD-PARTY-LICENSES.txt'),path.join(OUT,'THIRD-PARTY-LICENSES.txt'));
-
-// Isolated worker for the one kilometre mode inside My routes.
-await build({entryPoints:[path.join(SRC,'js/tile-builder/worker.js')],bundle:true,minify:true,format:'esm',target:'es2022',outfile:path.join(OUT,'tile-worker.js')});

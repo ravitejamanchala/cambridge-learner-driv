@@ -1,17 +1,29 @@
-# One kilometre tile prototype
+# Refined map renderer
 
-This is a fresh branch from `main` (`e444919`), not a continuation of the deleted world-inspector branch. Open **`/?tile`** on its PR preview, or **My routes → 1 km tile**. This uses the existing simulator panel, fonts, colours, search and map; there is no restyled page.
+The separate 1 km tile tool has been removed. Its geometry and markings now power the existing **My routes** flow; there is no second editor, mode selector or tile-preview shortcut.
 
-1. Search for a town, street or postcode and select a result. Cambridge is selected initially.
-2. The pink square shows exactly **1,000 × 1,000 metres in the simulator's local projection**. Click the street map or drag its centre pin to reposition it.
-3. Choose **Generate 3D tile**. The app downloads a bounded 1,200 × 1,200 metre area, processes it in a worker and displays only the central 1 km tile.
-4. Drag to orbit, right-drag to pan, scroll/pinch to zoom. **Reset view** frames the whole tile. Return to **Map** to choose another area.
+1. Open **My routes** and search for a place.
+2. Place start A and finish B, then choose **Generate route**.
+3. Choose **Save & drive**, or use **Drive** on an existing saved route.
 
-The prototype shows joined roads, flat pavements, mapped water/green spaces and simple extruded building footprints. Mapped trees, fences, walls, hedges, gates, bollards, lamps, benches, bins, post boxes, cycle parking and bus-stop assets reuse the simulator’s procedural geometry. A separate names/direction guide can be switched off. It uses the existing simulator OSM converter and coordinate conventions. The tile renderer now buffers whole road polylines into continuous rounded outlines, unions them with fitted junction corners, and subtracts the carriageway from pavement and walking/cycling surfaces. This avoids folded ribbon triangles and rectangular pavement pieces in the road. This change is confined to the tile renderer. The preview retains source building geometry rather than applying driving-clearance edits. Existing simulator import behavior is unchanged.
+The simulator retains its UI, building assets, car physics, live traffic and local route storage. Built-in course and mock worlds retain their rendering. Personal drives share continuous road buffers, pavement subtraction, corrected approaches and source/inferred markings, split into nearby rendering chunks. The full route is prepared before driving, without a 1 km clipping boundary or provider requests while driving.
 
-Buildings and street furniture are each batched into a mesh; roads and land are grouped by material. The viewer renders when the camera or viewport changes, rather than continuously when idle. Changing the selected square cancels in-flight work and invalidates the old result. Generation runs outside the UI thread. Partial provider responses, empty road coverage and excessive data return visible errors instead of showing a default map.
+Saved entries are local recipes with a bounded source cache; evicted source data may need to be fetched again before driving. Untagged widths, heights and markings are estimates. Exact yellow boxes, road text and parking bays appear only where the base source provides them. The prototype-only supplementary marking endpoint and its failed live import check were removed along with the tool. Existing live search/routing/base-map checks remain enabled.
 
-The 1 km inspector remains a static preview: it excludes routing, driving, audits, satellite interpretation, publication, persistence and detailed house assets. Personal driving uses the integration described below. Widths and untagged heights remain estimates; terrain has no elevation and bridges are not vertically separated. This is a geometry prototype, not a complete or survey-accurate digital twin. Large/high-density responses are bounded by the existing broker and a 60,000-element client limit.
+The shared geometry modules and internal synthetic renderer harness remain for regression testing. They are not exposed as an app tool or bundled as a separate tile worker. Earlier tile screenshots under `docs/evidence/one-km-tile/` document development comparisons; current route evidence is under `docs/evidence/my-routes-refined/`.
+
+## Run and verify
+
+```sh
+npm ci
+npm test
+node tools/build_demo.mjs . dist-preview --preview
+npm run dev:routes -- dist-preview 8000
+TEST_SITE=dist-preview node tests/personal-routes-browser.mjs
+node tests/tile-markings-browser.mjs
+```
+
+Open `http://127.0.0.1:8000/` and choose My routes. Browser interaction tests use deterministic providers and real simulator physics; hosted provider checks run separately in CI.
 
 ## CityGen3D manual review
 
@@ -27,51 +39,3 @@ Reviewed the uploaded **CityGen3D v1.20** manual. Page numbers below refer to it
 - **Builds (p. 47–48):** the manual describes standalone Unity builds and excluding editor-only components. It does not establish that its editor generation workflow can run inside our existing WebGL app.
 
 **Assessment:** adopt the small-tile workflow now. Evaluate the actual licensed Unity package separately only if an engine migration becomes the goal. A manual alone cannot establish its speed, accuracy or suitability for our mobile browsers.
-
-## Run and verify
-
-```
-npm ci
-node tools/build_demo.mjs . dist-tile --preview
-npm run dev:routes -- dist-tile 8000
-```
-
-Open `http://127.0.0.1:8000/?tile`. The existing source broker handles search and base OSM requests; no new key is required. The same Pages Worker makes a supplementary fixed Overpass query for standalone road markings and parking spaces, limited to a 1,250 m bounding extent, with a one-hour cache, client throttling, timeouts and response-size limits. Network/5xx outages can use the public Private.coffee Overpass mirror; rate limits and other 4xx responses are returned without switching providers. It accepts bounds, never arbitrary query text. If the detail provider fails, the base tile remains usable and the missing details are reported. OSM map tiles are displayed directly with attribution. No satellite imagery is fetched or analysed.
-
-```
-npm test
-TEST_SITE=dist-tile node tests/tile-builder-browser.mjs
-```
-
-The browser test uses fixture map tiles and provider responses. It verifies visible selection, search, pin dragging, buffered bounds, 3D rendering, orbit/reset, invalidation, cancellation, provider errors/retry and mobile overflow. `LIVE_TILE=1` adds a separate live street-map/search/generation check on the deployed preview. These are distinct from verifying geographic accuracy.
-
-A captured Cambridge source response for the reported square (**52.20479, 0.13407**) produces 1,595 buildings and 10 continuous road polygons with the current renderer. All building heights in that square are estimated. The response reports 2026-08-10; it is not a fresh survey. Current local browser evidence is in `docs/evidence/one-km-tile/`; deterministic tests use a fixture basemap and captured source transport. Live-provider evidence is kept separately in GitHub Actions artifacts.
-
-## Street detail coverage
-
-- Directional lane arrows read explicit `turn:lanes` tags; BUS LANE reads designated/only bus or PSV lanes. Inconsistent directional counts and unsupported turn values are reported instead of silently choosing a lane. `oneway=-1` is handled after native geometry reversal. Where marking tags are missing, the existing simulator lane-line and junction-approach logic provides estimated markings. Explicit `lane_markings=no` is respected. Direction arrows prefer source tags; inferred multi-lane junction guidance is identified in the coverage counts. Marking placement and lane widths are approximations, not measurements.
-- Explicit closed `road_marking=box_junction`/`yellow_box` polygons (also `junction=box` and `box_junction=yes`) produce metre-scale yellow hatching clipped to the polygon and its holes. Diagonal edges use geometry rather than a rectangular image. `keep_clear` and `word` markings become road text. Closed `amenity=parking_space` polygons produce individual bay outlines. Missing boundaries are not replaced by guessed boxes.
-- Mapped signals, stop/give-way controls, zebra crossings, signal-controlled crossing studs and tagged tactile paving are shown. Lane lines leave a gap across the crossing. `traffic_signals:direction` is respected before approach positioning, and equivalent signal heads are deduplicated. Junction-coordinated crossings reuse existing vehicle approaches; a pedestrian push button does not imply a separate standalone controller. Pedestrian heads have a distinct small red-person appearance and face the walking path. This is a static layout preview: it does not simulate live signal phases. Supported source upright signs include UK stop, give-way, no-entry and speed signs. Unsupported signs stay in the coverage report. Pole placement/orientation is estimated using the native roadside-clearance code.
-- OSM turn restrictions and their original relation members/tags are retained; their labels and blue one-way guides are reference overlays. This preview has no driving/routing enforcement. Road names are labels, not invented painted inscriptions.
-- Roadside furniture whose base intersects a road is omitted with a count. Barriers/gates/bollards remain because they can intentionally obstruct traffic. Source data is not mutated.
-- The captured Cambridge base response contains no explicit yellow-box or individual parking-space polygons. The separate query can retrieve additional mapped details; it cannot recover features absent from OSM. This does not certify every real street marking.
-
-Pure tests cover reverse one-way lanes, asymmetric counts, malformed lane tags, KEEP CLEAR/BUS LANE, explicit yellow-box and parking polygons, fence/tree/lamp assets, turn restrictions, road-overlap suppression and provider validation/rate-limit errors. Synthetic tests demonstrate supported features without adding fictional markings to the Cambridge dataset. Browser tests also verify the guide toggle and asset coverage controls.
-
-## Screenshot-driven refinement
-
-The reported square is centred on **52.20479, 0.13407**. A captured base OSM response generates 1,595 building footprints (all heights estimated). The renderer now uses continuous buffered road geometry, joined walking paths, native lane-line patterns, corrected junction approaches, and distinct crossing/signal roles. Exact yellow-box locations remain dependent on mapped boundaries; the captured base response contains none. The renderer test uses a clearly labelled synthetic junction to verify hatching, road text and arrow rendering without inventing Cambridge source data.
-
-See `docs/evidence/one-km-tile/junction-before.png` and `junction-after.png` for the same camera and source data. Guidance labels are switched off in both so the road edges can be inspected; the label feature itself is unchanged.
-
-## Try the generator in My routes
-
-On the same PR preview, open **My routes → Route**, search for a place, set **A** and **B**, then choose **Generate route → Save & drive**. Existing saved routes also use the refined generator when driven again; there is no need to delete them. The existing UI and local route storage are retained.
-
-Personal routes now share the tile generator's continuous road buffers, pavement subtraction, source signal-direction filtering, corrected approaches and road-paint geometry. The route worker processes the entire fetched corridor using one origin, then splits rendering into native scenery chunks. It does not clip routes to the inspector's 1 km square. Only nearby marking/surface meshes are created and displayed. All required base map areas are prepared before driving; no map download is triggered at a chunk boundary.
-
-The simulator keeps its existing building style, car physics, collisions, live vehicle-light controller and graded/ungraded modes. Static preview signal heads, restriction labels and blue direction guides are not inserted into the live scene. Built-in courses and mocks keep their existing renderer. Native simulator signal timing is not a reconstruction of surveyed real-world phases.
-
-Saved entries remain compact start/end/geometry recipes in local storage, with a bounded, disposable source cache. Reloading can require refetching evicted source data before driving. This is not a promise of offline map persistence or account sync. Extra yellow boxes, parking bays and road text render when present in the fetched source; personal routes currently use the existing base source broker, without repeatedly calling the unavailable supplementary detail provider along the corridor.
-
-Validation includes a >2 km route with continuous road coverage and markings beyond ±500 m, saved-route reload followed by real native driving, scenery chunk transitions without provider requests, graded mock pass/fail, and a source-mode cockpit regression. Test provider responses are deterministic fixtures, not live map-accuracy certification.

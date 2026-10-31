@@ -4,15 +4,15 @@
   "searchRequests": 1,
   "routeRequests": 1,
   "osmRequests": 7,
-  "buildings": 50,
+  "buildings": 49,
   "performance": {
-    "chunks": 13,
+    "chunks": 14,
     "geometries": 108,
     "textures": 12,
     "calls": 126,
-    "triangles": 8406,
+    "triangles": 8471,
     "programs": 15,
-    "heap": 41
+    "heap": 40
   },
   "preparedWholeRoute": true,
   "boundaryWithoutReload": true,

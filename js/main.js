@@ -275,9 +275,9 @@ async function boot() {
   mountLocalLibrary({selectedRoute:()=>hub.plan().kind==='mock'?hub.plan().key.slice(6):null,onSelect:(id)=>{const pl=hub.select('mock',id);hub.render();return pickPlan(pl,false);}});
   let personalUI=null,personal=null;
   function stopPersonal(){personal?.journey.cancel();personal=null;for(const key of localTracks.keys())if(key.startsWith('personal:'))localTracks.delete(key);index.areas=index.areas.filter(a=>!a.id.startsWith('personal:')); $('personalJourneyProgress').hidden=true;document.body.classList.remove('personal-drive');}
-  async function openPersonal(tile=false){
+  async function openPersonal(){
     hub.closeSheets();
-    try{if(!personalUI){const {createRoutesUI}=await import('./personal/ui.js');personalUI=createRoutesUI({onDrive:startPersonal,canDrive:graded=>canAccessPlan({kind:'personal',graded}),requestLogin:()=>{personalUI.close();hub.requestAccess();},onClose:()=>$('myRoutesBtn').focus()});}personalUI.open({tile:tile===true});}
+    try{if(!personalUI){const {createRoutesUI}=await import('./personal/ui.js');personalUI=createRoutesUI({onDrive:startPersonal,canDrive:graded=>canAccessPlan({kind:'personal',graded}),requestLogin:()=>{personalUI.close();hub.requestAccess();},onClose:()=>$('myRoutesBtn').focus()});}personalUI.open();}
     catch(e){$('personalOpenStatus').textContent='Route creator could not load. Check your connection and retry.';}
   }
   $('myRoutesBtn').onclick=openPersonal;
@@ -865,7 +865,6 @@ async function boot() {
   });
   await areaChain; await new Promise(r => setTimeout(r, 0));
   $('loadOv').hidden = true;
-  if(new URLSearchParams(location.search).has('tile'))await openPersonal(true);
 }
 
 boot().catch(err => { console.error(err); setLoad(err.message || 'Something went wrong while loading.'); const b = $('loadErr'); if (b) b.hidden = false; });

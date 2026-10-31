@@ -61,26 +61,6 @@ test('street assets retain explicit markings, restrictions and reversed one-way 
  const unmarked=generateTile({elements:plain.filter(e=>!e.tags?.road_marking)},s.center);assert.equal(unmarked.street.arrows.length,0);assert.equal(unmarked.street.texts.length,0);assert.equal(unmarked.street.boxes.length,0);
 });
 
-import {tileDetailQuery} from '../server/map/tile-details.js';
-import {handleMapRequest} from '../server/map/handler.js';
-test('supplementary markings query is bounded, fixed and rejects partial provider responses',async()=>{
- const bounds=tileSelection([.1218,52.2053]).dataBounds;
- assert.match(tileDetailQuery(bounds),/nwr\[road_marking\]/);assert.match(tileDetailQuery(bounds),/amenity=parking_space/);
- assert.throws(()=>tileDetailQuery([52,0,52.012,.015]),/limited/);
- let calls=0;const req=()=>new Request('https://preview.pages.dev/map-api/tile-details',{method:'POST',headers:{Origin:'https://preview.pages.dev'},body:JSON.stringify({bounds})});
- const good=await handleMapRequest(req(),{},{fetch:async (url,options)=>{calls++;assert.equal(url,'https://overpass-api.de/api/interpreter');assert.equal(options.method,'POST');assert.match(new URLSearchParams(options.body).get('data'),/nwr\[road_marking\]/);return Response.json({elements:[]});}});assert.equal(good.status,200);assert.equal(calls,1);
- const partial=await handleMapRequest(req(),{},{fetch:async()=>Response.json({elements:[],remark:'timeout'})});assert.equal(partial.status,502);
- const limited=await handleMapRequest(req(),{},{fetch:async()=>new Response('',{status:429,headers:{'Retry-After':'20'}})});assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'20');
- const foreign=new Request('https://preview.pages.dev/map-api/tile-details',{method:'POST',headers:{Origin:'https://other.test'},body:JSON.stringify({bounds})});assert.equal((await handleMapRequest(foreign,{},{})).status,403);
-});
-
-test('supplementary source failover is limited to outages, never rate limits',async()=>{
- const bounds=tileSelection([.1218,52.2053]).dataBounds,request=()=>new Request('https://preview.pages.dev/map-api/tile-details',{method:'POST',body:JSON.stringify({bounds})});
- const urls=[];const fallback=await handleMapRequest(request(),{},{fetch:async url=>{urls.push(url);return urls.length===1?new Response('Unavailable',{status:503}):Response.json({elements:[]});}});
- assert.equal(fallback.status,200);assert.deepEqual(urls,['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter']);
- for(const status of [403,429]){let calls=0;const limited=await handleMapRequest(request(),{},{fetch:async()=>{calls++;return new Response('',{status});}});assert.equal(calls,1);assert.equal((await limited.json()).providerStatus,status);}
-});
-
 import {bufferedLine,tileSurfaces} from '../js/tile-builder/surfaces.js';
 import {insideRing,ringArea} from '../js/road-space.js';
 import {polygonOperation} from '../js/road-surfaces.js';
