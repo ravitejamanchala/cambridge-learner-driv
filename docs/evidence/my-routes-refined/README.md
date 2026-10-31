@@ -13,3 +13,7 @@ Verified locally:
 `drive.png`, `next-section.png`, `create-desktop.png` and `result.json` come from deterministic provider fixtures with real converter, storage and physics. They are not screenshots of surveyed Cambridge or a mobile performance benchmark. No live-provider success is claimed here. The prototype-only supplementary marking endpoint has been removed. My routes uses the existing base source broker, and its live provider checks remain in CI.
 
 After removing the standalone tool, the current regression suite contains 257 tests (two tests belonged to its removed supplementary endpoint). Source/build and browser verification remain separate from live-provider availability.
+
+## Route loader
+
+The themed loader stays visible through route lookup, map preparation and simulator startup. It shows current status, supports cancellation without deleting saved routes, traps keyboard focus, and respects reduced motion. Browser verification covers a deliberately pending request, desktop/mobile screenshots, Escape cancellation, retry success, failed map preparation and a successful native drive. `loading-desktop.png` and `loading-mobile.png` show that pending-request state.

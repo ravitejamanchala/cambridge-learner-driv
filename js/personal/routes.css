@@ -18,3 +18,10 @@
 .personal-drive #pauseSheet .detail>h3,.personal-drive #flist{display:none}.personal-drive #resultSheet .score{display:none}
 #personalOpenStatus:empty{display:none}
 .personal-routes [hidden]{display:none!important}
+
+.personal-route-loading{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:20px;background:#173b4bcc;box-sizing:border-box}
+.route-loading-panel{box-sizing:border-box;width:min(380px,100%);max-height:calc(100dvh - 40px);overflow:auto;text-align:center;padding:28px 24px;border:2px solid #fff;border-radius:24px;background:var(--cream,#fff6ea);color:var(--ink,#193c4a);box-shadow:0 12px 40px #0003}
+.route-loading-panel h3{margin:16px 0 8px;font-size:21px}.route-loading-panel p{min-height:3em;margin:0 0 18px}.route-loading-panel .cbtn{min-width:130px}
+.route-loading-spinner{display:block;box-sizing:border-box;width:48px;height:48px;margin:auto;border:5px solid #087f8326;border-top-color:#087f83;border-right-color:#c13070;border-radius:50%;animation:route-loading-spin .85s linear infinite}
+@keyframes route-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.route-loading-spinner{animation:none}}
