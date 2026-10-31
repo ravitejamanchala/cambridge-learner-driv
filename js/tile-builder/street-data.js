@@ -21,8 +21,9 @@ export function laneLayout(tags,oneway){
  return {forward:f,backward:b,total:f+b};
 }
 export function turnCode(value){const parts=value.split(';');if(parts.some(v=>!['left','through','right','none',''].includes(v)))return null;return ['left','through','right'].filter(v=>parts.includes(v)).map(v=>({left:'L',through:'S',right:'R'})[v]).join('');}
-const inside=p=>Math.abs(p.x)<=500&&Math.abs(p.z)<=500;
 export function streetData(track,net,data,core,surface){
+ const extent=core.flat(2).reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
+ const inside=p=>p.x>=extent[0]&&p.z>=extent[1]&&p.x<=extent[2]&&p.z<=extent[3];
  const paint=[],arrows=[],texts=[],boxes=[],signs=[],signals=[],labels=[],guides=[],unknown=[],parking=[],restrictions=[],crossings=[],tactile=[],crossingPaint=[],crossingAreas=[];
  const nodes=new Map(data.elements.filter(e=>e.type==='node').map(e=>[e.id,e])),project=n=>({x:(n.lon-net.origin[1])*net.kx,z:-(n.lat-net.origin[0])*net.kz});
  const blocked=objectBlocker(track.objects.filter(o=>o.type==='building')),space=roadSpace(net),source=track.osm.ways;
@@ -86,7 +87,7 @@ export function streetData(track,net,data,core,surface){
  for(const r of track.osm.restrictions||[]){const via=r.members?.find(m=>m.role==='via'&&m.type==='node'),n=via&&nodes.get(via.ref);const p=n&&project(n);restrictions.push({...r,position:p||null});if(p&&inside(p))labels.push({...p,text:(r.tags.restriction||r.tags['restriction:conditional']||'Turn restriction').replaceAll('_',' ').toUpperCase(),restriction:true});}
  const excluded=[];
  const objects=track.objects.filter(o=>o.type!=='building'&&!['footway','pedestrian','water','forest','parking','park','sports','garden','grass','cemetery','industrial','sand','plaza'].includes(o.properties.mapFeature)).filter(o=>{
-  if(Math.abs(o.x)>510+o.sx/2||Math.abs(o.z)>510+o.sz/2)return false;
+  if(o.x+o.sx/2<extent[0]-10||o.x-o.sx/2>extent[2]+10||o.z+o.sz/2<extent[1]-10||o.z-o.sz/2>extent[3]+10)return false;
   if(['tree','lamp','bench','bin','postBox','bicycleParking','busStop'].includes(o.properties.mapFeature)&&space.disk(o.x,o.z,o.properties.mapFeature==='tree'?.2:Math.min(o.sx,o.sz)/2)){excluded.push(o.properties.sourceId);return false;}return true;
  });
  const pathKinds=['cycleway','path','steps','bridleway'];const paths=pathKinds.map(kind=>({kind,polygons:polygonOperation(polygonOperation(objects.filter(o=>o.properties.mapFeature===kind).map(objectRings),core,'intersection'),surface.road,'difference')})).filter(p=>p.polygons.length);

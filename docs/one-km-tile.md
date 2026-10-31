@@ -11,7 +11,7 @@ The prototype shows joined roads, flat pavements, mapped water/green spaces and 
 
 Buildings and street furniture are each batched into a mesh; roads and land are grouped by material. The viewer renders when the camera or viewport changes, rather than continuously when idle. Changing the selected square cancels in-flight work and invalidates the old result. Generation runs outside the UI thread. Partial provider responses, empty road coverage and excessive data return visible errors instead of showing a default map.
 
-This first version deliberately excludes routing, driving, audits, satellite interpretation, publication, persistence and detailed house assets. Widths and untagged heights remain estimates; terrain has no elevation and bridges are not vertically separated. This is a geometry prototype, not a complete or survey-accurate digital twin. Large/high-density responses are bounded by the existing broker and a 60,000-element client limit.
+The 1 km inspector remains a static preview: it excludes routing, driving, audits, satellite interpretation, publication, persistence and detailed house assets. Personal driving uses the integration described below. Widths and untagged heights remain estimates; terrain has no elevation and bridges are not vertically separated. This is a geometry prototype, not a complete or survey-accurate digital twin. Large/high-density responses are bounded by the existing broker and a 60,000-element client limit.
 
 ## CityGen3D manual review
 
@@ -63,3 +63,15 @@ Pure tests cover reverse one-way lanes, asymmetric counts, malformed lane tags, 
 The reported square is centred on **52.20479, 0.13407**. A captured base OSM response generates 1,595 building footprints (all heights estimated). The renderer now uses continuous buffered road geometry, joined walking paths, native lane-line patterns, corrected junction approaches, and distinct crossing/signal roles. Exact yellow-box locations remain dependent on mapped boundaries; the captured base response contains none. The renderer test uses a clearly labelled synthetic junction to verify hatching, road text and arrow rendering without inventing Cambridge source data.
 
 See `docs/evidence/one-km-tile/junction-before.png` and `junction-after.png` for the same camera and source data. Guidance labels are switched off in both so the road edges can be inspected; the label feature itself is unchanged.
+
+## Try the generator in My routes
+
+On the same PR preview, open **My routes → Route**, search for a place, set **A** and **B**, then choose **Generate route → Save & drive**. Existing saved routes also use the refined generator when driven again; there is no need to delete them. The existing UI and local route storage are retained.
+
+Personal routes now share the tile generator's continuous road buffers, pavement subtraction, source signal-direction filtering, corrected approaches and road-paint geometry. The route worker processes the entire fetched corridor using one origin, then splits rendering into native scenery chunks. It does not clip routes to the inspector's 1 km square. Only nearby marking/surface meshes are created and displayed. All required base map areas are prepared before driving; no map download is triggered at a chunk boundary.
+
+The simulator keeps its existing building style, car physics, collisions, live vehicle-light controller and graded/ungraded modes. Static preview signal heads, restriction labels and blue direction guides are not inserted into the live scene. Built-in courses and mocks keep their existing renderer. Native simulator signal timing is not a reconstruction of surveyed real-world phases.
+
+Saved entries remain compact start/end/geometry recipes in local storage, with a bounded, disposable source cache. Reloading can require refetching evicted source data before driving. This is not a promise of offline map persistence or account sync. Extra yellow boxes, parking bays and road text render when present in the fetched source; personal routes currently use the existing base source broker, without repeatedly calling the unavailable supplementary detail provider along the corridor.
+
+Validation includes a >2 km route with continuous road coverage and markings beyond ±500 m, saved-route reload followed by real native driving, scenery chunk transitions without provider requests, graded mock pass/fail, and a source-mode cockpit regression. Test provider responses are deterministic fixtures, not live map-accuracy certification.

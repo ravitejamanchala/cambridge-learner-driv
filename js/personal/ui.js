@@ -65,7 +65,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   };
   $('generatePersonalRoute').onclick=async()=>{
     invalidate();const token=sequence;controller=new AbortController();setBusy(true);say('Finding a driving route…');
-    try{const recipe=await findRoute(...pins,{signal:controller.signal,onStatus:say});if(token!==sequence)return;recipe.title=(place+' · A to B').slice(0,120);drawRecipe(recipe);say('Route ready. Save it here or drive it now.');}
+    try{const recipe=await findRoute(...pins,{signal:controller.signal,onStatus:say});if(token!==sequence)return;recipe.title=(place+' · A to B').slice(0,120);drawRecipe(recipe);say('Route ready. Save & drive builds it with the refined map generator.');}
     catch(e){if(e.name!=='AbortError'&&token===sequence)say(e.message);}finally{if(token===sequence)setBusy(false);}
   };
   function save(){if(!draft)throw Error('Generate a route first.');const title=$('personalRouteName').value.trim();if(!title)throw Error('Give your route a name.');draft={...draft,title};store.save(draft);renderSaved();return draft;}

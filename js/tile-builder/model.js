@@ -1,14 +1,10 @@
-import {filterSignalApproaches} from './signals.js';
+import {refineTrack} from './refine.js';
 import {streetData} from './street-data.js';
 import {boundsCheck} from '../personal/geometry.js';
 import {convertOSM} from '../personal/geo/osm.js';
-import {buildNet} from '../net.js';
-import {applyMappedRoadTags} from '../mapped-road-tags.js';
 import {tileSurfaces} from './surfaces.js';
 import {polygonOperation} from '../road-surfaces.js';
-import {joinMappedPaths} from '../path-joins.js';
-import {correctApproaches} from '../junction-approaches.js';
-import {objectRings,fitRoadCorners} from '../roadside-clearance.js';
+import {objectRings} from '../roadside-clearance.js';
 
 import {tileSelection,TILE_SIZE} from './selection.js';
 export {tileSelection} from './selection.js';
@@ -19,11 +15,7 @@ export function generateTile(data,center){
   if(data?.remark)throw Error('The provider returned incomplete map data. Please retry.');
   if(!Array.isArray(data?.elements)||data.elements.length>60000)throw Error('This square contains too much map data. Move it to a less dense area and retry.');
   const track=convertOSM(data,selection.dataBounds,{boundsCheck,makeTrack,object,preserveSourceGeometry:true,limits:{elements:60000,nodes:120000,edges:20000,objects:20000}});
-  const signalFilter=filterSignalApproaches(track,data);track.network=signalFilter.network;track.osm.signalSources=signalFilter.sources;track.osm.omittedSignalApproaches=signalFilter.omitted;
-  track.objects=joinMappedPaths(track.objects);
-  let net=buildNet(track.network,{tidyLines:false});applyMappedRoadTags(net,track.osm?.ways);fitRoadCorners(net,track.objects);
-  const corrected=correctApproaches(track.network,net);track.network=corrected.network;
-  net=buildNet(track.network,{tidyLines:false});applyMappedRoadTags(net,track.osm?.ways);fitRoadCorners(net,track.objects);
+  const net=refineTrack(track,data);
   const edge=TILE_SIZE/2,core=[[[[-edge,-edge],[edge,-edge],[edge,edge],[-edge,edge]]]];
   const surfaces=tileSurfaces(net,track.objects,core);
   const land=[];let occupied=[];

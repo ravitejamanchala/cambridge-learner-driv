@@ -1,3 +1,4 @@
+import {addStreet} from './tile-builder/street-renderer.js';
 import {applyMappedRoadTags} from './mapped-road-tags.js';
 import {roadsidePosition} from './road-space.js';
 import {objectBlocker,fitRoadCorners} from './roadside-clearance.js';
@@ -95,6 +96,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   }
 
   for (const e of net.edges) {
+    if(options.refinedMarkings)continue;
     if (isMway(e.way)) { motorwayEdge(e); continue; }
     const wy = e.way, w = wy.w, A = accFor(e.px[0], e.pz[0]), pave = A.pave, road = A.road, white = A.white;
     if(!joined){ribbon(pave, e, -(w / 2 + 2.6), w / 2 + 2.6, 0.02);
@@ -117,12 +119,12 @@ export function buildWorld(scene, net, traffic, options = {}) {
   }
   // rounded kerbs at junction corners (see net.js junctionFillets)
   if(!joined)for (const f of net.fillets) { const road = accFor(f.C[0], f.C[1]).road; for (let k = 0; k < f.pts.length - 1; k++) road.quad(f.C[0], f.C[1], f.pts[k][0], f.pts[k][1], f.pts[k + 1][0], f.pts[k + 1][1], f.pts[k + 1][0], f.pts[k + 1][1], 0.04); }
-  for (const st of net.stops) bar(accFor(st.x, st.z).white, st, st.e.way.oneway ? -st.w / 2 + 0.3 : 0.2, st.w / 2 - 0.3, 0.35);
-  for (const g of net.giveways) {
+  if(!options.refinedMarkings)for (const st of net.stops) bar(accFor(st.x, st.z).white, st, st.e.way.oneway ? -st.w / 2 + 0.3 : 0.2, st.w / 2 - 0.3, 0.35);
+  if(!options.refinedMarkings)for (const g of net.giveways) {
     const white = accFor(g.x, g.z).white;
     for (const back of [0, 0.7]) for (let o = 0.3; o < g.w / 2 - 0.3; o += 1) bar(white, g, o, Math.min(o + 0.55, g.w / 2 - 0.3), 0.25, back);
   }
-  for (const z of net.zebras) {
+  if(!options.refinedMarkings)for (const z of net.zebras) {
     const white = accFor(z.x, z.z).white;
     for (let o = -z.w / 2 + 0.3; o < z.w / 2 - 0.3; o += 1) {
       const o2 = Math.min(o + 0.5, z.w / 2 - 0.2), nx = z.tz, nz = -z.tx;
@@ -132,7 +134,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   // KEEP CLEAR (diagram 1026) across the lanes of one direction, only where configured: the words read
   // from the approaching driver, KEEP nearest, elongated as road text is so it reads at a shallow angle
   const keepClear = [], textMats = [];
-  for (const k of net.keepClear || []) {
+  for (const k of options.refinedMarkings?[]:net.keepClear || []) {
     const L = laneInfo(k.e, k.dir);
     for (let i = 0; i < L.n; i++) {
       const off = (L.outer - L.laneW * (i + 0.5)) * k.dir, w = Math.min(2.6, L.laneW - 0.5);
@@ -149,7 +151,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     for (const k of keepClear) { const m = new T.Mesh(g, mats[k.word]); m.position.set(k.x, 0.08, k.z); m.rotation.y = k.yaw; m.scale.set(k.w, 1, 3.2); m.renderOrder = 5; m.userData.keepClear = k.word; scene.add(m); }
   }
   // yellow box junctions (diagram 1043): a yellow border and criss-cross lines over the whole crossing (issue #5)
-  for (const [i, b] of (net.boxes || []).entries()) {
+  for (const [i, b] of (options.refinedMarkings?[]:net.boxes || []).entries()) {
     const A = boxArea(net, b.node, i); if (!A) continue;
     const mat = new T.MeshBasicMaterial({ map: boxTexture(A.hl * 2, A.hw * 2), transparent: true, depthWrite: false }); textMats.push(mat);
     const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
@@ -203,6 +205,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
       const A=accFor(tile.x,tile.z);(A.surfaces||=[]).push({tile,kind,mat,y,order});
     }
   }
+  if(options.refinedMarkings)for(const tile of options.surfaceTiles||[]){const A=accFor(tile.x,tile.z);(A.detailTiles||=[]).push(tile);}
   for (const [key, A] of roadChunks) {
     for (const [acc, mat, ord] of [[A.pave, pm, 1], [A.road, rm, 2], [A.cyc, cm, 3], [A.white, wm, 4]]) {
       if (!acc.idx.length) continue; const m = acc.mesh(mat, ord); m.frustumCulled = true; m.receiveShadow = true; A.meshes.push(m); scene.add(m);
@@ -210,6 +213,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
     A.bounds = new T.Box3();
     for(const m of A.meshes){m.geometry.computeBoundingBox();A.bounds.union(m.geometry.boundingBox);}
     for(const {tile}of A.surfaces||[])for(const [x,z]of [[tile.bounds[0],tile.bounds[1]],[tile.bounds[2],tile.bounds[3]]])A.bounds.expandByPoint(new T.Vector3(x,0,z));
+    for(const tile of A.detailTiles||[])for(const [x,z]of [[tile.bounds[0],tile.bounds[1]],[tile.bounds[2],tile.bounds[3]]])A.bounds.expandByPoint(new T.Vector3(x,0,z));
     A.cx = Math.floor(key / 8192) - 4000; A.cz = (key % 8192) - 4000; A.pave = A.road = A.cyc = A.white = null;
   }
   // bike symbols painted in cycle lanes
@@ -291,7 +295,7 @@ export function buildWorld(scene, net, traffic, options = {}) {
   }));
   for (const m of [bPole, globes]) { m.frustumCulled = false; scene.add(m); }
 
-  buildSigns(scene, net, {blocked,placements});
+  buildSigns(scene, net, {blocked,placements,laneGuidance:!options.refinedMarkings});
 
   // Central reservation: a concrete step barrier along the motorway's centre line, one instance per
   // segment so the whole circuit is a single draw call.
@@ -389,11 +393,12 @@ export function buildWorld(scene, net, traffic, options = {}) {
     for (const A of roadChunks.values()) {
       const radius=Math.max(WORLD.hideRadius+200,viewRadius),vis = roadBoundsVisible(A.bounds, px, pz, radius), far = !roadBoundsVisible(A.bounds, px, pz, Math.max(WORLD.freeRadius,radius+200));
       if(vis&&A.surfaces){for(const {tile,kind,mat,y,order}of A.surfaces){const m=new T.Mesh(kind==='road'?surfaceGeometry(T,tile[kind]):raisedSurfaceGeometry(T,tile[kind],{bounds:tile.bounds}),mat);m.position.y=y;m.renderOrder=order;m.receiveShadow=true;m.userData.roadSurface=kind;A.meshes.push(m);scene.add(m);m.updateMatrixWorld(true);m.matrixAutoUpdate=false;}A.surfaces=null;}
+      if(vis&&A.detailTiles){for(const tile of A.detailTiles){const group=new T.Group();group.userData.refinedMarkings=true;addStreet(group,tile,[],{paintOnly:true});scene.add(group);group.updateMatrixWorld(true);group.traverse(o=>{o.matrixAutoUpdate=false;});A.meshes.push(group);}A.detailTiles=null;}
       for (const m of A.meshes) m.visible = vis;
       // The road itself is built once for the whole map, but a hidden mesh keeps its GPU buffers from
       // the last time it was drawn, so a lap of the motorway left every section it had passed on the
       // GPU. Far behind, give the buffers back; the geometry stays here and uploads again on return.
-      if (far && A.onGpu) { for (const m of A.meshes) m.geometry.dispose(); A.onGpu = false; }
+      if (far && A.onGpu) { for (const m of A.meshes) m.traverse(o=>o.geometry?.dispose()); A.onGpu = false; }
       else if (vis) A.onGpu = true;
     }
   }
