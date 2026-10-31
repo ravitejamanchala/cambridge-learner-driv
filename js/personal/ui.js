@@ -15,20 +15,30 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
       <p id="pinSummary" class="muted">Find your area, then click the map to place A and B. Drag either pin to adjust.</p>
       <button class="cbtn centre-pin" id="pinAtCentre">Set start at map centre</button>
       <button class="cbtn go generate-route" id="generatePersonalRoute" disabled>Generate route</button>
-      <p id="personalRouteStatus" role="status" aria-live="polite"></p><button class="cbtn" id="cancelRouteRequest" hidden>Cancel</button>
+      <p id="personalRouteStatus" role="status" aria-live="polite"></p>
       <div id="routeReady" hidden><p id="routeDistance"></p><label for="personalRouteName">Route name</label><input id="personalRouteName" maxlength="120" type="text"><p class="muted" id="routeSnap"></p><div class="route-actions"><button class="cbtn" id="savePersonalRoute">Save route</button><button class="cbtn go" id="drivePersonalRoute">Save &amp; drive</button><button class="cbtn go" id="mockPersonalRoute" hidden>Start graded mock test</button></div></div>
       <p class="route-note">Generated roads may differ from real life. Routes over 6 miles can also be driven as a graded mock test: 15 or fewer driving faults and no serious faults to pass. Mock results stay on this device.</p>
     </div><div class="personal-map-column"><div id="personalRouteMap" role="region" aria-label="Choose start and finish on the map"></div><p id="mapTileStatus" role="status" hidden>Map tiles could not load. Check your connection; your pins and route are kept.</p></div></div>
     <section class="personal-library"><div class="route-library-title"><h3>Saved on this device</h3><p>Routes stay in this browser. Clearing site data removes them. No account sync yet.</p></div><div id="personalSavedRoutes"></div></section>
     <footer class="route-credits">Map data and tiles © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL</a> · Routing <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>. Searches and pins are sent to map providers to generate your route.</footer>
-  </div>`;
+  </div><div id="personalRouteLoading" class="personal-route-loading" hidden role="dialog" aria-modal="true" aria-labelledby="routeLoadingHeading"><div class="route-loading-panel"><span class="route-loading-spinner" aria-hidden="true"></span><h3 id="routeLoadingHeading">Getting your route ready</h3><p id="routeLoadingStatus" role="status" aria-live="polite" aria-atomic="true"></p><button class="cbtn" id="cancelRouteRequest">Cancel</button></div></div>`;
   document.body.append(sheet);const $=id=>sheet.querySelector('#'+id),status=$('personalRouteStatus'),store=routeStore();
   const map=L.map($('personalRouteMap'),{zoomControl:true}).setView([52.2053,.1218],13);
   const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
   tiles.on('tileerror',()=>{$('mapTileStatus').hidden=false;});tiles.on('tileload',()=>{$('mapTileStatus').hidden=true;});
   let choice=0,pins=[null,null],markers=[null,null],line=null,draft=null,controller=null,sequence=0,journey=null,place='My route',busy=false;
-  const say=text=>{status.textContent=text;};
-  function setBusy(value){busy=value;$('generatePersonalRoute').disabled=value||!pins.every(Boolean);$('cancelRouteRequest').hidden=!value;for(const id of ['savePersonalRoute','drivePersonalRoute','mockPersonalRoute'])$(id).disabled=value;}
+  const say=text=>{status.textContent=text;$('routeLoadingStatus').textContent=text;};
+  let loadingFocus=null;
+  function setBusy(value){
+    const wasBusy=busy;busy=value;
+    if(value&&!wasBusy)loadingFocus=document.activeElement;
+    $('generatePersonalRoute').disabled=value||!pins.every(Boolean);
+    for(const id of ['savePersonalRoute','drivePersonalRoute','mockPersonalRoute'])$(id).disabled=value;
+    const card=sheet.querySelector('.card');card.inert=value;card.setAttribute('aria-busy',String(value));
+    $('personalRouteLoading').hidden=!value;status.hidden=value;
+    if(value&&!wasBusy)$('cancelRouteRequest').focus();
+    else if(!value&&wasBusy){if(loadingFocus?.isConnected&&loadingFocus.getClientRects().length&&!loadingFocus.disabled)loadingFocus.focus();loadingFocus=null;}
+  }
   function cancel(){sequence++;controller?.abort();controller=null;journey?.cancel();journey=null;setBusy(false);}
   function invalidate(){cancel();draft=null;$('routeReady').hidden=true;if(line){line.remove();line=null;}say('');}
   function select(which){choice=which;$('chooseStart').setAttribute('aria-pressed',String(which===0));$('chooseEnd').setAttribute('aria-pressed',String(which===1));$('pinAtCentre').textContent=`Set ${which?'finish':'start'} at map centre`;}
@@ -64,7 +74,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   $('savePersonalRoute').onclick=()=>{try{save();say('Saved on this device.');}catch(e){say(e.message);}};
   async function drive(recipe,graded=false){
     if(graded&&!eligibleForMock(recipe)){say('A graded mock needs a route longer than 6 miles.');return;}if(!canDrive(graded)){requestLogin();return;}cancel();const token=sequence;setBusy(true);journey=createJourney(recipe,{store,onStatus:text=>{if(token===sequence)say(text);}});
-    try{const world=await journey.prepare();if(token!==sequence)return;const selected=journey;await onDrive(selected,world,{graded});if(token!==sequence)return;journey=null;sheet.hidden=true;setBusy(false);}
+    try{const world=await journey.prepare();if(token!==sequence)return;const selected=journey;say('Starting your drive…');await onDrive(selected,world,{graded});if(token!==sequence)return;journey=null;sheet.hidden=true;setBusy(false);}
     catch(e){if(token===sequence&&e.name!=='AbortError')say(e.message);if(token===sequence){journey?.cancel();journey=null;setBusy(false);}}
   }
   $('drivePersonalRoute').onclick=()=>{try{drive(save());}catch(e){say(e.message);}};
@@ -83,7 +93,7 @@ export function createRoutesUI({onDrive,onClose,canDrive,requestLogin}) {
   }
   function close(){cancel();sheet.hidden=true;onClose?.();}
   sheet.querySelector('.x').onclick=close;sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
-  sheet.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();close();}if(e.key==='Tab'){const items=[...sheet.querySelectorAll('button,input,a[href],[tabindex="0"]')].filter(e=>!e.disabled&&e.getClientRects().length),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+  sheet.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();if(busy){cancel();say('Cancelled. Your saved routes are kept.');}else close();}if(e.key==='Tab'){const items=[...sheet.querySelectorAll('button,input,a[href],[tabindex="0"]')].filter(e=>!e.disabled&&!e.closest('[inert]')&&e.getClientRects().length),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
   window.addEventListener('storage',e=>{if(e.key?.startsWith('slaydrive.personal-routes'))renderSaved();});
   window.addEventListener('learner-access-change',()=>{if(!canDrive()&&busy){cancel();say('Sign in again to drive your saved route.');}});
   const fit=()=>{map.invalidateSize({pan:false});if(line)map.fitBounds(line.getBounds(),{padding:[32,32],maxZoom:16});};

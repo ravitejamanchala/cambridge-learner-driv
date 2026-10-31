@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "counts": "1595 buildings · 10 road surfaces · 1595 estimated building heights · OSM 2026-08-10",
+  "drawCalls": 165,
+  "sourceFixture": "/tmp/cambridge-junction-osm.json",
+  "checks": [
+    "visible map and one kilometre square",
+    "search and select",
+    "drag centre",
+    "1200 m buffered request",
+    "real 3D render",
+    "street asset coverage",
+    "road guidance toggle",
+    "batched draw call budget",
+    "orbit",
+    "reset view",
+    "changed selection invalidates old tile",
+    "cancel",
+    "error and retry",
+    "mobile overflow"
+  ],
+  "liveProviders": false
+}

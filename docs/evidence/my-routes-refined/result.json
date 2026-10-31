@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
+  "searchRequests": 1,
+  "routeRequests": 2,
+  "osmRequests": 7,
+  "buildings": 49,
+  "performance": {
+    "chunks": 14,
+    "geometries": 108,
+    "textures": 12,
+    "calls": 126,
+    "triangles": 8471,
+    "programs": 15,
+    "heap": 43
+  },
+  "loaderCancellation": true,
+  "loaderMobileAndKeyboard": true,
+  "preparedWholeRoute": true,
+  "boundaryWithoutReload": true,
+  "offlineWhileDriving": true,
+  "preflightFailureRecovery": true,
+  "gradedMockPassAndFail": true,
+  "courseRoadLessons": 9,
+  "voiceMute": true
+}

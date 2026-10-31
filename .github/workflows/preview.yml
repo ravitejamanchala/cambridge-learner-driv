@@ -59,6 +59,8 @@ jobs:
           EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify personal route interactions
         run: node tests/personal-routes-browser.mjs
+      - name: Verify road marking renderer
+        run: node tests/tile-markings-browser.mjs
       - name: Verify mobile panels
         run: node tests/modal-layout-browser.mjs
       - name: Verify live map providers separately

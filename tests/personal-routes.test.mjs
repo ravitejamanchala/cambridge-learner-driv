@@ -72,3 +72,17 @@ test('cancelled section requests do not finish or write map cache',async()=>{
  const journey=createJourney(recipe(),{store:{getSection:()=>null,putSection:()=>writes++},fetchSection:async(_,options)=>{await abortableDelay(500,options.signal);return{};},generate:()=>({})});
  const request=journey.prepare();journey.cancel();await assert.rejects(request,e=>e.name==='AbortError');assert.equal(writes,0);assert.equal(journey.cancelled,true);
 });
+
+test('refined personal drives retain road paint beyond the inspector square and use native simulator buildings',async()=>{
+ const {generateRoute}=await import('../js/personal/section.js'),{roadFixture}=await import('./personal-route-fixture.mjs');
+ const start=[.12,52.2],end=[.12,52.22],fixture=roadFixture(start,end),route=measure(fixture.coordinates),parts=Array.from({length:Math.ceil(route.length/600)},(_,i)=>section(route,i));
+ const bounds=[Math.min(...parts.map(p=>p.bounds[0])),Math.min(...parts.map(p=>p.bounds[1])),Math.max(...parts.map(p=>p.bounds[2])),Math.max(...parts.map(p=>p.bounds[3]))];
+ const track=generateRoute(fixture.osm,{bounds,coordinates:fixture.coordinates,sourceSections:parts.length});
+ assert.equal(track.refinedMarkings,true);assert.equal(track.buildingStyle,'simulator');assert.equal(track.practiceMode,'experimental');
+ assert.ok(track.objects.some(o=>o.type==='building'));assert.ok(track.surfaceTiles.some(t=>Math.abs(t.z)>500&&t.paint.length));
+ const n=(await import('../js/net.js')).buildNet(track.renderNetwork);
+ const inRing=(p,ring)=>{let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a[1]>p.z)!==(b[1]>p.z)&&p.x<(b[0]-a[0])*(p.z-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;};
+ const onRoad=p=>track.surfaceTiles.some(t=>t.road.some(poly=>inRing(p,poly[0])&&!poly.slice(1).some(r=>inRing(p,r))));
+ for(let s=10;s<route.length-10;s+=20)assert.ok(onRoad(project(n,at(route,s))),`road missing at ${s} m`);
+ const clone=JSON.parse(JSON.stringify(track));assert.equal(clone.mapCoverage.generator,'refined-tile-v1');assert.ok(clone.surfaceTiles.every(t=>t.bounds.length===4));
+});

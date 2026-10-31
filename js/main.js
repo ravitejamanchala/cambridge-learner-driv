@@ -124,8 +124,8 @@ async function boot() {
       // Local navigation inserts waypoint nodes; the original graph keeps road
       // paint continuous through those artificial cuts. Signals share cluster/group
       // identifiers with traffic, so both graphs display the same live phase.
-      const visualNet = d.renderNetwork ? buildNet(d.renderNetwork) : net;
-      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],surfaceTiles:d.renderTiles?d.surfaceTiles:undefined,osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
+      const visualNet = d.renderNetwork ? buildNet(d.renderNetwork,{tidyLines:!d.refinedMarkings}) : net;
+      const world = buildWorld(scene, visualNet, traffic, {objects:d.objects||[],surfaceTiles:d.renderTiles?d.surfaceTiles:undefined,refinedMarkings:!!d.refinedMarkings,osmWays:d.osm?.ways,authored: d.sceneryMode !== "procedural" && (!!d.network || d.sceneryMode === "authored")});
       const authoredTiles=d.renderTiles?createAuthoredTiles(T,scene,d,visualNet,{joinedPavements:world.joinedPavements}):null;
       if(d.network&&!authoredTiles)addEditorObjects(T,scene,d,visualNet,{joinedPavements:world.joinedPavements});
       world.setShadows(shadowsOn && !lowPower);
