@@ -40,8 +40,14 @@ export async function handleMapRequest(request,env={},deps={}) {
   try{
     let target=upstream;
     if(path==='tile-details'){const provider=new URL(upstream),query=provider.searchParams.get('data');provider.search='';target=provider.href;options={...options,method:'POST',headers:{...options.headers,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({data:query}).toString()};}
-    const response=await fetcher(target,options);
-    if(!response.ok)return json({message:response.status===429?'The map provider is busy. Please wait and retry.':response.status===400&&path==='route'?'The routing provider cannot connect these pins. Choose points on connected public roads.':'The map provider is unavailable. Please retry shortly.'},response.status===429?429:502,{'Retry-After':response.headers.get('Retry-After')||'6'});
+    let response;
+    if(path==='tile-details'){
+      // Independent public mirror for outages only. A rate limit or other 4xx
+      // response is returned to the caller, never evaded by switching servers.
+      const providers=[target,'https://overpass.private.coffee/api/interpreter'];
+      for(let i=0;i<providers.length;i++){try{response=await fetcher(providers[i],{...options,signal:AbortSignal.timeout(15000)});if(response.status<500||i===providers.length-1)break;await response.body?.cancel();}catch(e){if(i===providers.length-1)throw e;}}
+    }else response=await fetcher(target,options);
+    if(!response.ok)return json({providerStatus:response.status,message:response.status===429?'The map provider is busy. Please wait and retry.':response.status===400&&path==='route'?'The routing provider cannot connect these pins. Choose points on connected public roads.':'The map provider is unavailable. Please retry shortly.'},response.status===429?429:502,{'Retry-After':response.headers.get('Retry-After')||'6'});
     // Bound response size without buffering an unbounded provider response.
     const reader=response.body.getReader(),chunks=[];let size=0;
     try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>12*1024*1024){await reader.cancel();return json({message:'The map provider response was too large. Try a less detailed route or retry later.'},422);}chunks.push(value);}}finally{reader.releaseLock();}

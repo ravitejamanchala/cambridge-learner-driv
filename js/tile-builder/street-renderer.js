@@ -3,17 +3,23 @@ import {BufferGeometryUtils} from 'three/examples/jsm/utils/BufferGeometryUtils.
 import {mappedAppearance} from '../mapped-scenery.js';
 import {buildNet} from '../net.js';
 import {surfaceGeometry} from '../road-surfaces.js';
-import {arrowTex,speedSignTex,giveWaySignTex,noEntryTex} from '../signs.js';
-import {roadText,boxTexture} from '../world.js';
+import {applyMappedRoadTags} from '../mapped-road-tags.js';
+import {objectBlocker} from '../roadside-clearance.js';
+import {invalidateRoadSpace} from '../road-space.js';
+import {buildSigns,arrowTex,speedSignTex,giveWaySignTex,noEntryTex} from '../signs.js';
+import {roadText} from '../world.js';
 
 // Original simulator assets, batched within this disposable preview scene.
-export function addStreet(parent,street){
+export function addStreet(parent,street,buildings=[]){
  const solids=new T.Group(),guidance=new T.Group();parent.add(solids,guidance);
  const color=c=>new T.Color(c).convertSRGBToLinear();
  const solid=(geo,c,x=0,y=0,z=0)=>{const m=new T.Mesh(geo,new T.MeshLambertMaterial({color:color(c)}));m.position.set(x,y,z);solids.add(m);return m;};
- const net=buildNet(street.network);
+ const net=buildNet(street.network,{tidyLines:false});applyMappedRoadTags(net,street.sourceWays);net.fillets=street.fillets;invalidateRoadSpace(net);
+ const blockers=buildings.map(b=>{const xs=b.rings[0].map(p=>p[0]),zs=b.rings[0].map(p=>p[1]);return {type:'building',x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2,y:b.bottom,sx:Math.max(...xs)-Math.min(...xs),sz:Math.max(...zs)-Math.min(...zs),rotation:0,properties:{footprint:b.rings[0].map(([x,z])=>({x,z})),holes:b.rings.slice(1).map(r=>r.map(([x,z])=>({x,z})))}};});
+ buildSigns(parent,net,{blocked:objectBlocker(blockers),laneGuidance:false});
  for(const o of street.objects){const m=new T.Mesh(new T.BoxGeometry(),new T.MeshLambertMaterial());m.position.set(o.x,o.y+o.sy/2,o.z);m.rotation.y=o.rotation;m.scale.set(o.sx,o.sy,o.sz);mappedAppearance(T,m,o,net);m.traverse(c=>{for(const mat of [].concat(c.material||[]))mat.color?.convertSRGBToLinear();});solids.add(m);}
  for(const p of street.signals){
+  if(p.role==='pedestrian'){solid(new T.CylinderGeometry(.04,.05,1.5,6),0x4b5154,p.x,.75,p.z);const head=solid(new T.BoxGeometry(.3,.5,.18),0x262c2b,p.x,1.3,p.z);head.rotation.y=Math.atan2(-p.tx,-p.tz);const person=new T.Group();const red=new T.MeshBasicMaterial({color:0xed504c});const skull=new T.Mesh(new T.CircleGeometry(.035,8),red);skull.position.set(0,.11,.096);person.add(skull);const body=new T.Mesh(new T.PlaneGeometry(.035,.11),red);body.position.set(0,.03,.096);person.add(body);for(const side of [-1,1]){const leg=new T.Mesh(new T.PlaneGeometry(.025,.09),red);leg.position.set(side*.025,-.055,.096);person.add(leg);}head.add(person);continue;}
   solid(new T.CylinderGeometry(.075,.09,3.9,8),0x4b5154,p.x,1.95,p.z);
   const head=solid(new T.BoxGeometry(.48,1.4,.34),0x262c2b,p.x,3.35,p.z);head.rotation.y=Math.atan2(-p.tx,-p.tz);
   for(let i=0;i<3;i++){const lamp=new T.Mesh(new T.CircleGeometry(.16,12),new T.MeshLambertMaterial({color:color([0x793330,0x796537,0x315942][i])}));lamp.position.set(0,.43-i*.43,.176);head.add(lamp);}
@@ -31,10 +37,12 @@ export function addStreet(parent,street){
  for(const p of street.texts){const key='text:'+p.text;if(!batches.has(key))batches.set(key,{tex:()=>roadText(p.text),items:[]});batches.get(key).items.push(p);}
  for(const [key,b]of batches)textured(key,b.tex,floor(),b.items);
  if(street.paint.length)solid(surfaceGeometry(T,street.paint),0xf2f1ea,0,.07,0);
+ if(street.tactile?.length)solid(surfaceGeometry(T,street.tactile),0xd6b38b,0,.045,0);
  const outlines=[];
  for(const polygon of street.parking)for(const ring of polygon)for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length];outlines.push(a[0],.09,a[1],b[0],.09,b[1]);}
  if(outlines.length){const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(outlines,3));parent.add(new T.LineSegments(geo,new T.LineBasicMaterial({color:0xf2f1ea})));}
- for(const polygon of street.boxes){const geo=surfaceGeometry(T,[polygon]),pos=geo.attributes.position;geo.computeBoundingBox();const b=geo.boundingBox,w=Math.max(1,b.max.x-b.min.x),l=Math.max(1,b.max.z-b.min.z),uv=[];for(let i=0;i<pos.count;i++)uv.push((pos.getX(i)-b.min.x)/w,(pos.getZ(i)-b.min.z)/l);geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));const m=new T.Mesh(geo,new T.MeshBasicMaterial({map:boxTexture(l,w),transparent:true,depthWrite:false,side:T.DoubleSide}));m.position.y=.085;m.renderOrder=3;parent.add(m);}
+ for(const path of street.paths||[])solid(surfaceGeometry(T,path.polygons),path.kind==='cycleway'?0xa3aaa5:0xc4bba8,0,.02,0);
+ if(street.yellowPaint?.length){const m=new T.Mesh(surfaceGeometry(T,street.yellowPaint),new T.MeshBasicMaterial({color:0xf0c419,side:T.DoubleSide}));m.position.y=.085;parent.add(m);}
  function stopTexture(){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const g=canvas.getContext('2d');g.fillStyle='#cf2333';g.strokeStyle='white';g.lineWidth=5;g.beginPath();for(let i=0;i<8;i++){const a=(i+.5)*Math.PI/4,x=64+59*Math.cos(a),y=64+59*Math.sin(a);i?g.lineTo(x,y):g.moveTo(x,y);}g.closePath();g.fill();g.stroke();g.fillStyle='white';g.font='bold 32px sans-serif';g.textAlign='center';g.fillText('STOP',64,75);return new T.CanvasTexture(canvas);}
  const signGroups=new Map();
  for(const p of street.signs){solid(new T.CylinderGeometry(.04,.05,2.3,6),0x777f82,p.x,1.15,p.z);const k=p.kind+':'+p.value;if(!signGroups.has(k))signGroups.set(k,{p,items:[]});signGroups.get(k).items.push(p);}

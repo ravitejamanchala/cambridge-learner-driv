@@ -22,10 +22,10 @@ export function roadSpace(net){
  const overlaps=(rings,margin=0)=>{const r=rings[0],xs=r.map(p=>p[0]),zs=r.map(p=>p[1]),solid=p=>insideRing(p,r)&&!rings.slice(1).some(h=>insideRing(p,h));return nearby(Math.min(...xs)-margin,Math.min(...zs)-margin,Math.max(...xs)+margin,Math.max(...zs)+margin).filter(p=>solidOverlap(rings,p.ring,margin)).map(p=>p.edge);};
  const result={patches,nearby,disk,overlaps};cache.set(net,result);return result;
 }
-export function roadsidePosition(net,feature,{radius=.4,side=1,blocked=()=>false}={}){
+export function roadsidePosition(net,feature,{radius=.4,side=1,sideOnly=false,blocked=()=>false}={}){
  const space=roadSpace(net),nx=feature.tz,nz=-feature.tx;
  // Never fall back to an unsafe point if every candidate fails.
- for(const sd of [side,-side])for(const extra of [0,.75,1.5,2.5,4,6])for(const back of [0,1.5,3,5,8,12]){
+ for(const sd of (sideOnly?[side]:[side,-side]))for(const extra of [0,.75,1.5,2.5,4,6])for(const back of [0,1.5,3,5,8,12]){
   const off=sd*(feature.w/2+.8+radius+extra),x=feature.x+nx*off-feature.tx*back,z=feature.z+nz*off-feature.tz*back;
   if(!space.disk(x,z,radius+.35)&&!net.cycleRings.some(r=>Math.abs(Math.hypot(x-r.x,z-r.z)-r.r)<1.8+radius)&&!blocked(x,z,radius))return {x,z};
  }

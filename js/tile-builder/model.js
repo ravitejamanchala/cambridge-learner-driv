@@ -1,10 +1,14 @@
+import {filterSignalApproaches} from './signals.js';
 import {streetData} from './street-data.js';
 import {boundsCheck} from '../personal/geometry.js';
 import {convertOSM} from '../personal/geo/osm.js';
 import {buildNet} from '../net.js';
 import {applyMappedRoadTags} from '../mapped-road-tags.js';
-import {joinedRoadSurfaces,polygonOperation} from '../road-surfaces.js';
-import {objectRings} from '../roadside-clearance.js';
+import {tileSurfaces} from './surfaces.js';
+import {polygonOperation} from '../road-surfaces.js';
+import {joinMappedPaths} from '../path-joins.js';
+import {correctApproaches} from '../junction-approaches.js';
+import {objectRings,fitRoadCorners} from '../roadside-clearance.js';
 
 import {tileSelection,TILE_SIZE} from './selection.js';
 export {tileSelection} from './selection.js';
@@ -15,9 +19,13 @@ export function generateTile(data,center){
   if(data?.remark)throw Error('The provider returned incomplete map data. Please retry.');
   if(!Array.isArray(data?.elements)||data.elements.length>60000)throw Error('This square contains too much map data. Move it to a less dense area and retry.');
   const track=convertOSM(data,selection.dataBounds,{boundsCheck,makeTrack,object,preserveSourceGeometry:true,limits:{elements:60000,nodes:120000,edges:20000,objects:20000}});
-  const net=buildNet(track.network);applyMappedRoadTags(net,track.osm?.ways);
+  const signalFilter=filterSignalApproaches(track,data);track.network=signalFilter.network;track.osm.signalSources=signalFilter.sources;track.osm.omittedSignalApproaches=signalFilter.omitted;
+  track.objects=joinMappedPaths(track.objects);
+  let net=buildNet(track.network,{tidyLines:false});applyMappedRoadTags(net,track.osm?.ways);fitRoadCorners(net,track.objects);
+  const corrected=correctApproaches(track.network,net);track.network=corrected.network;
+  net=buildNet(track.network,{tidyLines:false});applyMappedRoadTags(net,track.osm?.ways);fitRoadCorners(net,track.objects);
   const edge=TILE_SIZE/2,core=[[[[-edge,-edge],[edge,-edge],[edge,edge],[-edge,edge]]]];
-  const surfaces=joinedRoadSurfaces(net,track.objects).map(t=>Object.fromEntries(['road','pave','kerb'].map(k=>[k,polygonOperation(t[k],core,'intersection')])));
+  const surfaces=tileSurfaces(net,track.objects,core);
   const land=[];let occupied=[];
   for(const kind of ['water','plaza','parking','sports','garden','forest','park','grass','sand','industrial']){
     const input=track.objects.filter(o=>o.properties.mapFeature===kind&&o.properties.footprint).map(objectRings);if(!input.length)continue;
@@ -29,5 +37,5 @@ export function generateTile(data,center){
     const clipped=polygonOperation([objectRings(o)],core,'intersection');
     for(const rings of clipped)buildings.push({id:o.properties.osmId||o.id,rings,height:o.sy,bottom:o.y||0,estimated:!!o.properties.heightEstimated,type:o.properties.tags?.building||'yes'});
   }
-  return {selection,surfaces,land,buildings,street:streetData(track,net,data,core),source:{provider:'OpenStreetMap',attribution:'© OpenStreetMap contributors · ODbL',timestamp:track.osm.dataTimestamp},stats:{buildings:buildings.length,estimatedHeights:buildings.filter(b=>b.estimated).length,roadPolygons:surfaces.reduce((n,t)=>n+t.road.length,0)},notes:['Flat terrain for this prototype.','Road widths and untagged building heights use estimates.','Lane arrows and road text use source tags; their placement is estimated.']};
+  return {selection,surfaces,land,buildings,street:streetData(track,net,data,core,surfaces[0]),source:{provider:'OpenStreetMap',attribution:'© OpenStreetMap contributors · ODbL',timestamp:track.osm.dataTimestamp},stats:{buildings:buildings.length,estimatedHeights:buildings.filter(b=>b.estimated).length,roadPolygons:surfaces.reduce((n,t)=>n+t.road.length,0)},notes:['Flat terrain for this prototype.','Road widths and untagged building heights use estimates.','Standard road markings are inferred when source tags are missing; exact box boundaries require mapped data.']};
 }

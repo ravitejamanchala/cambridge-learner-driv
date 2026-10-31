@@ -35,9 +35,9 @@ export function createViewer(container){
       geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));geometries.push(geometry);
     }
     if(geometries.length){const combined=BufferGeometryUtils.mergeBufferGeometries(geometries);geometries.forEach(g=>g.dispose());const material=new T.MeshLambertMaterial({vertexColors:true});group.add(new T.Mesh(combined,material));}
-    guidance=addStreet(group,tile.street);guidance.visible=guidesVisible;renderer.domElement.dataset.streetAssets=String(tile.street.objects.length);
+    guidance=addStreet(group,tile.street,tile.buildings);guidance.visible=guidesVisible;renderer.domElement.dataset.streetAssets=String(tile.street.objects.length);
     const border=new T.BufferGeometry().setFromPoints([[-500,-500],[500,-500],[500,500],[-500,500],[-500,-500]].map(([x,z])=>new T.Vector3(x,.1,z)));group.add(new T.Line(border,new T.LineBasicMaterial({color:0xe56a9f})));
     renderer.domElement.dataset.buildings=String(tile.buildings.length);renderer.domElement.dataset.center=tile.selection.center.join(',');reset();
   }
-  return {show,clear,reset,render,setGuides(value){guidesVisible=value;if(guidance)guidance.visible=value;render();},stats:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles})};
+  return {show,clear,reset,render,focus(x,z,{distance=180,azimuth=0,elevation=1.3}={}){controls.target.set(x,0,z);camera.position.set(x+distance*Math.cos(elevation)*Math.sin(azimuth),distance*Math.sin(elevation),z+distance*Math.cos(elevation)*Math.cos(azimuth));controls.update();render();},setGuides(value){guidesVisible=value;if(guidance)guidance.visible=value;render();},stats:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles})};
 }

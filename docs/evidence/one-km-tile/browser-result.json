@@ -1,8 +1,8 @@
 {
   "passed": true,
-  "counts": "1050 buildings · 121 road surfaces · 1047 estimated building heights · OSM 2026-08-10",
-  "drawCalls": 86,
-  "sourceFixture": "/tmp/cambridge-one-km-osm.json",
+  "counts": "1595 buildings · 10 road surfaces · 1595 estimated building heights · OSM 2026-08-10",
+  "drawCalls": 165,
+  "sourceFixture": "/tmp/cambridge-junction-osm.json",
   "checks": [
     "visible map and one kilometre square",
     "search and select",

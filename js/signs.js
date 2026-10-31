@@ -60,7 +60,7 @@ class Batch {
   }
 }
 
-export function buildSigns(scene, net, {blocked=()=>false,placements=[]}={}) {
+export function buildSigns(scene, net, {blocked=()=>false,placements=[],laneGuidance=true}={}) {
   const floorG = new T.PlaneGeometry(1, 1); floorG.rotateX(-Math.PI / 2);
   const floor = (tex) => { const m = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }); return new Batch(floorG, m, 5); };
   const plateG = new T.PlaneGeometry(1, 1), discG = new T.CircleGeometry(0.5, 24);
@@ -133,7 +133,7 @@ export function buildSigns(scene, net, {blocked=()=>false,placements=[]}={}) {
       // lane arrows where there are two or more lanes towards the junction
       // lane arrows (the same ones the examiner marks you on)
       const L = laneInfo(e, ad), codes = L.n >= 2 && e.len > 40 ? laneArrows(net, e, ad) : null;
-      if (codes) {
+      if (codes && laneGuidance) {
         const KIND = { L: 'left', S: 'ahead', R: 'right', LS: 'aheadleft', SR: 'aheadright' };
         const back0 = signals ? 4 : 0;
         codes.forEach((c, i) => { for (const back of [10, 32, 60]) if (back < e.len - 12) paint(arrowB(KIND[c] || 'ahead'), e, e.len - stopDist - back - back0, ad, laneCentre(e, ad, i), 1.1, 4.5); });
