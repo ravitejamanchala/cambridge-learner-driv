@@ -1,28 +1,38 @@
 {
-  "revision": "02a3af4054e8e989899c549fa30b827eb5fc8875",
-  "result": "failure",
+  "revision": "055dc6f8dd690f5428585a9c26b8e340bf51231b",
+  "result": "success",
   "visual": "success",
   "smoke": "success",
   "billing": {
-    "status": "skipped"
+    "status": "not-configured",
+    "missing": [
+      "PREVIEW_DATABASE_URL",
+      "PREVIEW_DATABASE_HOST",
+      "PREVIEW_CLERK_SECRET_KEY",
+      "PREVIEW_CLERK_PUBLISHABLE_KEY",
+      "PREVIEW_STRIPE_SECRET_KEY",
+      "PREVIEW_STRIPE_PRICE_ID"
+    ]
   },
   "url": "https://pr-26.learner-drive-app.pages.dev/",
-  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/41153630236",
-  "recordedAt": "2026-10-31T01:09:16.241Z",
-  "mobilePanels": null,
+  "run": "https://github.com/ravitejamanchala/cambridge-learner-driv/actions/runs/41155634954",
+  "recordedAt": "2026-10-31T01:33:25.547Z",
+  "mobilePanels": {
+    "passed": 48
+  },
   "personalRoutes": {
     "status": "passed",
     "source": "deterministic provider fixtures; real UI, converter, storage and simulator physics",
     "searchRequests": 1,
     "routeRequests": 1,
     "osmRequests": 7,
-    "buildings": 52,
+    "buildings": 50,
     "performance": {
       "chunks": 13,
-      "geometries": 112,
+      "geometries": 108,
       "textures": 12,
-      "calls": 130,
-      "triangles": 8073,
+      "calls": 126,
+      "triangles": 7918,
       "programs": 15,
       "heap": 38
     },
@@ -36,7 +46,7 @@
   },
   "mapProviders": {
     "source": "live providers through the deployed Pages map proxy",
-    "at": "2026-10-31T01:08:56.901Z",
+    "at": "2026-10-31T01:33:09.640Z",
     "checks": [
       "Cambridge search",
       "OSRM connected driving route",
